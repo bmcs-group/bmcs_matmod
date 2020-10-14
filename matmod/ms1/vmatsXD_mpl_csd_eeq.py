@@ -17,9 +17,7 @@ import numpy as np
 import traits.api as tr
 
 
-class MATS2DMplCSDEEQ(MATSBase, InteractiveModel):
-
-    concrete_type = tr.Int
+class MATSXDMplCSDEEQ(MATSBase, InteractiveModel):
 
     gamma_T = tr.Float(100000.,
                        label="Gamma",
@@ -353,59 +351,6 @@ class MATS2DMplCSDEEQ(MATSBase, InteractiveModel):
         MPTT_ijr = self._get__MPTT()
         return np.einsum('nija,...ij->...na', MPTT_ijr, eps_Emab)
 
-    #--------------------------------------------------------
-    # return the state variables (Damage , inelastic strains)
-    #--------------------------------------------------------
-    def _get_state_variables(self, eps_Emab,
-                             int_var, eps_aux):
-
-        e_N_arr = self._get_e_N_Emn_2(eps_Emab)
-        e_T_vct_arr = self._get_e_T_Emnar_2(eps_Emab)
-
-        omega_N_Emn = int_var[:, 0]
-        z_N_Emn = int_var[:, 1]
-        alpha_N_Emn = int_var[:, 2]
-        r_N_Emn = int_var[:, 3]
-        eps_N_p_Emn = int_var[:, 4]
-        sigma_N_Emn = int_var[:, 5]
-
-        omega_T_Emn = int_var[:, 9]
-        z_T_Emn = int_var[:, 10]
-        alpha_T_Emna = int_var[:, 11:13]
-        eps_T_pi_Emna = int_var[:, 13:15]
-
-
-        omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, Z_n, X_n, Y_n = self.get_normal_law(e_N_arr,  omega_N_Emn, z_N_Emn,
-                                                                                                        alpha_N_Emn, r_N_Emn, eps_N_p_Emn, eps_aux)
-
-        omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_T_Emna, Z_T, X_T, Y_T = self.get_tangential_law(e_T_vct_arr, omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn)
-
-        # Definition internal variables / forces per column:  1) damage N, 2)iso N, 3)kin N, 4)consolidation N, 5) eps p N,
-        # 6) sigma N, 7) iso F N, 8) kin F N, 9) energy release N, 10) damage T, 11) iso T, 12-13) kin T, 14-15) eps p T,
-        # 16-17) sigma T, 18) iso F T, 19-20) kin F T, 21) energy release T
-
-        int_var[:, 0] = omega_N_Emn
-        int_var[:, 1] = z_N_Emn
-        int_var[:, 2] = alpha_N_Emn
-        int_var[:, 3] = r_N_Emn
-        int_var[:, 4] = eps_N_p_Emn
-        int_var[:, 5] = sigma_N_Emn
-        int_var[:, 6] = Z_n
-        int_var[:, 7] = X_n
-        int_var[:, 8] = Y_n
-
-        int_var[:, 9] = omega_T_Emn
-        int_var[:, 10] = z_T_Emn
-        int_var[:, 11:13] = alpha_T_Emna
-        int_var[:, 13:15] = eps_T_pi_Emna
-        int_var[:, 15:17] = sigma_T_Emna
-        int_var[:, 17] = Z_T
-        int_var[:, 18:20] = X_T
-        int_var[:, 20] = Y_T
-
-
-        return int_var
-
     #---------------------------------------------------------------------
     # Extra homogenization of damage tensor in case of two damage parameters
     # Returns the 4th order damage tensor 'beta4' using (ref. [Baz99], Eq.(63))
@@ -474,11 +419,9 @@ class MATS2DMplCSDEEQ(MATSBase, InteractiveModel):
 
         return eps_p_Emab
 
-    #-------------------------------------------------------------------------
-    # Evaluation - get the corrector and predictor
-    #-------------------------------------------------------------------------
-
     def get_corr_pred(self, eps_Emab, t_n1, int_var, eps_aux, F):
+        '''Evaluation - get the corrector and predictor
+        '''
 
         # Definition internal variables / forces per column:  1) damage N, 2)iso N, 3)kin N, 4)consolidation N, 5) eps p N,
         # 6) sigma N, 7) iso F N, 8) kin F N, 9) energy release N, 10) damage T, 11) iso T, 12-13) kin T, 14-15) eps p T,
@@ -505,6 +448,7 @@ class MATS2DMplCSDEEQ(MATSBase, InteractiveModel):
         z_T_Emn = int_var[:, 10]
         alpha_T_Emna = int_var[:, 11:13]
         eps_T_pi_Emna = int_var[:, 13:15]
+
 
         beta_Emabcd = self._get_beta_Emabcd_2(
             eps_Emab, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, omega_T_Emn, z_T_Emn,
@@ -535,10 +479,14 @@ class MATS2DMplCSDEEQ(MATSBase, InteractiveModel):
 
         return D_Emabcd, sig_Emab, eps_p_Emab
 
-    #-----------------------------------------------
-    # number of microplanes
-    #-----------------------------------------------
+
+class MATS2DMplCSDEEQ(MATSXDMplCSDEEQ):
+    """Two dimensional version of the MS1 model
+    """
+
     n_mp = tr.Constant(360)
+    '''Number of microplanes
+    '''
 
     #-----------------------------------------------
     # get the normal vectors of the microplanes
@@ -565,3 +513,55 @@ class MATS2DMplCSDEEQ(MATSBase, InteractiveModel):
         MPW = np.ones(self.n_mp) / self.n_mp * 2
 
         return MPW
+
+    #--------------------------------------------------------
+    # return the state variables (Damage , inelastic strains)
+    #--------------------------------------------------------
+    def _get_state_variables(self, eps_Emab,
+                             int_var, eps_aux):
+
+        e_N_arr = self._get_e_N_Emn_2(eps_Emab)
+        e_T_vct_arr = self._get_e_T_Emnar_2(eps_Emab)
+
+        omega_N_Emn = int_var[:, 0]
+        z_N_Emn = int_var[:, 1]
+        alpha_N_Emn = int_var[:, 2]
+        r_N_Emn = int_var[:, 3]
+        eps_N_p_Emn = int_var[:, 4]
+        sigma_N_Emn = int_var[:, 5]
+
+        omega_T_Emn = int_var[:, 9]
+        z_T_Emn = int_var[:, 10]
+        alpha_T_Emna = int_var[:, 11:13]
+        eps_T_pi_Emna = int_var[:, 13:15]
+
+        omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, Z_n, X_n, Y_n = self.get_normal_law(e_N_arr,  omega_N_Emn, z_N_Emn,
+                                                                                                        alpha_N_Emn, r_N_Emn, eps_N_p_Emn, eps_aux)
+
+        omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_T_Emna, Z_T, X_T, Y_T = self.get_tangential_law(e_T_vct_arr, omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn)
+
+        # Definition internal variables / forces per column:  1) damage N, 2)iso N, 3)kin N, 4)consolidation N, 5) eps p N,
+        # 6) sigma N, 7) iso F N, 8) kin F N, 9) energy release N, 10) damage T, 11) iso T, 12-13) kin T, 14-15) eps p T,
+        # 16-17) sigma T, 18) iso F T, 19-20) kin F T, 21) energy release T
+
+        int_var[:, 0] = omega_N_Emn
+        int_var[:, 1] = z_N_Emn
+        int_var[:, 2] = alpha_N_Emn
+        int_var[:, 3] = r_N_Emn
+        int_var[:, 4] = eps_N_p_Emn
+        int_var[:, 5] = sigma_N_Emn
+        int_var[:, 6] = Z_n
+        int_var[:, 7] = X_n
+        int_var[:, 8] = Y_n
+
+        int_var[:, 9] = omega_T_Emn
+        int_var[:, 10] = z_T_Emn
+        int_var[:, 11:13] = alpha_T_Emna
+        int_var[:, 13:15] = eps_T_pi_Emna
+        int_var[:, 15:17] = sigma_T_Emna
+        int_var[:, 17] = Z_T
+        int_var[:, 18:20] = X_T
+        int_var[:, 20] = Y_T
+
+
+        return int_var

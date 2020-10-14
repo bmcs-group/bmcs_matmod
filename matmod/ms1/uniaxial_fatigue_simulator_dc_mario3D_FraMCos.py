@@ -3,7 +3,6 @@ import os
 import matplotlib
 
 from matmod.ms1.vmats3D_mpl_csd_eeq import MATS3DMplCSDEEQ
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -14,7 +13,6 @@ EPS = np.zeros((3, 3, 3), dtype='f')
 EPS[(0, 1, 2), (1, 2, 0), (2, 0, 1)] = 1
 EPS[(2, 1, 0), (1, 0, 2), (0, 2, 1)] = -1
 
-
 DD = np.hstack([DELTA, np.zeros_like(DELTA)])
 EEPS = np.hstack([np.zeros_like(EPS), EPS])
 
@@ -24,11 +22,9 @@ GAMMA = np.einsum(
     'ikj->kij', np.fabs(EEPS)
 )
 
-
 def get_eps_ab(eps_O): return np.einsum(
     'Oab,...O->...ab', GAMMA, eps_O
 )[np.newaxis, ...]
-
 
 GAMMA_inv = np.einsum(
     'aO,bO->Oab', DD, DD
@@ -58,9 +54,9 @@ def get_K_OP(D_abcd):
 # map the gradient of the residuum field to system matrix
 
 
-def get_UF_t(time_function, n_t):
+def get_UF_t(mats, time_function, n_t):
 
-
+    # @todo: put into the explorer  - rename int_vars to state_vars
     int_var = np.zeros((n_mp, 25))
     int_var_aux = np.zeros((n_mp, 25))
     dissip = np.zeros((n_mp, 8))
@@ -104,7 +100,7 @@ def get_UF_t(time_function, n_t):
             # Transform the primary vector to field
             eps_ab = get_eps_ab(U_k_O).reshape(3, 3)
             # Stress and material stiffness
-            D_abcd, sig_ab, eps_p_Emab, sig_ab_int = m.get_corr_pred(
+            D_abcd, sig_ab, eps_p_Emab, sig_ab_int = mats.get_corr_pred(
                 eps_ab, 1, int_var, eps_aux, F_ext
             )
             # Internal force
@@ -142,7 +138,7 @@ def get_UF_t(time_function, n_t):
 #         F_t_list.append(F_O)
 
             # Update states variables after convergence
-        int_var = m._get_state_variables(eps_ab, int_var, eps_aux)
+        int_var = mats._get_state_variables(eps_ab, int_var, eps_aux)
 
         # Definition internal variables / forces per column:  1) damage N, 2)iso N, 3)kin N, 4) consolidation N, 5) eps p N,
         # 6) sigma N, 7) iso F N, 8) kin F N, 9) energy release N, 10) damage T, 11) iso T, 12-14) kin T, 15-17) eps p T,
@@ -189,6 +185,7 @@ def get_int_var(path, size, n_mp):  # unpacks saved data
     for i in range(1, size):
         S[i] = np.array(pd.read_hdf(path, 'middle' + np.str(i - 1)))
 
+    # @todo: definition of protocols - order should not be defined by indexing
     omega_N_Emn = S[:, :, 0]
     z_N_Emn = S[:, :, 1]
     alpha_N_Emn = S[:, :, 2]
@@ -222,11 +219,15 @@ def get_int_var(path, size, n_mp):  # unpacks saved data
            Disip_omena_N_Emn, Disip_omena_T_Emn, Disip_eps_p_N_Emn, Disip_eps_p_T_Emn, Disip_iso_N_Emn, \
            Disip_iso_T_Emn, Disip_kin_N_Emn, Disip_kin_T_Emn
 
-
 concrete_type= 0        # 0:C40MA, 1:C80MA, 2:120MA, 3:Tensile, 4:Compressive, 5:Biaxial
 
-Concrete_Type_string = ['C40MA', 'C80MA','C120MA', 'Tensile', 'Compressive', 'Biaxial']
+# @todo: convert this to a list of dictionaries
+Concrete_Type_string = [
+    'C40MA', 'C80MA','C120MA',
+    'Tensile', 'Compressive', 'Biaxial'
+]
 
+# @todo: convert to a load scenario class
 loading_scenario = 'monotonic'   # monotonic, cyclic
 
 M_plot = 0  # Plot microplanes polar graphs. 1: yes, 0: no
@@ -256,10 +257,7 @@ if loading_scenario == 'cyclic':
 
     load = np.concatenate((load1, load2[1::], load3[1::], load4[1::], load5[1::], load6[1::], load7[1::], load8[1::], load9[1::]))
 
-
 t_steps = len(load)
-
-# Path saving data
 
 home_dir = os.path.expanduser('~')
 
@@ -267,13 +265,13 @@ if not os.path.exists('Data Processing'):
     os.makedirs('Data Processing')
 
 path = os.path.join(
-   home_dir, 'Data Processing/'+ '3Ddc' + Concrete_Type_string[concrete_type] + loading_scenario + '.hdf5')
+   home_dir, 'Data Processing',
+   '3Ddc' + Concrete_Type_string[concrete_type] + loading_scenario + '.hdf5')
 
-m = MATS3DMplCSDEEQ(concrete_type)
-
-
+ms1 = MATS3DMplCSDEEQ(concrete_type)
 
 U, F, D, U_p = get_UF_t(
+    ms1,
     load,
     t_steps
 )

@@ -73,8 +73,3 @@ class Micro2Dplot():
         plt.title(r'$\sigma_T$')
 
         plt.show()
-
-
-
-
-

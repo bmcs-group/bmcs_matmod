@@ -11,14 +11,12 @@ Microplane Fatigue model 3D
 Using Jirasek homogenization approach [1999]
 '''
 
-from traits.api import Constant, \
-    Dict, Property, cached_property
-
 import numpy as np
 import traits.api as tr
+from bmcs_matmod.matmod.mats_base import MATSBase
 
 
-class MATS3DMplCSDEEQ():
+class MATS3DMplCSDEEQ(MATSBase):
     concrete_type = tr.Int
 
     gamma_T = tr.Float(100000.,
@@ -345,9 +343,9 @@ class MATS3DMplCSDEEQ():
 
             self.nu = 0.2
 
-    #--------------------------------------------------------------
+    # --------------------------------------------------------------
     # microplane constitutive law (normal behavior CP + TD)
-    #--------------------------------------------------------------
+    # --------------------------------------------------------------
     def get_normal_law(self, eps_N_Emn, omega_N_Emn, z_N_Emn,
                        alpha_N_Emn, r_N_Emn, eps_N_p_Emn, eps_aux):
 
@@ -417,9 +415,9 @@ class MATS3DMplCSDEEQ():
 
         return omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, Z, X, Y_N
 
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # microplane constitutive law (Tangential CSD)-(Pressure sensitive cumulative damage)
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     def get_tangential_law(self, eps_T_Emna, omega_T_Emn, z_T_Emn,
                            alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn):
 
@@ -460,25 +458,25 @@ class MATS3DMplCSDEEQ():
                 (sig_pi_trial - X), (sig_pi_trial - X))) * plas_1
 
         eps_T_pi_Emna[..., 0] = eps_T_pi_Emna[..., 0] + plas_1 * delta_lamda * \
-            ((sig_pi_trial[..., 0] - X[..., 0]) /
-             (1.0 - omega_T_Emn)) / norm_2
+                                ((sig_pi_trial[..., 0] - X[..., 0]) /
+                                 (1.0 - omega_T_Emn)) / norm_2
         eps_T_pi_Emna[..., 1] = eps_T_pi_Emna[..., 1] + plas_1 * delta_lamda * \
-            ((sig_pi_trial[..., 1] - X[..., 1]) /
-             (1.0 - omega_T_Emn)) / norm_2
+                                ((sig_pi_trial[..., 1] - X[..., 1]) /
+                                 (1.0 - omega_T_Emn)) / norm_2
         eps_T_pi_Emna[..., 2] = eps_T_pi_Emna[..., 2] + plas_1 * delta_lamda * \
-            ((sig_pi_trial[..., 2] - X[..., 2]) /
-             (1.0 - omega_T_Emn)) / norm_2
+                                ((sig_pi_trial[..., 2] - X[..., 2]) /
+                                 (1.0 - omega_T_Emn)) / norm_2
 
         omega_T_Emn += ((1.0 - omega_T_Emn) ** self.c_T) * \
-            (delta_lamda * (Y / self.S_T) ** self.r_T)  # * \
-        #(self.tau_pi_bar / (self.tau_pi_bar - self.a * sigma_kk / 3.0))
+                       (delta_lamda * (Y / self.S_T) ** self.r_T)  # * \
+        # (self.tau_pi_bar / (self.tau_pi_bar - self.a * sigma_kk / 3.0))
 
-        alpha_T_Emna[..., 0] = alpha_T_Emna[..., 0] + plas_1 * delta_lamda *\
-            (sig_pi_trial[..., 0] - X[..., 0]) / norm_2
-        alpha_T_Emna[..., 1] = alpha_T_Emna[..., 1] + plas_1 * delta_lamda *\
-            (sig_pi_trial[..., 1] - X[..., 1]) / norm_2
-        alpha_T_Emna[..., 2] = alpha_T_Emna[..., 2] + plas_1 * delta_lamda *\
-            (sig_pi_trial[..., 2] - X[..., 2]) / norm_2
+        alpha_T_Emna[..., 0] = alpha_T_Emna[..., 0] + plas_1 * delta_lamda * \
+                               (sig_pi_trial[..., 0] - X[..., 0]) / norm_2
+        alpha_T_Emna[..., 1] = alpha_T_Emna[..., 1] + plas_1 * delta_lamda * \
+                               (sig_pi_trial[..., 1] - X[..., 1]) / norm_2
+        alpha_T_Emna[..., 2] = alpha_T_Emna[..., 2] + plas_1 * delta_lamda * \
+                               (sig_pi_trial[..., 2] - X[..., 2]) / norm_2
         z_T_Emn = z_T_Emn + delta_lamda
 
         sigma_T_Emna = np.einsum(
@@ -494,21 +492,21 @@ class MATS3DMplCSDEEQ():
 
         return omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_T_Emna, Z, X, Y
 
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # MICROPLANE-Kinematic constraints
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # get the operator of the microplane normals
-    _MPNN = Property(depends_on='n_mp')
+    _MPNN = tr.Property(depends_on='n_mp')
 
-    @cached_property
+    @tr.cached_property
     def _get__MPNN(self):
         MPNN_nij = np.einsum('ni,nj->nij', self._MPN, self._MPN)
         return MPNN_nij
 
     # get the third order tangential tensor (operator) for each microplane
-    _MPTT = Property(depends_on='n_mp')
+    _MPTT = tr.Property(depends_on='n_mp')
 
-    @cached_property
+    @tr.cached_property
     def _get__MPTT(self):
         delta = np.identity(3)
         MPTT_nijr = 0.5 * (
@@ -526,9 +524,10 @@ class MATS3DMplCSDEEQ():
         # get the tangential strain vector array for each microplane
         MPTT_ijr = self._get__MPTT()
         return np.einsum('nija,...ij->...na', MPTT_ijr, eps_Emab)
-    #--------------------------------------------------------
+
+    # --------------------------------------------------------
     # return the state variables (Damage , inelastic strains)
-    #--------------------------------------------------------
+    # --------------------------------------------------------
     def _get_state_variables(self, eps_Emab,
                              int_var, eps_aux):
 
@@ -667,7 +666,6 @@ class MATS3DMplCSDEEQ():
         # Damage tensor (4th order) using product- or sum-type symmetrization:
         # ------------------------------------------------------------------
 
-
         eps_N_Emn = self._get_e_N_Emn_2(eps_Emab)
         eps_T_Emna = self._get_e_T_Emnar_2(eps_Emab)
 
@@ -693,12 +691,8 @@ class MATS3DMplCSDEEQ():
         # Damaged stiffness tensor calculated based on the damage tensor beta4:
         # ------------------------------------------------------------------
 
-
-
         D_Emabcd = np.einsum(
             '...ijab, abef, ...cdef->...ijcd', beta_Emabcd, self.D_abef, beta_Emabcd)
-
-
 
         # ----------------------------------------------------------------------
         # Return stresses (corrector) and damaged secant stiffness matrix (predictor)
@@ -715,71 +709,74 @@ class MATS3DMplCSDEEQ():
         delta = np.identity(3)
         # calculation of the stress tensor
         sig_Emab = np.einsum('...abcd,...cd->...ab', D_Emabcd, eps_e_Emab)
-        sig_Emab_int= np.einsum('n,...n,na,nb->...ab',
-                          self._MPW, sigma_N_Emn, self._MPN, self._MPN) + 0.5 * np.einsum('n,...ne,na,eb->...ab',
-                          self._MPW, sigma_T_Emna, self._MPN, delta) + 0.5 * np.einsum('n,...ne,nb,ea->...ab',
-                          self._MPW, sigma_T_Emna, self._MPN, delta)
+        sig_Emab_int = (
+                np.einsum('n,...n,na,nb->...ab',
+                          self._MPW, sigma_N_Emn, self._MPN, self._MPN) + \
+                0.5 * np.einsum('n,...ne,na,eb->...ab',
+                                self._MPW, sigma_T_Emna, self._MPN, delta) + \
+                0.5 * np.einsum('n,...ne,nb,ea->...ab',
+                                self._MPW, sigma_T_Emna, self._MPN, delta))
 
         return D_Emabcd, sig_Emab, eps_p_Emab, sig_Emab_int
 
-    #-----------------------------------------------
+    # -----------------------------------------------
     # number of microplanes - currently fixed for 3D
-    #-----------------------------------------------
-    n_mp = Constant(28)
+    # -----------------------------------------------
+    n_mp = tr.Constant(28)
 
-    #-----------------------------------------------
+    # -----------------------------------------------
     # get the normal vectors of the microplanes
-    #-----------------------------------------------
-    _MPN = Property(depends_on='n_mp')
+    # -----------------------------------------------
+    _MPN = tr.Property(depends_on='n_mp')
 
-    @cached_property
+    @tr.cached_property
     def _get__MPN(self):
         return np.array([[.577350259, .577350259, .577350259],
-                      [.577350259, .577350259, -.577350259],
-                      [.577350259, -.577350259, .577350259],
-                      [.577350259, -.577350259, -.577350259],
-                      [.935113132, .250562787, .250562787],
-                      [.935113132, .250562787, -.250562787],
-                      [.935113132, -.250562787, .250562787],
-                      [.935113132, -.250562787, -.250562787],
-                      [.250562787, .935113132, .250562787],
-                      [.250562787, .935113132, -.250562787],
-                      [.250562787, -.935113132, .250562787],
-                      [.250562787, -.935113132, -.250562787],
-                      [.250562787, .250562787, .935113132],
-                      [.250562787, .250562787, -.935113132],
-                      [.250562787, -.250562787, .935113132],
-                      [.250562787, -.250562787, -.935113132],
-                      [.186156720, .694746614, .694746614],
-                      [.186156720, .694746614, -.694746614],
-                      [.186156720, -.694746614, .694746614],
-                      [.186156720, -.694746614, -.694746614],
-                      [.694746614, .186156720, .694746614],
-                      [.694746614, .186156720, -.694746614],
-                      [.694746614, -.186156720, .694746614],
-                      [.694746614, -.186156720, -.694746614],
-                      [.694746614, .694746614, .186156720],
-                      [.694746614, .694746614, -.186156720],
-                      [.694746614, -.694746614, .186156720],
-                      [.694746614, -.694746614, -.186156720]])
+                         [.577350259, .577350259, -.577350259],
+                         [.577350259, -.577350259, .577350259],
+                         [.577350259, -.577350259, -.577350259],
+                         [.935113132, .250562787, .250562787],
+                         [.935113132, .250562787, -.250562787],
+                         [.935113132, -.250562787, .250562787],
+                         [.935113132, -.250562787, -.250562787],
+                         [.250562787, .935113132, .250562787],
+                         [.250562787, .935113132, -.250562787],
+                         [.250562787, -.935113132, .250562787],
+                         [.250562787, -.935113132, -.250562787],
+                         [.250562787, .250562787, .935113132],
+                         [.250562787, .250562787, -.935113132],
+                         [.250562787, -.250562787, .935113132],
+                         [.250562787, -.250562787, -.935113132],
+                         [.186156720, .694746614, .694746614],
+                         [.186156720, .694746614, -.694746614],
+                         [.186156720, -.694746614, .694746614],
+                         [.186156720, -.694746614, -.694746614],
+                         [.694746614, .186156720, .694746614],
+                         [.694746614, .186156720, -.694746614],
+                         [.694746614, -.186156720, .694746614],
+                         [.694746614, -.186156720, -.694746614],
+                         [.694746614, .694746614, .186156720],
+                         [.694746614, .694746614, -.186156720],
+                         [.694746614, -.694746614, .186156720],
+                         [.694746614, -.694746614, -.186156720]])
 
-    #-------------------------------------
+    # -------------------------------------
     # get the weights of the microplanes
-    #-------------------------------------
-    _MPW = Property(depends_on='n_mp')
+    # -------------------------------------
+    _MPW = tr.Property(depends_on='n_mp')
 
-    @cached_property
+    @tr.cached_property
     def _get__MPW(self):
         return np.array([.0160714276, .0160714276, .0160714276, .0160714276, .0204744730,
-                      .0204744730, .0204744730, .0204744730, .0204744730, .0204744730,
-                      .0204744730, .0204744730, .0204744730, .0204744730, .0204744730,
-                      .0204744730, .0158350505, .0158350505, .0158350505, .0158350505,
-                      .0158350505, .0158350505, .0158350505, .0158350505, .0158350505,
-                      .0158350505, .0158350505, .0158350505]) * 6.0
+                         .0204744730, .0204744730, .0204744730, .0204744730, .0204744730,
+                         .0204744730, .0204744730, .0204744730, .0204744730, .0204744730,
+                         .0204744730, .0158350505, .0158350505, .0158350505, .0158350505,
+                         .0158350505, .0158350505, .0158350505, .0158350505, .0158350505,
+                         .0158350505, .0158350505, .0158350505]) * 6.0
 
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
     # Cached elasticity tensors
-    #-------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
 
     def _get_lame_params(self):
         la = self.E * self.nu / ((1. + self.nu) * (1. - 2. * self.nu))

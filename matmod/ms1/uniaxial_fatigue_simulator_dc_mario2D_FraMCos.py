@@ -4,7 +4,7 @@ import matplotlib
 
 from matmod.ms1.Micro2Dplot import Micro2Dplot
 from matmod.ms1.vmats2D_mpl_csd_eeq import MATS2DMplCSDEEQ
-
+import matmod.ms1.concrete_material_db as cdb
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -209,6 +209,7 @@ def get_int_var(path, size, n_mp):  # unpacks saved data
 
 
 
+
 concrete_type= 0 # 0:C40MA, 1:C80MA, 2:120MA, 3:Tensile, 4:Compressive, 5:Biaxial, 6: Paper 2D redistribution
 
 Concrete_Type_string = ['C40MA', 'C80MA','C120MA', 'Tensile', 'Compressive', 'Biaxial', 'Paper_2D']
@@ -255,7 +256,8 @@ if not os.path.exists('Data Processing'):
 path = os.path.join(
    home_dir, 'Data Processing/' + 'dc' + Concrete_Type_string[concrete_type] + loading_scenario + '.hdf5')
 
-m = MATS2DMplCSDEEQ(concrete_type)
+m = MATS2DMplCSDEEQ(**cdb.C40MA)
+
 plot = Micro2Dplot()
 
 
@@ -282,10 +284,7 @@ ax2.set_xlabel(r'$|\varepsilon_{11}$| [-]', fontsize=25)
 ax2.set_ylabel(r'$|\sigma{11}$| [-]', fontsize=25)
 
 print(np.max(np.abs(F[:, 0])), 'fc')
-
 plt.show()
-
-
 
 if M_plot == 1:
 
@@ -305,7 +304,6 @@ if M_plot == 1:
         eps = get_eps_ab(U[i])
         eps_T_Emna[i] = m._get_e_T_Emnar_2(eps)
 
-
     eps_T_sign_Emn = np.zeros_like(eps_N_p_Emn)
     eps_pi_T = np.zeros_like(eps_N_p_Emn)
     eps_pi_T_sign = np.zeros_like(eps_N_p_Emn)
@@ -314,13 +312,11 @@ if M_plot == 1:
     X_T = np.zeros_like(eps_N_p_Emn)
     X_T_sign = np.zeros_like(eps_N_p_Emn)
 
-
     eps_T_Emn = np.sqrt(np.einsum('...i,...i->... ', eps_T_Emna, eps_T_Emna))
     eps_T_pi_Emn = np.sqrt(np.einsum('...i,...i->... ', eps_T_pi_Emna, eps_T_pi_Emna))
     sigma_T_Emn = np.sqrt(np.einsum('...i,...i->... ', sigma_T_Emna, sigma_T_Emna))
     X_T_pi_Emn = np.sqrt(np.einsum('...i,...i->... ', X_T_pi_Emna, X_T_pi_Emna))
     alpha_T_Emn = np.sqrt(np.einsum('...i,...i->... ', alpha_T_Emna, alpha_T_Emna))
-
 
     plot.get_2Dviz(n_mp, eps_N_Emn, eps_T_Emn, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, Z_N_Emn, X_N_Emn, Y_N_Emn, \
            omega_T_Emn, z_T_Emn, alpha_T_Emn, eps_T_pi_Emn, sigma_T_Emn, Z_T_pi_Emn, X_T_pi_Emn, Y_T_pi_Emn, \
