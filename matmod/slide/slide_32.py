@@ -266,16 +266,22 @@ subs_tau_eff
 
 # In[25]:
 
-from bmcs_matmod.matmod.slide.f_double_cap import FDoubleCapExpr as F_
+from bmcs_matmod.matmod.slide.f_double_cap import FDoubleCap
 import bmcs_utils.api as bu
 
-f_t = F_.f_t
-f_c = F_.f_c
-f_c0 = F_.f_c0
-m = F_.m
+fdc = FDoubleCap()
+f_t = fdc.symb.f_t
+f_c = fdc.symb.f_c
+f_c0 = fdc.symb.f_c0
+m = fdc.symb.m
+x = fdc.symb.x
+y = fdc.symb.y
 
-f_solved_ = F_.f_solved
-f_ = f_solved_.subs({F_.x:sig_eff, F_.y:norm_Q}).subs(subs_Q).subs(subs_tau_eff).subs(F_.tau_bar, (bartau+Z))
+f_solved_ = fdc.symb.f_solved
+f_1 = f_solved_.subs({x:sig_eff, y:norm_Q})
+f_2 = f_1.subs(subs_Q)
+f_3 = f_2.subs(subs_tau_eff)
+f_ = f_3.subs(fdc.symb.tau_bar, (bartau+Z))
 
 # **Executable code generation** $f(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$
 # 
@@ -283,43 +289,16 @@ f_ = f_solved_.subs({F_.x:sig_eff, F_.y:norm_Q}).subs(subs_Q).subs(subs_tau_eff)
 
 # The derivative of $f$ required for time-stepping $\frac{\partial f}{\partial \boldsymbol{\mathcal{S}}}$ is obtained as
 
-# In[27]:
-
-
 df_dSig_ = f_.diff(Sig)
-#df_dSig_.T
-
-
-# **Executable code generation** $\displaystyle \frac{\partial f}{\partial \boldsymbol{\mathcal{S}}}(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S})}$
-
-
-# Due to the direct dependency of $f$ on $\boldsymbol{\mathcal{E}}$ also the term $\displaystyle\frac{\partial^\mathrm{dir} f}{\partial^\mathrm{dir} \boldsymbol{\mathcal{E}}}$ must be provided for numerical evaluation of derivatives
-
-# In[29]:
-
-
 ddf_dEps_ = f_.diff(Eps)
-#ddf_dEps_.T
 
-
-# In[32]:
-
-
-phi_s_ext = (1-omega_s)**c_s * (Y_s**2 / S_s + eta * (Y_s * Y_w) / S_s) 
+phi_s_ext = (1-omega_s)**c_s * (Y_s**2 / S_s + eta * (Y_s * Y_w) / S_s)
 phi_w_ext = (1-omega_w)**c_w * (Y_w**2 / S_w + eta * (Y_s * Y_w) / S_w) 
-
 
 # The flow potential $\varphi(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$ reads
 
-# In[33]:
-
-
 phi_ = f_ + phi_s_ext + phi_w_ext
 phi_
-
-
-# In[34]:
-
 
 # and the corresponding directions of flow given as a product of the sign operator $\Upsilon$ and of the derivatives with respect to state variables
 # $\boldsymbol{\Upsilon} \, \partial_{\boldsymbol{\mathcal{S}}} \varphi$
@@ -372,13 +351,13 @@ class Slide23Expr(bu.SymbExpr):
 
     # List of expressions for which the methods `get_`
     symb_expressions = [
-        # ('Sig_', ('s_x', 's_y', 'w', 'Eps')),
-        # ('dSig_dEps_', ('s_x', 's_y', 'w', 'Eps')),
+        ('Sig_', ('s_x', 's_y', 'w', 'Eps')),
+        ('dSig_dEps_', ('s_x', 's_y', 'w', 'Eps')),
         ('f_', ('Eps', 'Sig')),
-        # ('df_dSig_', ('Eps', 'Sig')),
-        # ('ddf_dEps_', ('Eps', 'Sig')),
-        # ('phi_', ('Eps', 'Sig')),
-        # ('Phi_', ('Eps', 'Sig')),
+        ('df_dSig_', ('Eps', 'Sig')),
+        ('ddf_dEps_', ('Eps', 'Sig')),
+        ('phi_', ('Eps', 'Sig')),
+        ('Phi_', ('Eps', 'Sig')),
     ]
 
 #get_Sig_C = ccode('get_Sig',Sig_,'SLIDE1_3')
@@ -398,21 +377,75 @@ class Slide32(bu.InjectSymbExpr):
     E_s = tr.Float(28000, MAT=True)
     gamma_s = tr.Float(10, MAT=True)
     K_s = tr.Float(8, MAT=True)
-    S_s = tr.Float(28000, MAT=True)
-    c_s = tr.Float(28000, MAT=True)
+    S_s = tr.Float(1, MAT=True)
+    c_s = tr.Float(1, MAT=True)
     bartau = tr.Float(28000, MAT=True)
     E_w = tr.Float(28000, MAT=True)
-    S_w =tr.Float(28000, MAT=True)
-    c_w = tr.Float(28000, MAT=True)
-    m = tr.Float(28000, MAT=True)
-    f_t = tr.Float(28000, MAT=True)
-    f_c = tr.Float(28000, MAT=True)
-    f_c0 = tr.Float(28000, MAT=True)
-    eta = tr.Float(28000, MAT=True)
+    S_w =tr.Float(1, MAT=True)
+    c_w = tr.Float(1, MAT=True)
+    m = tr.Float(0.1, MAT=True)
+    f_t = tr.Float(3, MAT=True)
+    f_c = tr.Float(30, MAT=True)
+    f_c0 = tr.Float(20, MAT=True)
+    eta = tr.Float(0.5, MAT=True)
 
-# **Prepare the cythonification**
+    def get_f_df(self, s_x_n1, s_y_n1, w_n1, Eps_k):
+        Sig_k = self.symb.get_Sig(s_x_n1, s_y_n1, w_n1, Eps_k)[0]
+        dSig_dEps_k = self.symb.get_dSig_dEps(s_x_n1, s_y_n1, w_n1, Eps_k)
+        f_k = np.array([self.symb.get_f(Eps_k, Sig_k)])
+        df_dSig_k = self.get_df_dSig(Eps_k, Sig_k)
+        ddf_dEps_k = self.get_ddf_dEps(Eps_k, Sig_k)
+        df_dEps_k = np.einsum(
+            'ik,ji->jk', df_dSig_k, dSig_dEps_k) + ddf_dEps_k
+        Phi_k = self.get_Phi(Eps_k, Sig_k)
+        dEps_dlambda_k = Phi_k
+        df_dlambda = np.einsum(
+            'ki,kj->ij', df_dEps_k, dEps_dlambda_k)
+        df_k = df_dlambda
+        return f_k, df_k, Sig_k
 
-# In[38]:
+    def get_Eps_k1(self, s_x_n1, s_y_n1, w_n1, Eps_n, lam_k, Eps_k):
+        '''Evolution equations:
+        The update of state variables
+        for an updated $\lambda_k$ is performed using this procedure.
+        '''
+
+        Sig_k = self.symb.get_Sig(s_x_n1, s_y_n1, w_n1, Eps_k)[0]
+        Phi_k = self.symb.get_Phi(Eps_k, Sig_k)
+        Eps_k1 = Eps_n + lam_k * Phi_k[:, 0]
+        return Eps_k1
+
+    rtol = tr.Float(1e-4, ALG=True)
+    '''Relative tolerance of the return mapping algorithm related 
+    to the tensile strength
+    '''
+
+    def get_sig_n1(self, s_x_n1, s_y_n1, w_n1, Eps_n, k_max):
+        '''Return mapping iteration:
+        This function represents a user subroutine in a finite element
+        code or in a lattice model. The input is $s_{n+1}$ and the state variables
+        representing the state in the previous solved step $\boldsymbol{\mathcal{E}}_n$.
+        The procedure returns the stresses and state variables of
+        $\boldsymbol{\mathcal{S}}_{n+1}$ and $\boldsymbol{\mathcal{E}}_{n+1}$
+        '''
+        Eps_k = np.copy(Eps_n)
+        lam_k = 0
+        f_k, df_k, Sig_k = self.symb.get_f_df(s_x_n1, s_y_n1, w_n1, Eps_k)
+        f_k_norm = np.linalg.norm(f_k)
+        f_k_trial = f_k[0]
+        k = 0
+        while k < k_max:
+            if f_k_trial < 0 or f_k_norm < self.f_t * self.rtol:
+                return Eps_k, Sig_k, k + 1
+            dlam = np.linalg.solve(df_k, -f_k)
+            lam_k += dlam
+            Eps_k = self.symb.get_Eps_k1(s_x_n1, s_y_n1, w_n1, Eps_n, lam_k, Eps_k)
+            f_k, df_k, Sig_k = self.symb.get_f_df(s_x_n1, s_y_n1, w_n1, Eps_k)
+            f_k_norm = np.linalg.norm(f_k)
+            k += 1
+        else:
+            raise ValueError('no convergence')
+
 
 
 # # Time integration scheme
@@ -573,4 +606,94 @@ class Slide32(bu.InjectSymbExpr):
 # </table>
 
 # **Threshold and its derivatives:** To avoid repeated calculation of the same expressions, let us put the evaluation of $f$ and $\partial_\lambda f$ into a single procedure. The iteration loop can be constructed in such a way that the predictor for the next step is calculated along with the residuum. In case that the residuum is below the required tolerance, the overhead for an extra calculated derivative is negligible or, with some care, can be even reused in the next time step.  
+
+
+# # Code generation
+# See the docs for the code generation, the latexified  sympy symbols
+# must be substituted such that they can act as standard C variable names.
+# The issue with this substitution might have been partially fixed by the substitution
+# code defined by this code.
+#
+# The methods
+#  * `get_f_df()`, and
+#  * `get_Eps_n1` must be rewritten in C.
+#
+# **How to transform `einsum` to C?**
+#
+# The state arrays `Eps` and `Sig` must be prepared by the callee, i.e. the function to be
+# called from at a level of material point in a finite-element or lattice code.
+# All the state variable matrices are flattened in the generated C code so that index access operators must be constructed with the correct convention, i.e.
+# `i * n_row + j` or `i + n_col * j`.
+#
+# Let us consider the line
+# ```Python
+# df_dEps_k = np.einsum('ik,ji->jk', df_dSig_k, dSig_dEps_k) + ddf_dEps_k
+# ````
+#
+# To transform this systematically into the C loop it is proposed define
+# index directives specifying the size of the first dimension. Then, the
+# indexes from the `einsum` call can be systematically transferred to the
+# multi-loop running over the indexes and respecting their order. No more
+# thinking needed. The index operators below are prepared for arrays with
+# 2, 3, and 4 dimensions.
+# ```C
+# #define IJ(N_I,I,J) (N_I * J + I)
+# #define IJK(N_I,N_J,I,J,K) (N_I * IJ(N_J,J,K) + I)
+# #define IJKL(N_I,N_J,N_K,I,J,K,L) (N_I * IJK(N_J,N_K,J,K,L) + I)
+# ````
+# to perform the matrix multiplication
+# ```C
+# int k=0;
+# for(int i=0;i<N_I;i++)
+#     for(int j=0;j<N_J;j++)
+#         df_dEps_1[IJ(N_J,j,k)] += df_dSig_k[IJ(N_I(i,k)] * dSig_dEps_k[IJ(N_J,j,i)]
+#     df_dEps[IJ(N_I,i,k)] = df_dEps_1[IJ(N_J,j,k)] + ddSig_dEps(IJ(N_I,i,k)];
+# ````
+#
+# The whole material model is represented by the material method
+# that mimics the internal par of the `get_response` function defined above
+#
+#  1. Call `get_f_df()` to get the trial state
+#  2. Start the return mapping iteration loop
+#  3. If admissibility criterion fulfilled - admissible state found - return stress
+#  4. Evaluate delta of plastic multiplier and update it
+#  5. Update state variables using evolution equations `get_Eps_n1`
+#  6. Evaluate the residuum using `get_f_df()` and continuum with point 3.
+#
+
+# In[ ]:
+
+
+# C_code = get_Sig_C, get_dSig_dEps_C, get_f_C, get_df_dSig_C, get_ddf_dEps_C, get_Phi_C
+
+# In[ ]:
+
+
+import os
+import os.path as osp
+
+def codegen():
+    code_dirname = 'sympy_codegen'
+    code_fname = 'SLIDE_1_3_2D'
+
+    home_dir = osp.expanduser('~')
+    code_dir = osp.join(home_dir, code_dirname)
+    if not osp.exists(code_dir):
+        os.makedirs(code_dir)
+
+    code_file = osp.join(code_dir, code_fname)
+
+    print('code_file', code_file)
+    h_file = code_file + '.h'
+    c_file = code_file + '.c'
+
+    h_f = open(h_file, 'w')
+    c_f = open(c_file, 'w')
+
+    if True:
+        for function_C in C_code:
+            h_f.write(function_C[1][1])
+            c_f.write(function_C[0][1])
+    h_f.close()
+    c_f.close()
 

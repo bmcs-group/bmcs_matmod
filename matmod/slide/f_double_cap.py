@@ -25,7 +25,7 @@ import ipywidgets as ipw
 # In[33]:
 
 
-x, y = sp.symbols('x y')
+x, y = sp.symbols('x, y')
 
 
 # **Unknown parameters of the ellipse cap function**
@@ -50,37 +50,25 @@ m = sp.symbols('m')
 # In[36]:
 
 f_mid_ = sp.sqrt( y**2 ) - (y_bar - m * (x-x_0))
-get_f_mid = sp.lambdify((x, y, y_bar, m), f_mid_)
-
 
 # # Cap function
 # 
 # It is introduced in form of an ellipse centered at the position ($x_c, 0$)
 
-# In[37]:
-
-
 f_cap_ = sp.sqrt( (x-x_0-x_c)**2/a**2 + y**2/b**2 ) - c
-f_cap_
 
 # Construct the derivatives
-
-# In[38]:
 
 df_cap_dx_ = f_cap_.diff(x)
 df_cap_dy_ = f_cap_.diff(y)
 
 # # Value and continuity conditions specified in the figure above
 
-# In[39]:
-
 eq1 = sp.Eq( f_cap_.subs({x:x_bar, y:0}), 0 )
 eq2 = sp.Eq( f_cap_.subs({x:x_0, y:y_bar}), 0)
 eq3 = sp.Eq( ( -df_cap_dx_ / df_cap_dy_).subs({x:x_0, y:y_bar}), -m)
 
 # Solve for $a, b$ and $x_c$
-
-# In[40]:
 
 abx_subs = sp.solve({eq1,eq2,eq3},{a,b,x_c})[0]
 abx_subs
@@ -100,88 +88,22 @@ eq4 = sp.Eq( f_cap_abxc_, f_mid_c_ )
 
 # Which can be used to express $c$
 
-# In[42]:
-
 c_solved = sp.solve(eq4, c)[0]
 
 # Substitute back the $f_\mathrm{cap}$ to obtain its resolved form
 
-# In[43]:
-
-
-f_cap_abxc_ = f_cap_abx_.subs(c, c_solved)
-
-# # Test the results
-
-# In[44]:
-
-_x_0=-3
-_x_bar=-5
-_y_bar=3
-_m=.3
-
-
-# The value in the denominator must not be equal to 0
-
-# In[45]:
-
-m_limit_ = sp.solve(2*x_bar * m + y_bar, m)[0]
-_m_limit = m_limit_.subs({x_bar:_x_bar, y_bar:_y_bar})
-_m_limit
-
-
-# In[46]:
-
-if _m < _m_limit * sp.sign(_x_bar - _x_0):
-    print('Take care')
-
+f_cap_solved_ = f_cap_abx_.subs(c, c_solved)
 
 # Test the obtained position of $x_c$
-
-# In[47]:
-
-
 x_c_ = abx_subs[x_c]
-x_c_
-
-# In[48]:
-
-get_x_c = sp.lambdify((x_bar, y_bar, m, x_0), x_c_, 'numpy' )
-_x_c = get_x_c(_x_bar, _y_bar, _m, _x_0)
-_x_c
 
 # # Domain separation for $f_\mathrm{cap}$ and $f_\mathrm{mid}$
 # 
 # Define the transition between cap and mid domains by defining a connection 
 # line between [$x_c$,0]-[0,$\bar{\tau}$]. 
 
-# In[49]:
-
 y_trans_ = (-y_bar / (x_c) * (x - x_0 -x_c)).subs(x_c, x_c_)
 f_cap_domain_ = sp.sign(x_bar-x_0) * sp.sign(-m) * (sp.Abs(y) - y_trans_)  > 0
-
-# In[50]:
-
-x_trans = np.linspace(_x_c, _x_0, 10)
-get_y_trans = sp.lambdify((x, x_bar, y_bar, m, x_0), y_trans_)
-y_trans = get_y_trans(x_trans, _x_bar, _y_bar, _m, _x_0)
-x_trans, y_trans
-
-# In[51]:
-
-get_y_trans(_x_c, _x_bar, _y_bar, _m, _x_0)
-
-# # Composed smooth level set function $f_\mathrm{full}(x,y)$
-
-# In[52]:
-
-f_full_ = sp.Piecewise(
-    (f_cap_abxc_, f_cap_domain_),
-    (f_mid_, True)
-)
-
-get_f_full = sp.lambdify( (x,y,x_bar,y_bar,m,x_0), f_full_, 'numpy')
-f_full_
 
 # # Visualization
 
@@ -189,21 +111,6 @@ f_t, f_c, f_c0, tau_bar = sp.symbols('f_t, f_c, f_c0, tau_bar')
 subs_tension = {x_0:0, x_bar:f_t, y_bar:tau_bar}
 subs_shear = {y_bar:tau_bar, x_0:0}
 subs_compression = {x_0: -f_c0, x_bar:-f_c,  y_bar: tau_bar-m*(-f_c0) }
-
-
-# In[71]:
-
-
-# -------------------------------------------------------------------------
-# Symbolic derivation of variables
-# -------------------------------------------------------------------------
-x = sp.Symbol(
-    r'x', real=True,
-)
-
-max_f_c = 100
-max_f_t = 10
-max_tau_bar = 20
 
 import bmcs_utils.api as bu
 import traits.api as tr
@@ -213,7 +120,9 @@ class FDoubleCapExpr(bu.SymbExpr):
     # Symbolic derivation of variables
     # -------------------------------------------------------------------------
 
-    x, y = x, y
+    x = x
+
+    y = y
 
     # -------------------------------------------------------------------------
     # Model parameters
@@ -226,8 +135,8 @@ class FDoubleCapExpr(bu.SymbExpr):
     # -------------------------------------------------------------------------
 
     f_solved = sp.Piecewise(
-        (f_cap_abxc_.subs(subs_tension), f_cap_domain_.subs(subs_tension)),
-        (f_cap_abxc_.subs(subs_compression), f_cap_domain_.subs(subs_compression)),
+        (f_cap_solved_.subs(subs_tension), f_cap_domain_.subs(subs_tension)),
+        (f_cap_solved_.subs(subs_compression), f_cap_domain_.subs(subs_compression)),
         (f_mid_.subs(subs_shear), True)
     )
 
@@ -242,6 +151,9 @@ class FDoubleCapExpr(bu.SymbExpr):
         ('f_solved', ('x', 'y')),
     ]
 
+max_f_c = 100
+max_f_t = 10
+max_tau_bar = 10
 
 class FDoubleCap(bu.InteractiveModel,bu.InjectSymbExpr):
 
@@ -268,7 +180,7 @@ class FDoubleCap(bu.InteractiveModel,bu.InjectSymbExpr):
 
         # In[53]:
 
-        X_a, Y_a = np.mgrid[-max_f_c:max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
+        X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
         Z_a = self.symb.get_f_solved(X_a, Y_a)
 
         # In[68]:

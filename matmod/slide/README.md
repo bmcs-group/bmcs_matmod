@@ -10,5 +10,7 @@
  * Implement the generic return mapping function in C  
    based on the Python code
    
+   - order of parameters in the generated function
+   
  * Compare the response for elementary loading conditions
  
