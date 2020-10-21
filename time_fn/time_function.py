@@ -25,7 +25,7 @@ class TimeFunction(bu.InteractiveModel):
     @tr.cached_property
     def _get_t_step(self):
         n_values = len(self.values)
-        return (self.n_i + 1) * n_values
+        return (self.n_i+1) * n_values
 
     tf = tr.Property(depends_on='data_points')
     def _get_tf(self):
@@ -38,7 +38,7 @@ class TimeFunction(bu.InteractiveModel):
 
     def update_plot(self, ax):
         n_values = len(self.values)
-        t = np.linspace(0,1,(self.n_i+1) * n_values)
+        t = np.linspace(0,1,(self.n_i)*(n_values-1) + n_values)
         v = self.tf(t)
         ax.plot(t, v, '-o')
 

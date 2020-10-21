@@ -16,6 +16,7 @@ class LoadFn(bu.InteractiveModel):
         return t
 
 class CyclicLoadFnExpr(bu.SymbExpr):
+    pass
 
 class CyclicLoadFn(LoadFn):
 

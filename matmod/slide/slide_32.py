@@ -307,9 +307,6 @@ phi_
 # \boldsymbol{\Phi} = - \Upsilon \frac{\partial \varphi}{\partial \boldsymbol{\mathcal{S}}} 
 # \end{align}
 
-# In[36]:
-
-
 Phi_ = -Sig_signs * phi_.diff(Sig)
 
 class Slide23Expr(bu.SymbExpr):
@@ -369,7 +366,7 @@ class Slide23Expr(bu.SymbExpr):
 
 import traits.api as tr
 
-class Slide32(bu.InjectSymbExpr):
+class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
 
     name = 'Slide 3.2'
     symb_class = Slide23Expr
@@ -389,15 +386,32 @@ class Slide32(bu.InjectSymbExpr):
     f_c0 = tr.Float(20, MAT=True)
     eta = tr.Float(0.5, MAT=True)
 
+    ipw_view = bu.View(
+        bu.Item('E_s', minmax=(0.5, 100)),
+        bu.Item('S_s', minmax=(.00001, 100)),
+        bu.Item('c_s', minmax=( 0.0001, 10)),
+        bu.Item('gamma_s', latex=r'\gamma_\mathrm{s}', minmax=(-20, 20)),
+        bu.Item('K_s', minmax=(-20, 20)),
+        bu.Item('bartau', latex=r'\bar{\tau}', minmax=(0.5, 20)),
+        bu.Item('E_w', minmax=(0.5, 100)),
+        bu.Item('S_w', minmax=(0.0001, 100)),
+        bu.Item('c_w', minmax=(0.0001, 10)),
+        bu.Item('m', minmax=(0.0001, 0.4)),
+        bu.Item('f_t', minmax=(0.1, 10)),
+        bu.Item('f_c', latex=r'f_\mathrm{c}', minmax=(1, 200)),
+        bu.Item('f_c0', latex=r'f_\mathrm{c0}', minmax=(1, 100)),
+        bu.Item('eta', minmax=(0, 1))
+    )
+
     def get_f_df(self, s_x_n1, s_y_n1, w_n1, Eps_k):
-        Sig_k = self.symb.get_Sig(s_x_n1, s_y_n1, w_n1, Eps_k)[0]
-        dSig_dEps_k = self.symb.get_dSig_dEps(s_x_n1, s_y_n1, w_n1, Eps_k)
-        f_k = np.array([self.symb.get_f(Eps_k, Sig_k)])
-        df_dSig_k = self.get_df_dSig(Eps_k, Sig_k)
-        ddf_dEps_k = self.get_ddf_dEps(Eps_k, Sig_k)
+        Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Eps_k)[0]
+        dSig_dEps_k = self.symb.get_dSig_dEps_(s_x_n1, s_y_n1, w_n1, Eps_k)
+        f_k = np.array([self.symb.get_f_(Eps_k, Sig_k)])
+        df_dSig_k = self.symb.get_df_dSig_(Eps_k, Sig_k)
+        ddf_dEps_k = self.symb.get_ddf_dEps_(Eps_k, Sig_k)
         df_dEps_k = np.einsum(
             'ik,ji->jk', df_dSig_k, dSig_dEps_k) + ddf_dEps_k
-        Phi_k = self.get_Phi(Eps_k, Sig_k)
+        Phi_k = self.symb.get_Phi_(Eps_k, Sig_k)
         dEps_dlambda_k = Phi_k
         df_dlambda = np.einsum(
             'ki,kj->ij', df_dEps_k, dEps_dlambda_k)
@@ -410,8 +424,8 @@ class Slide32(bu.InjectSymbExpr):
         for an updated $\lambda_k$ is performed using this procedure.
         '''
 
-        Sig_k = self.symb.get_Sig(s_x_n1, s_y_n1, w_n1, Eps_k)[0]
-        Phi_k = self.symb.get_Phi(Eps_k, Sig_k)
+        Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Eps_k)[0]
+        Phi_k = self.symb.get_Phi_(Eps_k, Sig_k)
         Eps_k1 = Eps_n + lam_k * Phi_k[:, 0]
         return Eps_k1
 
@@ -430,7 +444,7 @@ class Slide32(bu.InjectSymbExpr):
         '''
         Eps_k = np.copy(Eps_n)
         lam_k = 0
-        f_k, df_k, Sig_k = self.symb.get_f_df(s_x_n1, s_y_n1, w_n1, Eps_k)
+        f_k, df_k, Sig_k = self.get_f_df(s_x_n1, s_y_n1, w_n1, Eps_k)
         f_k_norm = np.linalg.norm(f_k)
         f_k_trial = f_k[0]
         k = 0
@@ -439,13 +453,15 @@ class Slide32(bu.InjectSymbExpr):
                 return Eps_k, Sig_k, k + 1
             dlam = np.linalg.solve(df_k, -f_k)
             lam_k += dlam
-            Eps_k = self.symb.get_Eps_k1(s_x_n1, s_y_n1, w_n1, Eps_n, lam_k, Eps_k)
-            f_k, df_k, Sig_k = self.symb.get_f_df(s_x_n1, s_y_n1, w_n1, Eps_k)
+            Eps_k = self.get_Eps_k1(s_x_n1, s_y_n1, w_n1, Eps_n, lam_k, Eps_k)
+            f_k, df_k, Sig_k = self.get_f_df(s_x_n1, s_y_n1, w_n1, Eps_k)
             f_k_norm = np.linalg.norm(f_k)
             k += 1
         else:
             raise ValueError('no convergence')
 
+    def update_plot(self, ax):
+        pass
 
 
 # # Time integration scheme
