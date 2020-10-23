@@ -371,20 +371,20 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
     name = 'Slide 3.2'
     symb_class = Slide23Expr
 
-    E_s = tr.Float(28000, MAT=True)
-    gamma_s = tr.Float(10, MAT=True)
-    K_s = tr.Float(8, MAT=True)
-    S_s = tr.Float(1, MAT=True)
-    c_s = tr.Float(1, MAT=True)
-    bartau = tr.Float(28000, MAT=True)
-    E_w = tr.Float(28000, MAT=True)
-    S_w =tr.Float(1, MAT=True)
-    c_w = tr.Float(1, MAT=True)
-    m = tr.Float(0.1, MAT=True)
-    f_t = tr.Float(3, MAT=True)
-    f_c = tr.Float(30, MAT=True)
-    f_c0 = tr.Float(20, MAT=True)
-    eta = tr.Float(0.5, MAT=True)
+    E_s = bu.Float(28000, MAT=True)
+    gamma_s = bu.Float(10, MAT=True)
+    K_s = bu.Float(8, MAT=True)
+    S_s = bu.Float(1, MAT=True)
+    c_s = bu.Float(1, MAT=True)
+    bartau = bu.Float(28000, MAT=True)
+    E_w = bu.Float(28000, MAT=True)
+    S_w =bu.Float(1, MAT=True)
+    c_w = bu.Float(1, MAT=True)
+    m = bu.Float(0.1, MAT=True)
+    f_t = bu.Float(3, MAT=True)
+    f_c = bu.Float(30, MAT=True)
+    f_c0 = bu.Float(20, MAT=True)
+    eta = bu.Float(0.5, MAT=True)
 
     ipw_view = bu.View(
         bu.Item('E_s', minmax=(0.5, 100)),
@@ -429,7 +429,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Eps_k1 = Eps_n + lam_k * Phi_k[:, 0]
         return Eps_k1
 
-    rtol = tr.Float(1e-4, ALG=True)
+    rtol = bu.Float(1e-4, ALG=True)
     '''Relative tolerance of the return mapping algorithm related 
     to the tensile strength
     '''

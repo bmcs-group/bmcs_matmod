@@ -161,24 +161,22 @@ class FDoubleCap(bu.InteractiveModel,bu.InjectSymbExpr):
 
     symb_class = FDoubleCapExpr
 
-    f_t = tr.Float(5, MAT=True)
-    f_c = tr.Float(80, MAT=True)
-    f_c0 = tr.Float(30, MAT=True)
-    tau_bar = tr.Float(5, MAT=True)
-    m = tr.Float(0.1, MAT=True)
+    f_t = bu.Float(5, MAT=True)
+    f_c = bu.Float(80, MAT=True)
+    f_c0 = bu.Float(30, MAT=True)
+    tau_bar = bu.Float(5, MAT=True)
+    m = bu.Float(0.1, MAT=True)
 
     ipw_view = bu.View(
-        bu.Item('f_t', minmax=(1, max_f_t)),
-        bu.Item('f_c', minmax=(10, max_f_c)),
-        bu.Item('f_c0', latex='f_{c0}', minmax=(5, 0.9 * max_f_c)),
-        bu.Item('tau_bar', latex=r'\bar{\tau}', minmax=(1, max_tau_bar)),
+        bu.Item('f_t', editor=bu.FloatRangeEditor(low=1, high=max_f_t)),
+        bu.Item('f_c', editor=bu.FloatRangeEditor(low=10, high=max_f_c)),
+        bu.Item('f_c0', latex='f_{c0}', editor=bu.FloatRangeEditor(low=5, high=0.9*max_f_c)),
+        bu.Item('tau_bar', latex=r'\bar{\tau}', editor=bu.FloatRangeEditor(low=1, high=max_tau_bar)),
         bu.Item('m', minmax=(0.0001, 0.5))
     )
 
     def update_plot(self, ax):
         # Evaluate the threshold function within an orthogonal grid
-
-        # In[53]:
 
         X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
         Z_a = self.symb.get_f_solved(X_a, Y_a)
