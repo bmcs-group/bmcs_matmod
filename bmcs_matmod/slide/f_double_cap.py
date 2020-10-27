@@ -8,11 +8,6 @@
 
 import sympy as sp
 import numpy as np
-import matplotlib.pylab as plt
-from mpl_toolkits.mplot3d import Axes3D
-import ipyvolume as ipv
-import ipywidgets as ipw
-
 
 # ![image.png](attachment:image.png)
 
@@ -113,7 +108,6 @@ subs_shear = {y_bar:tau_bar, x_0:0}
 subs_compression = {x_0: -f_c0, x_bar:-f_c,  y_bar: tau_bar-m*(-f_c0) }
 
 import bmcs_utils.api as bu
-import traits.api as tr
 
 class FDoubleCapExpr(bu.SymbExpr):
     # -------------------------------------------------------------------------
@@ -177,9 +171,6 @@ class FDoubleCap(bu.InteractiveModel,bu.InjectSymbExpr):
 
     def update_plot(self, ax):
         # Evaluate the threshold function within an orthogonal grid
-
         X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
         Z_a = self.symb.get_f_solved(X_a, Y_a)
-
-        # In[68]:
         ax.contour(X_a, Y_a, Z_a, levels=8)

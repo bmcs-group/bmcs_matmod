@@ -266,7 +266,7 @@ subs_tau_eff
 
 # In[25]:
 
-from bmcs_matmod.matmod.slide.f_double_cap import FDoubleCap
+from bmcs_matmod.slide.f_double_cap import FDoubleCap
 import bmcs_utils.api as bu
 
 fdc = FDoubleCap()
