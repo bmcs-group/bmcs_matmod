@@ -31,8 +31,8 @@ class SlideExplorer(bu.InteractiveModel):
     s_y_1 = bu.Float(0, INC=True)
     w_1 = bu.Float(0, INC=True)
 
-    n_steps = tr.Int(10, ALG=True)
-    k_max = tr.Int(20, ALG=True)
+    n_steps = bu.Int(10, ALG=True)
+    k_max = bu.Int(20, ALG=True)
 
     Sig_arr = tr.Array
     Eps_arr = tr.Array
@@ -40,7 +40,11 @@ class SlideExplorer(bu.InteractiveModel):
     ipw_view = bu.View(
         bu.Item('s_x_1', latex=r's_x', minmax=(-4, 4)),
         bu.Item('s_y_1', latex=r's_y', minmax=(-4, 4)),
-        bu.Item('w_1', latex=r'w', minmax=(-4, 4))
+        bu.Item('w_1', latex=r'w', minmax=(-4, 4)),
+        bu.Item('n_steps'),
+        bu.Item('k_max'),
+        simulator='run',
+        reset_simulator='reset'
     )
 
     def reset_i(self):
@@ -58,22 +62,24 @@ class SlideExplorer(bu.InteractiveModel):
         self.s_y_1 = 0
         self.w_1 = 0
 
-    def get_response_i(self):
+    def get_response_i(self, update_progress=lambda t: t):
         # global Eps_record, Sig_record, iter_record
         # global t_arr, s_x_t, s_y_t, w_t, s_x_0, s_y_0, w_0, t0, Eps_n1
         n_steps = self.n_steps
+        i_t = np.linspace(0,1, n_steps+1)
         t1 = self.t0 + 1
         ti_arr = np.linspace(self.t0, t1, n_steps + 1)
         si_x_t = np.linspace(self.s_x_0, self.s_x_1, n_steps + 1) + 1e-9
         si_y_t = np.linspace(self.s_y_0, self.s_y_1, n_steps + 1) + 1e-9
         wi_t = np.linspace(self.w_0, self.w_1, n_steps + 1) + 1e-9
-        for s_x_n1, s_y_n1, w_n1 in zip(si_x_t, si_y_t, wi_t):
+        for i, s_x_n1, s_y_n1, w_n1 in zip(i_t, si_x_t, si_y_t, wi_t):
             self.Eps_n1, Sig_n1, k = self.slide_model.get_sig_n1(
                 s_x_n1, s_y_n1, w_n1, self.Eps_n1, self.k_max
             )
             self.Sig_record.append(Sig_n1)
             self.Eps_record.append(self.Eps_n1)
             self.iter_record.append(k)
+            update_progress(i)
 
         self.Sig_arr = np.array(self.Sig_record, dtype=np.float_)
         self.Eps_arr = np.array(self.Eps_record, dtype=np.float_)
@@ -104,14 +110,18 @@ class SlideExplorer(bu.InteractiveModel):
 
         return ax_sxy, ax_sig
 
-    def update_plot(self, axes):
-        ax_sxy, ax_sig = axes
+    def run(self, update_progress=lambda t: t):
         try:
-            self.get_response_i()
+            self.get_response_i(update_progress)
         except ValueError:
             print('No convergence reached')
             return
 
+    def reset(self):
+        self.reset_i()
+
+    def update_plot(self, axes):
+        ax_sxy, ax_sig = axes
         self.plot_sig_w(ax_sig)
         ax_sig.set_xlabel(r'$w$ [mm]');
         ax_sig.set_ylabel(r'$\sigma$ [MPa]');

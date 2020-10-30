@@ -4,10 +4,10 @@ channels:
 dependencies:
 - appmode
 - jupyter_contrib_nbextensions
-- traits
+- traits>=6.1.1
 - matplotlib-base
-- numpy
-- scipy
+- numpy>=1.19.2
+- scipy>=1.5.2
 - sympy
 - ipywidgets
 - ipympl

@@ -429,7 +429,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Eps_k1 = Eps_n + lam_k * Phi_k[:, 0]
         return Eps_k1
 
-    rtol = bu.Float(1e-4, ALG=True)
+    rtol = bu.Float(1e-6, ALG=True)
     '''Relative tolerance of the return mapping algorithm related 
     to the tensile strength
     '''
@@ -461,6 +461,11 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
             raise ValueError('no convergence')
 
     def update_plot(self, ax):
+        X_a, Y_a = np.mgrid[-1.1*self.f_c:1.1*self.f_t:210j, -self.bartau:self.bartau:210j]
+        n_Eps = len(self.symb.Eps)
+        # Eps_k = self.n_Eps
+        # f_k = np.array([self.symb.get_f_(Eps_k, Sig_k)])
+        # self.f
         pass
 
 

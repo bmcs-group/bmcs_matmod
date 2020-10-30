@@ -169,8 +169,20 @@ class FDoubleCap(bu.InteractiveModel,bu.InjectSymbExpr):
         bu.Item('m', minmax=(0.0001, 0.5))
     )
 
-    def update_plot(self, ax):
-        # Evaluate the threshold function within an orthogonal grid
+    def subplots(self, fig):
+        ax = fig.add_subplot(1, 1, 1, projection='3d')
+        return ax
+
+    def plot_3d(self, ax):
         X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
         Z_a = self.symb.get_f_solved(X_a, Y_a)
-        ax.contour(X_a, Y_a, Z_a, levels=8)
+        #ax.contour(X_a, Y_a, Z_a, levels=8)
+        Z_0 = np.zeros_like(Z_a)
+        ax.plot_surface(X_a, Y_a, Z_a, rstride=1, cstride=1,
+                        cmap='winter', edgecolor='none')
+        ax.plot_surface(X_a, Y_a, Z_0, edgecolor='none')
+        ax.set_title('threshold function');
+
+    def update_plot(self, ax):
+        # Evaluate the threshold function within an orthogonal grid
+        self.plot_3d(ax)
