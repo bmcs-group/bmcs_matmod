@@ -4,6 +4,7 @@ import numpy as np
 import traits.api as tr
 from bmcs_matmod.slide.slide_32 import Slide32
 from bmcs_matmod.slide.energy_dissipation import EnergyDissipation
+from bmcs_matmod.slide.inel_state_evolution import InelStateEvolution
 from bmcs_matmod.time_fn.time_function import TimeFunction
 
 class SlideExplorer(bu.InteractiveModel):
@@ -15,6 +16,11 @@ class SlideExplorer(bu.InteractiveModel):
     '''Viewer to the energy dissipation'''
     def _energy_dissipation_default(self):
         return EnergyDissipation(slider_exp=self)
+
+    inel_state_evolution = tr.Instance(InelStateEvolution)
+    '''Viewer to the inelastic state evolution'''
+    def _inel_state_evolution_default(self):
+        return InelStateEvolution(slider_exp=self)
 
     time_fn = tr.Instance(TimeFunction, ())
 
@@ -132,68 +138,4 @@ class SlideExplorer(bu.InteractiveModel):
         ax_sxy.set_xlabel(r'$s_x$ [mm]');
         ax_sxy.set_ylabel(r'$s_y$ [mm]');
         ax_sxy.set_zlabel(r'$\| \tau \| = \sqrt{\tau_x^2 + \tau_y^2}$ [MPa]');
-
-    def plot_Sig_Eps(self, axes):
-        ax1, ax11, ax2, ax22, ax3, ax33, ax4, ax44 = axes
-        colors = ['blue', 'red', 'green', 'black', 'magenta']
-        s_x_pi_, s_y_pi_, w_pi_, z_, alpha_x_, alpha_y_, omega_s_, omega_w_ = self.Eps_arr.T
-        tau_x_pi_, tau_y_pi_, sig_pi_, Z_, X_x_, X_y_, Y_s_, Y_w_ = self.Sig_arr.T
-        n_step = len(s_x_pi_)
-        ax1.plot(self.s_x_t, self.tau_x_pi_, color='black',
-                 label='n_steps = %g' % n_step)
-        ax1.set_xlabel('$s$');
-        ax1.set_ylabel(r'$\tau$')
-        ax1.legend()
-        ax11.plot(self.s_x_t, self.iter_t, '-.')
-        ax2.plot(self.s_x_t, omega_s_, color='red',
-                 label='n_steps = %g' % n_step)
-        ax2.set_xlabel('$s$');
-        ax2.set_ylabel(r'$\omega$')
-        ax2.plot(self.s_x_t, omega_w_, color='green', )
-        #    ax22.plot(s_x_t, Y_s_, '-.', color='red',
-        #             label='n_steps = %g' % n_step)
-        #    ax22.set_ylabel('$Y$')
-        ax3.plot(self.s_x_t, z_, color='green',
-                 label='n_steps = %g' % n_step)
-        ax3.set_xlabel('$s$');
-        ax3.set_ylabel(r'$z$')
-        ax33.plot(self.s_x_t, Z_, '-.', color='green')
-        ax33.set_ylabel(r'$Z$')
-        ax4.plot(self.s_x_t, alpha_x_, color='blue',
-                 label='n_steps = %g' % n_step)
-        ax4.set_xlabel('$s$');
-        ax4.set_ylabel(r'$\alpha$')
-        ax44.plot(self.s_x_t, X_x_, '-.', color='blue')
-        ax44.set_ylabel(r'$X$')
-
-    def plot_dissipation2(self, ax):
-        colors = ['blue', 'red', 'green', 'black', 'magenta']
-        E_i = cumtrapz(self.Sig_arr, self.Eps_arr, initial=0, axis=0)
-        E_s_x_pi_, E_s_y_pi_, E_w_pi_, E_z_, E_alpha_x_, E_alpha_y_, E_omega_s_, E_omega_w_ = E_i.T
-        c = 'brown'
-        E_plastic_work = E_s_x_pi_ + E_s_y_pi_ + E_w_pi_
-        ax.plot(self.t_arr, E_plastic_work, '-.', lw=1, color=c)
-        c = 'blue'
-        E_isotropic_diss = E_z_
-        ax.plot(self.t_arr, E_isotropic_diss, '-.', lw=1, color='black')
-        ax.fill_between(self.t_arr, E_isotropic_diss, 0, color=c, alpha=0.3)
-        c = 'blue'
-        E_free_energy = E_alpha_x_ + E_alpha_y_
-        ax.plot(self.t_arr, E_free_energy, color='black', lw=1)
-        ax.fill_between(self.t_arr, E_free_energy, E_isotropic_diss,
-                        color=c, alpha=0.2);
-        E_plastic_diss = E_plastic_work - E_free_energy
-        ax.plot(self.t_arr, E_plastic_diss, color='black', lw=1)
-        ax.fill_between(self.t_arr, E_plastic_diss, 0,
-                        color='orange', alpha=0.3);
-        c = 'magenta'
-        E_damage_diss = E_omega_s_ + E_omega_w_
-        ax.plot(self.t_arr, E_plastic_diss + E_damage_diss, color=c, lw=1)
-        ax.fill_between(self.t_arr, E_plastic_diss + E_damage_diss,
-                        E_plastic_work,
-                        color=c, alpha=0.2);
-        ax.fill_between(self.t_arr, E_free_energy + E_plastic_diss + E_damage_diss,
-                        E_plastic_diss + E_damage_diss,
-                        color='yellow', alpha=0.3);
-
 

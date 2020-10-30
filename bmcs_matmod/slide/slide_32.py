@@ -429,7 +429,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Eps_k1 = Eps_n + lam_k * Phi_k[:, 0]
         return Eps_k1
 
-    rtol = bu.Float(1e-6, ALG=True)
+    rtol = bu.Float(1e-3, ALG=True)
     '''Relative tolerance of the return mapping algorithm related 
     to the tensile strength
     '''
