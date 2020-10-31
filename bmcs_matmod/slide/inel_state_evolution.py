@@ -1,10 +1,11 @@
-
 import bmcs_utils.api as bu
 import traits.api as tr
 from scipy.integrate import cumtrapz
+import numpy as np
+from scipy.integrate import cumtrapz
 
 class InelStateEvolution(bu.InteractiveModel):
-    name='State evolution'
+    name = 'State evolution'
 
     slider_exp = tr.WeakRef(bu.InteractiveModel)
 
@@ -32,40 +33,55 @@ class InelStateEvolution(bu.InteractiveModel):
         s_x_pi_, s_y_pi_, w_pi_, z_, alpha_x_, alpha_y_, omega_s_, omega_w_ = self.Eps_arr.T
         tau_x_pi_, tau_y_pi_, sig_pi_, Z_, X_x_, X_y_, Y_s_, Y_w_ = self.Sig_arr.T
         n_step = len(s_x_pi_)
-        ax1.plot(self.s_x_t, tau_x_pi_, color='black',
-                 label='n_steps = %g' % n_step)
-        ax1.set_xlabel('$s$');
-        ax1.set_ylabel(r'$\tau$')
+
+        # slip path in 2d
+        s_x, s_y = self.s_x_t, self.s_y_t
+        d_s_x, d_s_y = s_x[1:] - s_x[:-1], s_y[1:] - s_y[:-1]
+        d_s = np.hstack([0, np.sqrt(d_s_x**2 + d_s_y**2)])
+        s_t = cumtrapz(d_s, initial=0)
+        w_t = self.w_t
+        tau_pi = np.sqrt(tau_x_pi_**2 + tau_y_pi_**2)
+
+        ax1.plot(s_t, tau_pi, color='green',
+                 label=r'$||\tau(s)||$')
+        ax1.set_xlabel('$s,w$');
+        ax1.set_ylabel(r'$|| \tau ||, \sigma$')
+        ax1.plot(self.w_t, sig_pi_, color='red',
+                label = r'$\sigma(w)$')
         ax1.legend()
-        ax11.plot(self.w_t, sig_pi_, color='green')
-        ax2.plot(self.s_x_t, omega_s_, color='red',
-                 label='n_steps = %g' % n_step)
-        ax2.set_xlabel('$s$');
+
+        ax2.plot(s_t, omega_s_, color='green',
+                 label=r'$\omega_s(s)$')
+        ax2.set_xlabel('$s, w$');
         ax2.set_ylabel(r'$\omega$')
-        ax2.plot(self.s_x_t, omega_s_, color='green', )
-        ax2.plot(self.w_t, omega_w_, color='red', )
-        ax22.plot(self.s_x_t, Y_s_, '-.', color='green',
-                  label='n_steps = %g' % n_step)
-        ax22.plot(self.w_t, Y_w_, '-.', color='red',
-                  label='n_steps = %g' % n_step)
+        ax2.plot(w_t, omega_w_, color='red',
+                 label=r'$\omega_w(w)$')
+        ax22.plot(s_t, Y_s_, '-.', color='green',
+                  label=r'$Y(s)$')
+        ax22.plot(w_t, Y_w_, '-.', color='red',
+                  label=r'$Y(w)$')
         ax22.set_ylabel('$Y$')
-        ax3.plot(self.s_x_t, z_, color='green',
-                 label='n_steps = %g' % n_step)
-        ax3.plot(self.w_t, z_, color='red',
-                 label='n_steps = %g' % n_step)
-        ax3.set_xlabel('$s$');
+
+        ax3.plot(s_t, z_, color='green',
+                 label=r'$z(s)$')
+        ax3.plot(w_t, z_, color='red',
+                 label=r'$z(w)$')
+        ax3.set_xlabel('$s, w$');
         ax3.set_ylabel(r'$z$')
-        ax33.plot(self.s_x_t, Z_, '-.', color='green')
-        ax33.plot(self.w_t, Z_, '-.', color='red')
+        ax33.plot(s_t, Z_, '-.', color='green')
+        ax33.plot(w_t, Z_, '-.', color='red')
         ax33.set_ylabel(r'$Z$')
-        ax4.plot(self.s_x_t, alpha_x_, color='green',
-                 label='n_steps = %g' % n_step)
-        ax4.plot(self.w_t, alpha_x_, color='red',
-                 label='n_steps = %g' % n_step)
-        ax4.set_xlabel('$s$');
+
+        alpha_t = np.sqrt(alpha_x_**2 + alpha_y_**2)
+        X_t = np.sqrt(X_x_**2 + X_y_**2)
+        ax4.plot(s_t, alpha_t, color='green',
+                 label=r'$\alpha(s)$')
+        ax4.plot(w_t, alpha_t, color='red',
+                 label=r'$\alpha(w)$')
+        ax4.set_xlabel('$s, w$');
         ax4.set_ylabel(r'$\alpha$')
-        ax44.plot(self.s_x_t, X_x_, '-.', color='green')
-        ax44.plot(self.w_t, X_x_, '-.', color='red')
+        ax44.plot(s_t, X_t, '-.', color='green')
+        ax44.plot(w_t, X_t, '-.', color='red')
         ax44.set_ylabel(r'$X$')
 
     def plot_dissipation2(self, ax):
@@ -98,8 +114,8 @@ class InelStateEvolution(bu.InteractiveModel):
                         E_plastic_diss + E_damage_diss,
                         color='yellow', alpha=0.3);
 
-
-    def subplots(self, fig):
+    @staticmethod
+    def subplots(fig):
         ((ax1, ax2), (ax3, ax4)) = fig.subplots(2, 2)
         ax11 = ax1.twinx()
         ax22 = ax2.twinx()

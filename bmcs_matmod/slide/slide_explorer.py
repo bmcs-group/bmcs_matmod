@@ -43,6 +43,14 @@ class SlideExplorer(bu.InteractiveModel):
     Sig_arr = tr.Array
     Eps_arr = tr.Array
 
+    Sig_t = tr.Property
+    def _get_Sig_t(self):
+        return self.Sig_arr
+
+    Eps_t = tr.Property
+    def _get_Eps_t(self):
+        return self.Eps_arr
+
     ipw_view = bu.View(
         bu.Item('s_x_1', latex=r's_x', minmax=(-4, 4)),
         bu.Item('s_y_1', latex=r's_y', minmax=(-4, 4)),
