@@ -2,6 +2,7 @@
 import bmcs_utils.api as bu
 import traits.api as tr
 from scipy.integrate import cumtrapz
+import numpy as np
 
 class EnergyDissipation(bu.InteractiveModel):
     name='Energy'
@@ -40,10 +41,14 @@ class EnergyDissipation(bu.InteractiveModel):
                 cumtrapz(self.Sig_arr[:, 1], self.s_y_t, initial=0) +
                 cumtrapz(self.Sig_arr[:, 2], self.w_t, initial=0)
         )
+
+        s_x_el_t = (self.s_x_t - self.Eps_arr[:, 0])
+        s_y_el_t = (self.s_y_t - self.Eps_arr[:, 1])
+        w_el_t = (self.w_t - self.Eps_arr[:, 2])
         U_arr = (
-                self.Sig_arr[:, 0] * (self.s_x_t - self.Eps_arr[:, 0]) / 2.0 +
-                self.Sig_arr[:, 1] * (self.s_y_t - self.Eps_arr[:, 1]) / 2.0 +
-                self.Sig_arr[:, 2] * (self.w_t - self.Eps_arr[:, 2]) / 2.0
+                self.Sig_arr[:, 0] * s_x_el_t / 2.0 +
+                self.Sig_arr[:, 1] * s_y_el_t / 2.0 +
+                self.Sig_arr[:, 2] * w_el_t / 2.0
         )
         G_arr = W_arr - U_arr
         ax.plot(self.t_arr, W_arr, lw=2, color='black', label=r'$W$ - Input work')
