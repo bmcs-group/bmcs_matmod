@@ -13,5 +13,5 @@ dependencies:
 - ipympl
 - pip
 - pip:
-  - bmcs_utils
+  - bmcs_utils>=0.0.17a
   - -e .
