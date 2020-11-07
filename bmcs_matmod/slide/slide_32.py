@@ -471,6 +471,28 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         else:
             raise ConvergenceError('no convergence for step', [s_x_n1, s_y_n1, w_n1])
 
+    def plot_f_state(self, ax, Eps, Sig):
+        lower = -self.f_c * 1.05
+        upper = self.f_t + 0.05 * self.f_c
+        lower_tau = -self.bartau * 2
+        upper_tau = self.bartau * 2
+        tau_x, tau_y, sig = Sig[:3]
+        tau = np.sqrt(tau_x**2 + tau_y**2)
+        sig_ts, tau_x_ts  = np.mgrid[lower:upper:201j,lower_tau:upper_tau:201j]
+        Sig_ts = np.zeros((len(self.symb.Eps),) + tau_x_ts.shape)
+        Eps_ts = np.zeros_like(Sig_ts)
+        Sig_ts[0,...] = tau_x_ts
+        Sig_ts[2,...] = sig_ts
+        Sig_ts[3:,...] = Sig[3:,np.newaxis,np.newaxis]
+        Eps_ts[...] = Eps[:,np.newaxis,np.newaxis]
+        f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts)])
+        ax.set_title('threshold function');
+        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0)
+        ax.plot(sig, tau, marker='H', color='red')
+        ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
+        ax.plot([0, 0], [lower_tau, upper_tau], color='black', lw=0.4)
+
+
     def plot_f(self, ax):
         lower = -self.f_c * 1.05
         upper = self.f_t + 0.05 * self.f_c

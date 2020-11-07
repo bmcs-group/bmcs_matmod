@@ -108,6 +108,8 @@ class SlideExplorer(bu.InteractiveModel):
         self.w_t = np.hstack([self.w_t, wi_t])[:n_i]
         self.t0 = t1
         self.s_x_0, self.s_y_0, self.w_0 = self.s_x_1, self.s_y_1, self.w_1
+        # set the last step index in the response browser
+        self.inel_state_evolution.t_max = self.t_arr[-1]
         return
 
     # ## Plotting functions

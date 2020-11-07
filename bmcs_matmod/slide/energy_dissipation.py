@@ -7,6 +7,15 @@ import numpy as np
 class EnergyDissipation(bu.InteractiveModel):
     name='Energy'
 
+    colors = dict( # color associations
+        stored_energy = 'darkgreen', # recoverable
+        free_energy_kin = 'darkcyan', # freedom - sky
+        free_energy_iso = 'darkslateblue', # freedom - sky
+        plastic_diss_s = 'darkorange', # fire - heat
+        plastic_diss_w = 'red', # fire - heat
+        damage_diss_s = 'darkgray', # ruined
+        damage_diss_w = 'black'  # ruined
+    )
     slider_exp = tr.WeakRef(bu.InteractiveModel)
 
     t_arr = tr.DelegatesTo('slider_exp')
@@ -34,7 +43,6 @@ class EnergyDissipation(bu.InteractiveModel):
     )
 
     def plot_energy(self, ax, ax_i):
-        colors = ['blue', 'red', 'green', 'black', 'magenta']
 
         W_arr = (
                 cumtrapz(self.Sig_arr[:, 0], self.s_x_t, initial=0) +
@@ -52,8 +60,9 @@ class EnergyDissipation(bu.InteractiveModel):
         )
         G_arr = W_arr - U_arr
         ax.plot(self.t_arr, W_arr, lw=2, color='black', label=r'$W$ - Input work')
-        ax.plot(self.t_arr, G_arr, color='red', label=r'$G$ - Plastic work')
-        ax.fill_between(self.t_arr, W_arr, G_arr, color='green', alpha=0.2)
+        ax.plot(self.t_arr, G_arr, '--', color='black', lw = 0.5, label=r'$W^\mathrm{inel}$ - Inelastic work')
+        ax.fill_between(self.t_arr, W_arr, G_arr,
+                        color=self.colors['stored_energy'], alpha=0.2)
         ax.set_xlabel('$t$ [-]');
         ax.set_ylabel(r'$E$ [Nmm]')
         ax.legend()
