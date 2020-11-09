@@ -2,7 +2,7 @@
 import bmcs_utils.api as bu
 import numpy as np
 import traits.api as tr
-from bmcs_matmod.slide.slide_32 import Slide32
+from bmcs_matmod.slide.slide_32 import Slide32, ConvergenceError
 from bmcs_matmod.slide.energy_dissipation import EnergyDissipation
 from bmcs_matmod.slide.inel_state_evolution import InelStateEvolution
 from bmcs_matmod.time_fn.time_function import TimeFunction
@@ -80,30 +80,36 @@ class SlideExplorer(bu.InteractiveModel):
         # global Eps_record, Sig_record, iter_record
         # global t_arr, s_x_t, s_y_t, w_t, s_x_0, s_y_0, w_0, t0, Eps_n1
         n_steps = self.n_steps
-        i_t = np.linspace(0,1, n_steps+1)
+        t_i = np.linspace(0,1, n_steps+1)
         t1 = self.t0 + 1
         ti_arr = np.linspace(self.t0, t1, n_steps + 1)
         si_x_t = np.linspace(self.s_x_0, self.s_x_1, n_steps + 1) + 1e-9
         si_y_t = np.linspace(self.s_y_0, self.s_y_1, n_steps + 1) + 1e-9
         wi_t = np.linspace(self.w_0, self.w_1, n_steps + 1) + 1e-9
-        for i, s_x_n1, s_y_n1, w_n1 in zip(i_t, si_x_t, si_y_t, wi_t):
-            self.Eps_n1, Sig_n1, k = self.slide_model.get_sig_n1(
-                s_x_n1, s_y_n1, w_n1, self.Eps_n1, self.k_max
-            )
+        for t, s_x_n1, s_y_n1, w_n1 in zip(t_i, si_x_t, si_y_t, wi_t):
+            try: self.Eps_n1, Sig_n1, k = self.slide_model.get_sig_n1(
+                    s_x_n1, s_y_n1, w_n1, self.Eps_n1, self.k_max
+                )
+            except ConvergenceError as e:
+                print(e)
+                break
             self.Sig_record.append(Sig_n1)
             self.Eps_record.append(self.Eps_n1)
             self.iter_record.append(k)
-            update_progress(i)
+            update_progress(t)
 
         self.Sig_arr = np.array(self.Sig_record, dtype=np.float_)
         self.Eps_arr = np.array(self.Eps_record, dtype=np.float_)
         self.iter_t = np.array(self.iter_record, dtype=np.int_)
-        self.t_arr = np.hstack([self.t_arr, ti_arr])
-        self.s_x_t = np.hstack([self.s_x_t, si_x_t])
-        self.s_y_t = np.hstack([self.s_y_t, si_y_t])
-        self.w_t = np.hstack([self.w_t, wi_t])
+        n_i = len(self.iter_t)
+        self.t_arr = np.hstack([self.t_arr, ti_arr])[:n_i]
+        self.s_x_t = np.hstack([self.s_x_t, si_x_t])[:n_i]
+        self.s_y_t = np.hstack([self.s_y_t, si_y_t])[:n_i]
+        self.w_t = np.hstack([self.w_t, wi_t])[:n_i]
         self.t0 = t1
         self.s_x_0, self.s_y_0, self.w_0 = self.s_x_1, self.s_y_1, self.w_1
+        # set the last step index in the response browser
+        self.inel_state_evolution.t_max = self.t_arr[-1]
         return
 
     # ## Plotting functions

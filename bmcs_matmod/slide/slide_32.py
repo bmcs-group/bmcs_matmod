@@ -366,6 +366,17 @@ class Slide23Expr(bu.SymbExpr):
 
 import traits.api as tr
 
+class ConvergenceError(Exception):
+    """ Inappropriate argument value (of correct type). """
+
+    def __init__(self, message, state):  # real signature unknown
+        self.message = message
+        self.state = state
+        super().__init__(self.message)
+
+    def __str__(self):
+        return f'{self.message} for state {self.state}'
+
 class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
 
     name = 'Slide 3.2'
@@ -458,15 +469,48 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
             f_k_norm = np.linalg.norm(f_k)
             k += 1
         else:
-            raise ValueError('no convergence')
+            raise ConvergenceError('no convergence for step', [s_x_n1, s_y_n1, w_n1])
+
+    def plot_f_state(self, ax, Eps, Sig):
+        lower = -self.f_c * 1.05
+        upper = self.f_t + 0.05 * self.f_c
+        lower_tau = -self.bartau * 2
+        upper_tau = self.bartau * 2
+        tau_x, tau_y, sig = Sig[:3]
+        tau = np.sqrt(tau_x**2 + tau_y**2)
+        sig_ts, tau_x_ts  = np.mgrid[lower:upper:201j,lower_tau:upper_tau:201j]
+        Sig_ts = np.zeros((len(self.symb.Eps),) + tau_x_ts.shape)
+        Eps_ts = np.zeros_like(Sig_ts)
+        Sig_ts[0,...] = tau_x_ts
+        Sig_ts[2,...] = sig_ts
+        Sig_ts[3:,...] = Sig[3:,np.newaxis,np.newaxis]
+        Eps_ts[...] = Eps[:,np.newaxis,np.newaxis]
+        f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts)])
+        ax.set_title('threshold function');
+        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0)
+        ax.plot(sig, tau, marker='H', color='red')
+        ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
+        ax.plot([0, 0], [lower_tau, upper_tau], color='black', lw=0.4)
+
+
+    def plot_f(self, ax):
+        lower = -self.f_c * 1.05
+        upper = self.f_t + 0.05 * self.f_c
+        lower_tau = -self.bartau * 2
+        upper_tau = self.bartau * 2
+        sig_ts, tau_x_ts  = np.mgrid[lower:upper:201j,lower_tau:upper_tau:201j]
+        Sig_ts = np.zeros((len(self.symb.Eps),) + tau_x_ts.shape)
+        Sig_ts[0,:] = tau_x_ts
+        Sig_ts[2,:] = sig_ts
+        Eps_ts = np.zeros_like(Sig_ts)
+        f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts)])
+        ax.set_title('threshold function');
+        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0)
+        ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
+        ax.plot([0, 0], [lower_tau, upper_tau], color='black', lw=0.4)
 
     def update_plot(self, ax):
-        X_a, Y_a = np.mgrid[-1.1*self.f_c:1.1*self.f_t:210j, -self.bartau:self.bartau:210j]
-        n_Eps = len(self.symb.Eps)
-        # Eps_k = self.n_Eps
-        # f_k = np.array([self.symb.get_f_(Eps_k, Sig_k)])
-        # self.f
-        pass
+        self.plot_f(ax)
 
 
 # # Time integration scheme
@@ -718,3 +762,17 @@ def codegen():
     h_f.close()
     c_f.close()
 
+
+# material_params = dict(
+#     E_s=1, gamma_s=5, K_s=5, S_s=0.6, c_s=1, bartau=1,
+#     E_w=1, S_w=0.6, c_w = 1, m = 0.01, f_t=1, f_c=-20, f_c0=-10, eta=0.5
+# )
+#
+# slide = Slide32(**material_params)
+#
+# Eps_1 = np.zeros((8,), dtype=np.float_) + 0.1
+# Eps_1[0] = 10
+# Eps_1[2] = 0
+#
+# f_val = slide.symb.get_f_(Eps_1, np.zeros_like(Eps_1))
+# print(f_val)
