@@ -1,0 +1,24 @@
+Metadata-Version: 2.1
+Name: bmcs-matmod
+Version: 0.0.9a0
+Summary: Suite of utilities for material model development.
+Home-page: https://github.com/bmcs-group/bmcs_matmod
+Author: BMCS-Group
+Author-email: rostislav.chudoba@rwt-aachen.de
+License: MIT
+Description: 
+        
+        # Material model generator and explorer
+        
+        [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/bmcs-group/bmcs_matmod/master?urlpath=%2Fapps%2Fbmcs_matmod/slide/slide_explorer.ipynb) - SLIDE 3.2 interface model
+        
+        
+Platform: UNKNOWN
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Requires-Python: >=3.6.0
+Description-Content-Type: text/markdown
