@@ -101,17 +101,7 @@ w_pi = sp.symbols(r'w^{\pi}', real=True)
 #w_pi = sp.symbols(r'w_pi', real=True)
 
 
-# In[7]:
-
-
 Eps = sp.Matrix([s_pi_x, s_pi_y, w_pi, z, alpha_x, alpha_y, omega_s, omega_w])
-Eps.T
-
-
-# In[9]:
-# ## Thermodynamic forces
-
-# In[10]:
 
 
 tau_x, tau_y = sp.symbols('tau_x, tau_y', real=True)
@@ -126,19 +116,11 @@ sig_pi = sp.symbols(r'\sigma^\pi', real=True)
 #sig_pi = sp.symbols(r'sigma_pi', real=True)
 Y_w = sp.Symbol('Y_w', real=True)
 
-
-# In[11]:
-
-
 Sig = sp.Matrix([tau_pi_x, tau_pi_y, sig_pi, Z, X_x, X_y, Y_s, Y_w])
 Sig.T
 
 
 # ## Helmholtz free energy
-
-# The starting point in the thermodynamical representation of a process is a potential function of time dependent state variables. To describe the evolution of the state correctly describing the energy dissipation of the system the gradient of the potential function with respect to the state variables provides the generalized forces. The forces are constrained to characterize specific material properties, e.g. strength, hardening.
-
-# In[8]:
 
 
 rho_psi_s_ = sp.Rational(1,2)* (
@@ -185,7 +167,6 @@ Sig_signs = sp.diag(-1,-1,-1,1,1,1,-1,-1)
 
 
 Sig_ = Sig_signs * d_rho_psi_
-Sig_.T
 
 
 # **Executable code for** $\boldsymbol{\mathcal{S}}(s,\boldsymbol{\mathcal{E}})$
@@ -204,7 +185,6 @@ Sig_.T
 dSig_dEps_ = sp.Matrix([ 
     Sig_.T.diff(eps) for eps in Eps 
 ] ).T
-dSig_dEps_
 
 
 # **Executable Python code generation** $\displaystyle \frac{\partial }{\partial \boldsymbol{\mathcal{E}}}  \boldsymbol{\mathcal{S}}(s,\boldsymbol{\mathcal{E}})$
@@ -244,7 +224,6 @@ norm_Q = sp.sqrt(Q_x*Q_x + Q_y*Q_y)
 
 
 subs_Q = {Q_x: tau_eff_x - X_x, Q_y: tau_eff_y - X_y}
-subs_Q
 
 
 # Further substitution rule introduces the effective stress as a function of damage as
@@ -396,8 +375,44 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
     f_c0 = bu.Float(20, MAT=True)
     eta = bu.Float(0.5, MAT=True)
 
+    def C_codegen(self):
+
+        import os
+        import os.path as osp
+
+        C_code = []
+        for symb_name, symb_params in self.symb.symb_expressions:
+            c_func_name = 'get_' + symb_name
+            c_func = ccode(c_func_name, getattr(self.symb, symb_name), 'SLIDE33')
+            C_code.append(c_func)
+
+        code_dirname = 'sympy_codegen'
+        code_fname = 'SLIDE33_3D'
+
+        home_dir = osp.expanduser('~')
+        code_dir = osp.join(home_dir, code_dirname)
+        if not osp.exists(code_dir):
+            os.makedirs(code_dir)
+
+        code_file = osp.join(code_dir, code_fname)
+
+        print('generated code_file', code_file)
+        h_file = code_file + '.h'
+        c_file = code_file + '.c'
+
+        h_f = open(h_file, 'w')
+        c_f = open(c_file, 'w')
+
+        if True:
+            for function_C in C_code:
+
+                h_f.write(function_C[1][1])
+                c_f.write(function_C[0][1])
+        h_f.close()
+        c_f.close()
+
     ipw_view = bu.View(
-        bu.Item('E_s', minmax=(0.5, 100)),
+        bu.Item('E_s', latex='E_s', minmax=(0.5, 100)),
         bu.Item('S_s', minmax=(.00001, 100)),
         bu.Item('c_s', minmax=( 0.0001, 10)),
         bu.Item('gamma_s', latex=r'\gamma_\mathrm{s}', minmax=(-20, 20)),
@@ -732,35 +747,6 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
 # C_code = get_Sig_C, get_dSig_dEps_C, get_f_C, get_df_dSig_C, get_ddf_dEps_C, get_Phi_C
 
 # In[ ]:
-
-
-import os
-import os.path as osp
-
-def codegen():
-    code_dirname = 'sympy_codegen'
-    code_fname = 'SLIDE_1_3_2D'
-
-    home_dir = osp.expanduser('~')
-    code_dir = osp.join(home_dir, code_dirname)
-    if not osp.exists(code_dir):
-        os.makedirs(code_dir)
-
-    code_file = osp.join(code_dir, code_fname)
-
-    print('code_file', code_file)
-    h_file = code_file + '.h'
-    c_file = code_file + '.c'
-
-    h_f = open(h_file, 'w')
-    c_f = open(c_file, 'w')
-
-    if True:
-        for function_C in C_code:
-            h_f.write(function_C[1][1])
-            c_f.write(function_C[0][1])
-    h_f.close()
-    c_f.close()
 
 
 # material_params = dict(
