@@ -125,12 +125,6 @@ class SlideExplorer(bu.InteractiveModel):
         tau = np.sqrt(tau_x ** 2 + tau_y ** 2)
         ax3d.plot3D(self.s_x_t, self.s_y_t, tau, color='orange', lw=3)
 
-    def subplots(self, fig):
-        ax_sxy = fig.add_subplot(1, 2, 1, projection='3d')
-        ax_sig = fig.add_subplot(1, 2, 2)
-
-        return ax_sxy, ax_sig
-
     def run(self, update_progress=lambda t: t):
         try:
             self.get_response_i(update_progress)
@@ -140,6 +134,11 @@ class SlideExplorer(bu.InteractiveModel):
 
     def reset(self):
         self.reset_i()
+
+    def subplots(self, fig):
+        ax_sxy = fig.add_subplot(1, 2, 1, projection='3d')
+        ax_sig = fig.add_subplot(1, 2, 2)
+        return ax_sxy, ax_sig
 
     def update_plot(self, axes):
         ax_sxy, ax_sig = axes

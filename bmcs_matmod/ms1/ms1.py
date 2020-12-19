@@ -11,27 +11,28 @@ Microplane Fatigue model 2D
 Using Jirasek homogenization approach [1999]
 '''
 
-from ibvpy.tmodel.mats_eval import MATSEval
+from ibvpy.tmodel.mats3D.mats3D_eval import \
+    MATS3DEval
 from bmcs_utils.api import InteractiveModel, Item, View
 import numpy as np
 import traits.api as tr
 
 
-class MS1(MATSEval, InteractiveModel):
+class MS1(MATS3DEval, InteractiveModel):
     gamma_T = tr.Float(100000.,
-                       label="Gamma",
+                       label="gamma_T",
                        desc=" Tangential Kinematic hardening modulus",
                        enter_set=True,
                        auto_set=False)
 
     K_T = tr.Float(10000.,
-                   label="K",
+                   label="K_T",
                    desc="Tangential Isotropic harening",
                    enter_set=True,
                    auto_set=False)
 
     S_T = tr.Float(0.005,
-                   label="S",
+                   label="S_T",
                    desc="Damage strength",
                    enter_set=True,
                    auto_set=False)
@@ -41,52 +42,41 @@ class MS1(MATSEval, InteractiveModel):
                    desc="Damage cumulation parameter",
                    enter_set=True,
                    auto_set=False)
-    e_T = tr.Float(12.,
-                   label="e",
+    p_T = tr.Float(12.,
+                   label="p_T",
                    desc="Damage cumulation parameter",
                    enter_set=True,
                    auto_set=False)
 
     c_T = tr.Float(4.6,
-                   label="c",
+                   label="c_T",
                    desc="Damage cumulation parameter",
                    enter_set=True,
                    auto_set=False)
 
-    tau_pi_bar = tr.Float(1.7,
-                          label="Tau_bar",
+    sigma_T_0 = tr.Float(1.7,
+                          label="sigma_T_0",
                           desc="Reversibility limit",
                           enter_set=True,
                           auto_set=False)
 
-    a = tr.Float(0.003,
-                 label="a",
+    m_T = tr.Float(0.003,
+                 label="m_T",
                  desc="Lateral pressure coefficient",
                  enter_set=True,
                  auto_set=False)
-
-    ipw_view = View(
-        Item('gamma_T', latex=r'\gamma_\mathrm{T}', minmax=(10, 100000)),
-        Item('K_T', latex=r'K_\mathrm{T}', minmax=(10, 10000)),
-        Item('S_T', latex=r'S_\mathrm{T}', minmax=(0.001, 0.01)),
-        Item('r_T', latex=r'r_\mathrm{T}', minmax=(1, 3)),
-        Item('e_T', latex=r'e_\mathrm{T}', minmax=(1, 40)),
-        Item('c_T', latex=r'c_\mathrm{T}', minmax=(1, 10)),
-        Item('tau_pi_bar', latex=r'\bar{\tau}', minmax=(1, 10)),
-        Item('a', latex=r'a', minmax=(0.001, 3)),
-    )
 
     # -------------------------------------------
     # Normal_Tension constitutive law parameters (without cumulative normal strain)
     # -------------------------------------------
     Ad = tr.Float(100.0,
-                  label="a",
+                  label="A_d",
                   desc="brittleness coefficient",
                   enter_set=True,
                   auto_set=False)
 
     eps_0 = tr.Float(0.00008,
-                     label="a",
+                     label="eps_N_0",
                      desc="threshold strain",
                      enter_set=True,
                      auto_set=False)
@@ -106,8 +96,8 @@ class MS1(MATSEval, InteractiveModel):
                        enter_set=True,
                        auto_set=False)
 
-    sigma_0 = tr.Float(30.,
-                       label="sigma_0",
+    sigma_N_0 = tr.Float(30.,
+                       label="sigma_N_0",
                        desc="Yielding stress",
                        enter_set=True,
                        auto_set=False)
@@ -127,6 +117,17 @@ class MS1(MATSEval, InteractiveModel):
                   desc="Poison ratio",
                   auto_set=False,
                   input=True)
+
+    ipw_view = View(
+        Item('gamma_T', latex=r'\gamma_\mathrm{T}', minmax=(10, 100000)),
+        Item('K_T', latex=r'K_\mathrm{T}', minmax=(10, 10000)),
+        Item('S_T', latex=r'S_\mathrm{T}', minmax=(0.001, 0.01)),
+        Item('r_T', latex=r'r_\mathrm{T}', minmax=(1, 3)),
+        Item('p_T', latex=r'e_\mathrm{T}', minmax=(1, 40)),
+        Item('c_T', latex=r'c_\mathrm{T}', minmax=(1, 10)),
+        Item('sigma_T_0', latex=r'\bar{sigma}^\pi_{T}', minmax=(1, 10)),
+        Item('m_T', latex=r'm_\mathrm{T}', minmax=(0.001, 3)),
+    )
 
     n_D = 3
 
@@ -178,13 +179,14 @@ class MS1(MATSEval, InteractiveModel):
 
         E_N = self.E / (1.0 - 2.0 * self.nu)
 
-        # E_N = self.E * (1.0 + 2.0 *  self.nu) / (1.0 - self.nu**2)
-
-        # When deciding if a microplane is in tensile or compression, we define a strain boundary such that that
-        # sigmaN <= 0 if eps_N < 0, avoiding entering in the quadrant of compressive strains and traction
+        # When deciding if a microplane is in tensile or compression,
+        # we define a strain boundary such that
+        # sigmaN <= 0 if eps_N < 0, avoiding entering in the quadrant
+        # of compressive strains and traction
 
         sigma_trial = E_N * (eps_N_Emn - eps_N_p_Emn)
-        pos1 = [(eps_N_Emn < -1e-6) & (sigma_trial > 1e-6)]  # looking for microplanes violating strain boundary
+        # looking for microplanes violating strain boundary
+        pos1 = [(eps_N_Emn < -1e-6) & (sigma_trial > 1e-6)]
         sigma_trial[pos1[0]] = 0
         pos = eps_N_Emn > 1e-6  # microplanes under traction
         pos2 = eps_N_Emn < -1e-6  # microplanes under compression
@@ -197,7 +199,7 @@ class MS1(MATSEval, InteractiveModel):
 
         Z = self.K_N * z_N_Emn
         X = self.gamma_N * alpha_N_Emn * H2
-        h = (self.sigma_0 + Z) * H2
+        h = (self.sigma_N_0 + Z) * H2
 
         f_trial = (abs(sigma_N_Emn_tilde - X) - h) * H2
 
@@ -207,10 +209,10 @@ class MS1(MATSEval, InteractiveModel):
 
         delta_lamda = f_trial / \
                       (E_N / (1 - omega_N_Emn) + abs(self.K_N) + self.gamma_N) * thres_1
-        eps_N_p_Emn = eps_N_p_Emn + delta_lamda * \
+        eps_N_p_Emn += delta_lamda * \
                       np.sign(sigma_N_Emn_tilde - X)
-        z_N_Emn = z_N_Emn + delta_lamda
-        alpha_N_Emn = alpha_N_Emn + delta_lamda * \
+        z_N_Emn += delta_lamda
+        alpha_N_Emn += delta_lamda * \
                       np.sign(sigma_N_Emn_tilde - X)
 
         def R_N(r_N_Emn): return (1.0 / self.Ad) * (-r_N_Emn / (1.0 + r_N_Emn))
@@ -227,6 +229,7 @@ class MS1(MATSEval, InteractiveModel):
         def f_w(Y): return 1.0 - 1.0 / (1.0 + self.Ad * (Y - Y_0))
 
         omega_N_Emn[f > 1e-6] = f_w(Y_N)[f > 1e-6]
+        omega_N_Emn[...] = np.clip(omega_N_Emn,0,0.9999)
         r_N_Emn[f > 1e-6] = -omega_N_Emn[f > 1e-6]
 
         sigma_N_Emn = (1.0 - H * omega_N_Emn) * E_N * (eps_N_Emn - eps_N_p_Emn)
@@ -236,19 +239,16 @@ class MS1(MATSEval, InteractiveModel):
         Z = self.K_N * z_N_Emn
         X = self.gamma_N * alpha_N_Emn * H2
 
-        return omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, Z, X, Y_N
+        return sigma_N_Emn, Z, X, Y_N
 
     # -------------------------------------------------------------------------
     # microplane constitutive law (Tangential CSD)-(Pressure sensitive cumulative damage)
     # -------------------------------------------------------------------------
     def get_tangential_law(self, eps_T_Emna, omega_T_Emn, z_T_Emn,
                            alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn):
-        E_T = self.E / (1.0 + self.nu)
 
-        # E_T = self.E * (1.0 - 4 * self.nu) / \
-        #     ((1.0 + self.nu) * (1.0 - 2 * self.nu))
-
-        # E_T = self.E * (1.0 - 3.0 *  self.nu) / (1.0 - self.nu**2)
+        E_T = self.E * (1.0 - 4 * self.nu) / \
+            ((1.0 + self.nu) * (1.0 - 2 * self.nu))
 
         # thermo forces
 
@@ -269,8 +269,7 @@ class MS1(MATSEval, InteractiveModel):
 
         # threshold
 
-        f = norm_1 - self.tau_pi_bar - \
-            Z + self.a * sigma_N_Emn
+        f = norm_1 - self.sigma_T_0 - Z + self.m_T * sigma_N_Emn
 
         plas_1 = f > 1e-6
         elas_1 = f < 1e-6
@@ -283,23 +282,24 @@ class MS1(MATSEval, InteractiveModel):
                 '...na,...na->...n',
                 (sig_pi_trial - X), (sig_pi_trial - X))) * plas_1
 
-        eps_T_pi_Emna[..., 0] = eps_T_pi_Emna[..., 0] + plas_1 * delta_lamda * \
+        eps_T_pi_Emna[..., 0] += plas_1 * delta_lamda * \
                                 ((sig_pi_trial[..., 0] - X[..., 0]) /
                                  (1.0 - omega_T_Emn)) / norm_2
-        eps_T_pi_Emna[..., 1] = eps_T_pi_Emna[..., 1] + plas_1 * delta_lamda * \
+        eps_T_pi_Emna[..., 1] += plas_1 * delta_lamda * \
                                 ((sig_pi_trial[..., 1] - X[..., 1]) /
                                  (1.0 - omega_T_Emn)) / norm_2
 
         omega_T_Emn += ((1 - omega_T_Emn) ** self.c_T) * \
                        (delta_lamda * (Y / self.S_T) ** self.r_T) * \
-                       (self.tau_pi_bar / (self.tau_pi_bar + self.a * sigma_N_Emn)) ** self.e_T
+                       (self.sigma_T_0 / (self.sigma_T_0 + self.m_T * sigma_N_Emn)) ** self.p_T
+        omega_T_Emn[...] = np.clip(omega_T_Emn,0,0.9999)
 
-        alpha_T_Emna[..., 0] = alpha_T_Emna[..., 0] + plas_1 * delta_lamda * \
+        alpha_T_Emna[..., 0] += plas_1 * delta_lamda * \
                                (sig_pi_trial[..., 0] - X[..., 0]) / norm_2
-        alpha_T_Emna[..., 1] = alpha_T_Emna[..., 1] + plas_1 * delta_lamda * \
+        alpha_T_Emna[..., 1] += plas_1 * delta_lamda * \
                                (sig_pi_trial[..., 1] - X[..., 1]) / norm_2
 
-        z_T_Emn = z_T_Emn + delta_lamda
+        z_T_Emn += delta_lamda
 
         sigma_T_Emna = np.einsum(
             '...n,...na->...na', (1 - omega_T_Emn), E_T * (eps_T_Emna - eps_T_pi_Emna))
@@ -312,7 +312,7 @@ class MS1(MATSEval, InteractiveModel):
                 (eps_T_Emna - eps_T_pi_Emna),
                 (eps_T_Emna - eps_T_pi_Emna))
 
-        return omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_T_Emna, Z, X, Y
+        return sigma_T_Emna, Z, X, Y
 
     #     #-------------------------------------------------------------------------
     #     # MICROPLANE-Kinematic constraints
@@ -325,7 +325,6 @@ class MS1(MATSEval, InteractiveModel):
 
     @tr.cached_property
     def _get__MPNN(self):
-        print(self._MPN)
         MPNN_nij = np.einsum('ni,nj->nij', self._MPN, self._MPN)
         return MPNN_nij
 
@@ -365,10 +364,10 @@ class MS1(MATSEval, InteractiveModel):
         eps_N_Emn = self._get_e_N_Emn_2(eps_Emab)
         eps_T_Emna = self._get_e_T_Emnar_2(eps_Emab)
 
-        omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, Z_n, X_n, Y_n = self.get_normal_law(
+        sigma_N_Emn, Z_n, X_n, Y_n = self.get_normal_law(
             eps_N_Emn, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn)
 
-        omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_T_Emna, Z_T, X_T, Y_T = self.get_tangential_law(
+        sigma_T_Emna, Z_T, X_T, Y_T = self.get_tangential_law(
             eps_T_Emna, omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn)
 
         delta = self.DELTA
@@ -399,11 +398,11 @@ class MS1(MATSEval, InteractiveModel):
         eps_T_Emna = self._get_e_T_Emnar_2(eps_Emab)
 
         # plastic normal strains
-        omegaN, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, Z_n, X_n, Y_n = self.get_normal_law(
+        sigma_N_Emn, Z_n, X_n, Y_n = self.get_normal_law(
             eps_N_Emn, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn)
 
         # sliding tangential strains
-        omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_T_Emna, Z_T, X_T, Y_T = self.get_tangential_law(
+        sigma_T_Emna, Z_T, X_T, Y_T = self.get_tangential_law(
             eps_T_Emna, omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn)
 
         # 2-nd order plastic (inelastic) tensor
@@ -420,7 +419,7 @@ class MS1(MATSEval, InteractiveModel):
 
         return eps_p_Emab
 
-    def get_corr_pred(self, eps_Emab, t_n1, **state_vars):
+    def get_corr_pred(self, eps_Emab, t_n1, **Eps_k):
         """Evaluation - get the corrector and predictor
         """
         # Corrector predictor computation.
@@ -428,7 +427,7 @@ class MS1(MATSEval, InteractiveModel):
         # ------------------------------------------------------------------
         # Damage tensor (4th order) using product- or sum-type symmetrization:
         # ------------------------------------------------------------------
-        beta_Emabcd = self._get_beta_Emabcd_2(eps_Emab, **state_vars)
+        beta_Emabcd = self._get_beta_Emabcd_2(eps_Emab, **Eps_k)
 
         # ------------------------------------------------------------------
         # Damaged stiffness tensor calculated based on the damage tensor beta4:
@@ -443,7 +442,7 @@ class MS1(MATSEval, InteractiveModel):
         # Return stresses (corrector) and damaged secant stiffness matrix (predictor)
         # ----------------------------------------------------------------------
         # plastic strain tensor
-        eps_p_Emab = self._get_eps_p_Emab(eps_Emab, **state_vars)
+        eps_p_Emab = self._get_eps_p_Emab(eps_Emab, **Eps_k)
 
         # elastic strain tensor
         eps_e_Emab = eps_Emab - eps_p_Emab
@@ -454,7 +453,7 @@ class MS1(MATSEval, InteractiveModel):
             D_Emabcd, eps_e_Emab
         )
 
-        return D_Emabcd, sig_Emab, eps_p_Emab
+        return sig_Emab, D_Emabcd
 
 
 class MS12D(MS1):
