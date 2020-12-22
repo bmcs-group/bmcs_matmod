@@ -101,7 +101,7 @@ def get_UF_t(mats, time_function, n_t):
             eps_ab = get_eps_ab(U_k_O).reshape(3, 3)
             # Stress and material stiffness
             D_abcd, sig_ab, eps_p_Emab, sig_ab_int = mats.get_corr_pred(
-                eps_ab, 1, int_var, eps_aux, F_ext
+                eps_ab, 1, int_var, eps_aux
             )
             # Internal force
             F_O = get_sig_O(sig_ab.reshape(1, 3, 3)).reshape(6, )

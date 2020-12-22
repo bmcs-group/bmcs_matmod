@@ -72,6 +72,7 @@ class SlideExplorer(bu.InteractiveModel):
         self.t_arr = []
         self.s_x_t, self.s_y_t, self.w_t = [], [], []
         self.Eps_n1 = np.zeros((self.n_Eps,), dtype=np.float_)
+        self.Sig_n1 = np.zeros((self.n_Eps,), dtype=np.float_)
         self.s_x_1 = 0
         self.s_y_1 = 0
         self.w_1 = 0
@@ -87,13 +88,13 @@ class SlideExplorer(bu.InteractiveModel):
         si_y_t = np.linspace(self.s_y_0, self.s_y_1, n_steps + 1) + 1e-9
         wi_t = np.linspace(self.w_0, self.w_1, n_steps + 1) + 1e-9
         for t, s_x_n1, s_y_n1, w_n1 in zip(t_i, si_x_t, si_y_t, wi_t):
-            try: self.Eps_n1, Sig_n1, k = self.slide_model.get_sig_n1(
-                    s_x_n1, s_y_n1, w_n1, self.Eps_n1, self.k_max
+            try: self.Eps_n1, self.Sig_n1, k = self.slide_model.get_sig_n1(
+                    s_x_n1, s_y_n1, w_n1, self.Sig_n1, self.Eps_n1, self.k_max
                 )
             except ConvergenceError as e:
                 print(e)
                 break
-            self.Sig_record.append(Sig_n1)
+            self.Sig_record.append(self.Sig_n1)
             self.Eps_record.append(self.Eps_n1)
             self.iter_record.append(k)
             update_progress(t)
@@ -124,12 +125,6 @@ class SlideExplorer(bu.InteractiveModel):
         tau = np.sqrt(tau_x ** 2 + tau_y ** 2)
         ax3d.plot3D(self.s_x_t, self.s_y_t, tau, color='orange', lw=3)
 
-    def subplots(self, fig):
-        ax_sxy = fig.add_subplot(1, 2, 1, projection='3d')
-        ax_sig = fig.add_subplot(1, 2, 2)
-
-        return ax_sxy, ax_sig
-
     def run(self, update_progress=lambda t: t):
         try:
             self.get_response_i(update_progress)
@@ -139,6 +134,11 @@ class SlideExplorer(bu.InteractiveModel):
 
     def reset(self):
         self.reset_i()
+
+    def subplots(self, fig):
+        ax_sxy = fig.add_subplot(1, 2, 1, projection='3d')
+        ax_sig = fig.add_subplot(1, 2, 2)
+        return ax_sxy, ax_sig
 
     def update_plot(self, axes):
         ax_sxy, ax_sig = axes
