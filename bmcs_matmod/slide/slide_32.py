@@ -270,8 +270,8 @@ f_ = f_3.subs(fdc.symb.tau_bar, (bartau+Z))
 df_dSig_ = f_.diff(Sig)
 ddf_dEps_ = f_.diff(Eps)
 
-phi_s_ext = (1-omega_s)**c_s * (Y_s**2 / S_s + H(sig_pi) * eta * (Y_s * Y_w) / S_s)
-phi_w_ext = (1-omega_w)**c_w * (Y_w**2 / S_w + H(sig_pi) * eta * (Y_s * Y_w) / S_w)
+phi_s_ext = (1-omega_s)**c_s * (Y_s**2 / S_s + H(sig_pi) * eta * (Y_s * Y_w) / sp.sqrt(S_s * S_w))
+phi_w_ext = (1-omega_w)**c_w * (Y_w**2 / S_w + H(sig_pi) * eta * (Y_s * Y_w) / sp.sqrt(S_s * S_w))
 
 # The flow potential $\varphi(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$ reads
 
