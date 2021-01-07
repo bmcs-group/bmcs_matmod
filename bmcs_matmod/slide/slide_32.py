@@ -270,7 +270,7 @@ f_ = f_3.subs(fdc.symb.tau_bar, (bartau+Z))
 df_dSig_ = f_.diff(Sig)
 ddf_dEps_ = f_.diff(Eps)
 
-phi_s_ext = (1-omega_s)**c_s * (Y_s**2 / S_s + H(sig_pi) * eta * (Y_s * Y_w) / sp.sqrt(S_s * S_w))
+phi_s_ext = (1-omega_s)**c_s * (Y_s**2 / S_s + eta * (Y_s * Y_w) / sp.sqrt(S_s * S_w))
 phi_w_ext = (1-omega_w)**c_w * (Y_w**2 / S_w + H(sig_pi) * eta * (Y_s * Y_w) / sp.sqrt(S_s * S_w))
 
 # The flow potential $\varphi(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$ reads
@@ -501,12 +501,13 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Sig_ts[3:,...] = Sig[3:,np.newaxis,np.newaxis]
         Eps_ts[...] = Eps[:,np.newaxis,np.newaxis]
         f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts)])
+        phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts)])
         ax.set_title('threshold function');
-        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0)
+        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0, colors=('red',))
+        ax.contour(sig_ts, tau_x_ts, phi_ts[0, ...])
         ax.plot(sig, tau, marker='H', color='red')
         ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
         ax.plot([0, 0], [lower_tau, upper_tau], color='black', lw=0.4)
-
 
     def plot_f(self, ax):
         lower = -self.f_c * 1.05
@@ -519,10 +520,26 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Sig_ts[2,:] = sig_ts
         Eps_ts = np.zeros_like(Sig_ts)
         f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts)])
+        phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts)])
         ax.set_title('threshold function');
         ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0)
+        ax.contour(sig_ts, tau_x_ts, phi_ts[0, ...])
         ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
         ax.plot([0, 0], [lower_tau, upper_tau], color='black', lw=0.4)
+
+    def plot_phi_Y(self, ax):
+        lower_N = 0
+        upper_N = 1
+        lower_T = 0
+        upper_T = 1
+        Y_N, Y_T  = np.mgrid[lower_N:upper_N:201j,lower_T:upper_T:201j]
+        Sig_ts = np.zeros((len(self.symb.Eps),) + Y_T.shape)
+        Sig_ts[0,:] = Y_N
+        Sig_ts[2,:] = Y_T
+        Eps_ts = np.zeros_like(Sig_ts)
+        phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts)])
+        ax.set_title('potential function');
+        ax.contour(Y_N, Y_T, phi_ts[0,...]) #, levels=0)
 
     def update_plot(self, ax):
         self.plot_f(ax)
