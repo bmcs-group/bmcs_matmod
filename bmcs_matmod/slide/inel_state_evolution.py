@@ -30,7 +30,7 @@ class InelStateEvolution(bu.InteractiveModel):
         s_x_pi_, s_y_pi_, w_pi_, z_, alpha_x_, alpha_y_, omega_s_, omega_w_ = self.Eps_arr.T
         ax.plot(omega_w_,omega_s_, **kw)
         ax.set_xlabel(r'$\omega_\mathrm{N}$')
-        ax.set_xlabel(r'$\omega_\mathrm{T}$')
+        ax.set_ylabel(r'$\omega_\mathrm{T}$')
 
     def plot_Sig_Eps(self, axes):
         ax1, ax11, ax2, ax22, ax3, ax33, ax4, ax44 = axes
