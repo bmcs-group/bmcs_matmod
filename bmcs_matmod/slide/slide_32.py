@@ -12,18 +12,14 @@
 # 
 # as symbolic equations using the sympy package. The time-stepping algorithm gets generated automatically within the thermodynamically framework. The derived  evolution equations and return-mapping to the yield surface is performed using Newton scheme.  
 
-# In[1]:
-
 import sympy as sp
 import matplotlib.pyplot as plt
 import numpy as np
 
+H_switch = sp.symbols(r'H(\sigma^\pi)', real=True)
 H = lambda x: sp.Piecewise( (0, x <=0 ), (1, True) )
 
 # **Code generation** The derivation is adopted for the purpose of code generation both in Python and C utilizing the `codegen` package provided in `sympy`. The expressions that are part of the time stepping algorithm are transformed to an executable code directly at the place where they are derived. At the end of the notebook the C code can be exported to external files and applied in external tools. 
-
-# In[2]:
-
 
 # This code is needed to lambdify expressions named with latex symbols
 # it removes the backslashes and curly braces upon before code generation.
@@ -60,9 +56,6 @@ def ccode(cfun_name, sp_expr, cfile):
 
 # ## Material parameters
 
-# In[3]:
-
-
 E_s = sp.Symbol('E_s', real=True, nonnegative=True)
 gamma_s = sp.Symbol('gamma_s', real=True, nonnegative=True)
 K_s = sp.Symbol('K_s', real=True)
@@ -78,15 +71,7 @@ r_w = sp.Symbol('r_w', real=True)
 c_w = sp.Symbol('c_w', real=True)
 eta = sp.Symbol('eta', real=True, nonnegative=True)
 
-
-# In[5]:
-
-
-
 # ## State variables
-
-# In[6]:
-
 
 s_x, s_y = sp.symbols('s_x, s_y', real=True)
 omega_s = sp.Symbol('omega_s', real=True, nonnegative=True)
@@ -100,9 +85,7 @@ omega_w = sp.Symbol('omega_w', real=True, nonnegative=True)
 w_pi = sp.symbols(r'w^{\pi}', real=True)
 #w_pi = sp.symbols(r'w_pi', real=True)
 
-
 Eps = sp.Matrix([s_pi_x, s_pi_y, w_pi, z, alpha_x, alpha_y, omega_s, omega_w])
-
 
 tau_x, tau_y = sp.symbols('tau_x, tau_y', real=True)
 tau_pi_x, tau_pi_y = sp.symbols(r'\tau^\pi_x, \tau^\pi_y', real=True)
@@ -117,11 +100,8 @@ sig_pi = sp.symbols(r'\sigma^\pi', real=True)
 Y_w = sp.Symbol('Y_w', real=True)
 
 Sig = sp.Matrix([tau_pi_x, tau_pi_y, sig_pi, Z, X_x, X_y, Y_s, Y_w])
-Sig.T
-
 
 # ## Helmholtz free energy
-
 
 rho_psi_s_ = sp.Rational(1,2)* (
     (1-omega_s)*E_s*(s_x-s_pi_x)**2 +
@@ -134,8 +114,6 @@ rho_psi_s_ = sp.Rational(1,2)* (
 rho_psi_w_ = sp.Rational(1,2) * (1 - H(sig_pi) * omega_w) * E_w * (w - w_pi)**2
 
 rho_psi_ = rho_psi_s_ + rho_psi_w_
-rho_psi_
-
 
 # The introduce the thermodynamic forces we have to differentiate Hemholtz free energy
 # with respect to the kinematic state variables
@@ -143,106 +121,58 @@ rho_psi_
 # \frac{\partial \rho \psi }{\partial \boldsymbol{\mathcal{E}}}
 # \end{align}
 
-# In[12]:
-
-
 d_rho_psi_ = sp.Matrix([rho_psi_.diff(eps) for eps in Eps])
-d_rho_psi_
-
 
 # To obtain consistent signs of the Helmholtz derivatives we define a sign switch operator so that all generalized forces are defined as positive for the respective conjugate state variable $\boldsymbol{\Upsilon}$. 
 
-# In[13]:
-
-
 Sig_signs = sp.diag(-1,-1,-1,1,1,1,-1,-1)
-
 
 # The constitutive laws between generalized force and kinematic variables then read
 # \begin{align}
 # \boldsymbol{\mathcal{S}} = \boldsymbol{\Upsilon}\frac{\rho \psi}{\partial\boldsymbol{\mathcal{E}}} 
 # \end{align}
 
-# In[14]:
-
-
 Sig_ = Sig_signs * d_rho_psi_
 
-
 # **Executable code for** $\boldsymbol{\mathcal{S}}(s,\boldsymbol{\mathcal{E}})$
-
-# In[15]:
-
-
-# To derive the time stepping procedure we will need also the matrix of derivatives of the generalized stresses $\boldsymbol{\mathcal{S}}$ with respect to the kinematic variables $\boldsymbol{\mathcal{E}}$ 
+# To derive the time stepping procedure we will need also the matrix of derivatives of the generalized stresses $\boldsymbol{\mathcal{S}}$ with respect to the kinematic variables $\boldsymbol{\mathcal{E}}$
 # \begin{align}
 # \frac{\partial \boldsymbol{S}}{\partial \boldsymbol{E}}
 # \end{align}
 
-# In[16]:
-
-
-dSig_dEps_ = sp.Matrix([ 
+dSig_dEps_ = sp.Matrix([
     Sig_.T.diff(eps) for eps in Eps 
 ] ).T
 
-
 # **Executable Python code generation** $\displaystyle \frac{\partial }{\partial \boldsymbol{\mathcal{E}}}  \boldsymbol{\mathcal{S}}(s,\boldsymbol{\mathcal{E}})$
-
-# In[17]:
-
-
-
 # ## Threshold function
-
 # To keep the framework general for different stress norms and hardening definitions let us first introduce a general function for effective stress. Note that the observable stress $\tau$ is identical with the plastic stress $\tau_\pi$ due to the performed sign switch in the definition of the thermodynamic forces.
 
-# In[18]:
-
-
-tau_eff_x = sp.Function(r'\tau^{\mathrm{eff}}_x')(tau_pi_x, omega_s)
-tau_eff_y = sp.Function(r'\tau^{\mathrm{eff}}_y')(tau_pi_y, omega_s)
-sig_eff = sp.Function(r'\sigma_{\mathrm{eff}}')(sig_pi, omega_w)
-# tau_eff_x = sp.Function(r'tau_eff_x')(tau_pi_x, omega_s)
-# tau_eff_y = sp.Function(r'tau_eff_y')(tau_pi_y, omega_s)
-# sig_eff = sp.Function(r'sigma_eff')(sig_pi, omega_w)
+tau_eff_x = sp.Symbol(r'tau_eff_x')
+tau_eff_y = sp.Symbol(r'tau_eff_y')
+sig_eff = sp.Symbol(r'sigma_eff')
 Q_x = sp.Function('Q_x')(tau_eff_x,X_x)
 Q_y = sp.Function('Q_y')(tau_eff_y,X_y)
 
-
 # The stress norm is defined using the stress offset $X$, i.e. the kinematic hardening stress representing the shift of the origin of the yield locus.  
-
-# In[19]:
-
 
 norm_Q = sp.sqrt(Q_x*Q_x + Q_y*Q_y)
 
-
 # Let us now introduce the back stress $X$ by defining the substitution for $Q = \tau^\mathrm{eff} - X$
-
-# In[20]:
-
 
 subs_Q = {Q_x: tau_eff_x - X_x, Q_y: tau_eff_y - X_y}
 
+tau_eff_x_ = tau_pi_x / (1-omega_s)
+tau_eff_y_ = tau_pi_y / (1-omega_s)
+sig_eff_ = sig_pi / (1- H(sig_pi) * omega_w)
 
-# Further substitution rule introduces the effective stress as a function of damage as
-
-# In[21]:
-
-
-subs_tau_eff = {tau_eff_x: tau_pi_x / (1-omega_s), tau_eff_y: tau_pi_y / (1-omega_s), sig_eff: sig_pi / (1-omega_w)}
-subs_tau_eff
-
+subs_tau_eff = {tau_eff_x: tau_pi_x / (1-omega_s),
+                tau_eff_y: tau_pi_y / (1-omega_s),
+                sig_eff: sig_pi / (1- H_switch * omega_w)}
 
 # After substitutions the yield function reads
 
 # **Smooth yield function**
-
-# In[24]:
-
-
-# In[25]:
 
 from bmcs_matmod.slide.f_double_cap import FDoubleCap
 import bmcs_utils.api as bu
@@ -261,7 +191,7 @@ f_2 = f_1.subs(subs_Q)
 f_3 = f_2.subs(subs_tau_eff)
 f_ = f_3.subs(fdc.symb.tau_bar, (bartau+Z))
 
-norm_Q_fn = norm_Q.subs(subs_Q).subs(subs_tau_eff)
+f_eff_ = f_2.subs(fdc.symb.tau_bar, (bartau+Z))
 
 # **Executable code generation** $f(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$
 # 
@@ -272,57 +202,55 @@ norm_Q_fn = norm_Q.subs(subs_Q).subs(subs_tau_eff)
 df_dSig_ = f_.diff(Sig)
 ddf_dEps_ = f_.diff(Eps)
 
-phi_s_ext = (1-omega_s)**c_s * (Y_s**2 / S_s + eta * (Y_s * Y_w) / (2 * S_w) )
-phi_w_ext = (1-omega_w)**c_w * (Y_w**2 / S_w + eta * (Y_s * Y_w) / (2 * S_s) ) # * H(sig_pi)
+# phi_s_ext = (1-omega_s)**c_s * (Y_s**2 / S_s + eta * (Y_s * Y_w) / (2 * S_w) )
+# phi_w_ext = (1-omega_w)**c_w * (Y_w**2 / S_w + eta * (Y_s * Y_w) / (2 * S_s) ) # * H(sig_pi)
 
 Y_T, Y_N = Y_s, Y_w
 S_T, S_N = S_s, S_w
 omega_T, omega_N = omega_s, omega_w
 c_T, c_N = c_s, c_w
 
-# version with geometric mean
-phi_N_ext = (1-omega_N)**c_N * (
-    (Y_N**2 + eta * (Y_T * Y_N)) /
-    (2*(S_N - eta * (S_N - sp.sqrt(S_N * S_T))))
-) * H(sig_pi)
+if False:
+    # version with geometric mean
+    phi_N_ext = (1-omega_N)**c_N * (
+        (Y_N**2 + eta * (Y_T * Y_N)) /
+        (2*(S_N - eta * (S_N - sp.sqrt(S_N * S_T))))
+    ) * H(sig_pi)
 
-phi_T_ext = (1-omega_T)**c_T * (
-    (Y_T**2 + eta * (Y_T * Y_N)) /
-    (2*(S_T - eta * (S_T - sp.sqrt(S_N * S_T))))
-)
+    phi_T_ext = (1-omega_T)**c_T * (
+        (Y_T**2 + eta * (Y_T * Y_N)) /
+        (2*(S_T - eta * (S_T - sp.sqrt(S_N * S_T))))
+    )
 
-######################################################################
-# version with arithmetic mean
-phi_N_ext = (1-omega_N)**c_N * (
-    (Y_N**2 + eta * (Y_T * Y_N)) /
-    (2*(S_N - eta * (S_N - (S_N + S_T)/2)))
-)
-phi_T_ext = (1-omega_T)**c_T * (
-    (Y_T**2 + eta * (Y_T * Y_N)) /
-    (2*(S_T - eta * (S_T - (S_N + S_T)/2)))
-)
-# The flow potential $\varphi(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$ reads
+    ######################################################################
+    # version with arithmetic mean
+    phi_N_ext = (1-omega_N)**c_N * (
+        (Y_N**2 + eta * (Y_T * Y_N)) /
+        (2*(S_N - eta * (S_N - (S_N + S_T)/2)))
+    )
+    phi_T_ext = (1-omega_T)**c_T * (
+        (Y_T**2 + eta * (Y_T * Y_N)) /
+        (2*(S_T - eta * (S_T - (S_N + S_T)/2)))
+    )
+    # The flow potential $\varphi(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$ reads
 
-phi_ = f_ + phi_T_ext + phi_N_ext
-phi_
+    phi_ = f_ + phi_T_ext + phi_N_ext
 
 ########################################################################
 
-if True:
-    a,b,c,d = sp.symbols('a,b,c,d')
-    H_switch = sp.symbols(r'H(\sigma^\pi)', real=True)
-    phi_ext = a * Y_N**2 + b * eta * Y_N*(Y_N + Y_T) + c * Y_T**2 + d * eta * Y_T*(Y_T+Y_N)
-    d_phi_N_0 = phi_ext.diff(Y_N).subs(eta,0)
-    a_solved = sp.solve( sp.Eq( d_phi_N_0, (1 - omega_N)**c_N * Y_N / S_N * H_switch ), a )[0]
-    d_phi_T_0 = phi_ext.diff(Y_T).subs(eta,0)
-    c_solved = sp.solve( sp.Eq( d_phi_T_0, (1 - omega_T)**c_T * Y_T / S_T ), c )[0]
-    phi_ext_ac = phi_ext.subs({a: a_solved, c: c_solved})
-    d_phi_N_1 = phi_ext_ac.diff(Y_N).subs(eta,1)
-    d_phi_T_1 = phi_ext_ac.diff(Y_T).subs(eta,1)
-    d_phi_1_req = (1 - (omega_N + omega_T)/2)**((c_N+c_T)/2) * (Y_N + Y_T) / (S_N + S_T)
-    bd_solved = sp.solve({sp.Eq(d_phi_N_1, d_phi_1_req), sp.Eq(d_phi_T_1, d_phi_1_req)},[b,d])
-    phi_abcd = phi_ext_ac.subs(bd_solved).subs(H_switch, H(sig_pi))
-    phi_ = f_ + sp.simplify(phi_abcd)
+a,b,c,d = sp.symbols('a,b,c,d')
+phi_ext = a * Y_N**2 + b * eta * Y_N*(Y_N + Y_T) + c * Y_T**2 + d * eta * Y_T*(Y_T+Y_N)
+d_phi_N_0 = phi_ext.diff(Y_N).subs(eta,0)
+a_solved = sp.solve( sp.Eq( d_phi_N_0, (1 - omega_N)**c_N * Y_N / S_N * H_switch ), a )[0]
+d_phi_T_0 = phi_ext.diff(Y_T).subs(eta,0)
+c_solved = sp.solve( sp.Eq( d_phi_T_0, (1 - omega_T)**c_T * Y_T / S_T ), c )[0]
+phi_ext_ac = phi_ext.subs({a: a_solved, c: c_solved})
+d_phi_N_1 = phi_ext_ac.diff(Y_N).subs(eta,1)
+d_phi_T_1 = phi_ext_ac.diff(Y_T).subs(eta,1)
+d_phi_1_req = (1 - (omega_N + omega_T)/2)**((c_N+c_T)/2) * (Y_N + Y_T) / (S_N + S_T)
+bd_solved = sp.solve({sp.Eq(d_phi_N_1, d_phi_1_req), sp.Eq(d_phi_T_1, d_phi_1_req)},[b,d])
+phi_abcd = phi_ext_ac.subs(bd_solved) # .subs(H_switch, H(sig_pi))
+phi_ = f_ + sp.simplify(phi_abcd)
 
 ###########################################################################
 
@@ -357,6 +285,7 @@ class Slide23Expr(bu.SymbExpr):
     f_c0 = f_c0
     m = m
     eta = eta
+    H_switch = H_switch
 
     symb_model_params = [
         'E_s', 'gamma_s', 'K_s', 'S_s', 'c_s', 'bartau',
@@ -371,29 +300,23 @@ class Slide23Expr(bu.SymbExpr):
     ddf_dEps_ = ddf_dEps_
     phi_ = phi_
     Phi_ = Phi_
+    H_sig_pi_ = H(sig_pi)
 
-    norm_Q_ = norm_Q_fn
+    tau_eff_x_ = tau_pi_x / (1 - omega_s)
+    tau_eff_y_ = tau_pi_y / (1 - omega_s)
+    sig_eff_ = sig_pi / (1 - H(sig_pi) * omega_w)
 
     # List of expressions for which the methods `get_`
     symb_expressions = [
         ('Sig_', ('s_x', 's_y', 'w', 'Sig', 'Eps')),
         ('dSig_dEps_', ('s_x', 's_y', 'w', 'Sig', 'Eps')),
-        ('f_', ('Eps', 'Sig')),
-        ('df_dSig_', ('Eps', 'Sig')),
-        ('ddf_dEps_', ('Eps', 'Sig')),
-        ('phi_', ('Eps', 'Sig')),
-        ('Phi_', ('Eps', 'Sig')),
-        ('norm_Q_', ('Eps', 'Sig'))
+        ('f_', ('Eps', 'Sig', 'H_switch')),
+        ('df_dSig_', ('Eps', 'Sig', 'H_switch')),
+        ('ddf_dEps_', ('Eps', 'Sig', 'H_switch')),
+        ('phi_', ('Eps', 'Sig', 'H_switch')),
+        ('Phi_', ('Eps', 'Sig', 'H_switch')),
+        ('H_sig_pi_', ('Sig',))
     ]
-
-#get_Sig_C = ccode('get_Sig',Sig_,'SLIDE1_3')
-#get_dSig_dEps_C = ccode('get_dSig_dEps', dSig_dEps_, 'SLIDE1_3')
-#get_f_C = ccode('get_f', f_, 'SLIDE1_3')
-#get_df_dSig_C = ccode('get_df_dSig', df_dSig_, 'SLIDE1_3')
-#get_ddf_dEps_C = ccode('get_df_dEps', ddf_dEps_, 'SLIDE1_3')
-#get_Phi_C = ccode('get_Phi', Phi_, 'SLIDE1_3')
-
-import traits.api as tr
 
 class ConvergenceError(Exception):
     """ Inappropriate argument value (of correct type). """
@@ -482,12 +405,13 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
     def get_f_df(self, s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k):
         Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)[0]
         dSig_dEps_k = self.symb.get_dSig_dEps_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
-        f_k = np.array([self.symb.get_f_(Eps_k, Sig_k)])
-        df_dSig_k = self.symb.get_df_dSig_(Eps_k, Sig_k)
-        ddf_dEps_k = self.symb.get_ddf_dEps_(Eps_k, Sig_k)
+        H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
+        f_k = np.array([self.symb.get_f_(Eps_k, Sig_k, H_sig_pi)])
+        df_dSig_k = self.symb.get_df_dSig_(Eps_k, Sig_k, H_sig_pi)
+        ddf_dEps_k = self.symb.get_ddf_dEps_(Eps_k, Sig_k, H_sig_pi)
         df_dEps_k = np.einsum(
             'ik,ji->jk', df_dSig_k, dSig_dEps_k) + ddf_dEps_k
-        Phi_k = self.symb.get_Phi_(Eps_k, Sig_k)
+        Phi_k = self.symb.get_Phi_(Eps_k, Sig_k, H_sig_pi)
         dEps_dlambda_k = Phi_k
         df_dlambda = np.einsum(
             'ki,kj->ij', df_dEps_k, dEps_dlambda_k)
@@ -499,9 +423,9 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         The update of state variables
         for an updated $\lambda_k$ is performed using this procedure.
         '''
-
         Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)[0]
-        Phi_k = self.symb.get_Phi_(Eps_k, Sig_k)
+        H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
+        Phi_k = self.symb.get_Phi_(Eps_k, Sig_k, H_sig_pi)
         Eps_k1 = Eps_n + lam_k * Phi_k[:, 0]
         return Eps_k1
 
@@ -551,7 +475,8 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Sig_ts[2,...] = sig_ts
         Sig_ts[3:,...] = Sig[3:,np.newaxis,np.newaxis]
         Eps_ts[...] = Eps[:,np.newaxis,np.newaxis]
-        f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts)])
+        H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
+        f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts, H_sig_pi)])
         #phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts)])
         ax.set_title('threshold function');
         ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0, colors=('red',))
@@ -570,8 +495,9 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Sig_ts[0,:] = tau_x_ts
         Sig_ts[2,:] = sig_ts
         Eps_ts = np.zeros_like(Sig_ts)
-        f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts)])
-        phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts)])
+        H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
+        f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts, H_sig_pi)])
+        phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts, H_sig_pi)])
         ax.set_title('threshold function');
         ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0)
         ax.contour(sig_ts, tau_x_ts, phi_ts[0, ...])
@@ -588,7 +514,8 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Sig_ts[0,:] = Y_N
         Sig_ts[2,:] = Y_T
         Eps_ts = np.zeros_like(Sig_ts)
-        phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts)])
+        H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
+        phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts, H_sig_pi)])
         ax.set_title('potential function');
         ax.contour(Y_N, Y_T, phi_ts[0,...]) #, levels=0)
 
