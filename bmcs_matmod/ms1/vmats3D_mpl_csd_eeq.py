@@ -303,7 +303,7 @@ class MATS3DMplCSDEEQ(MATS3DEval):
     # --------------------------------------------------------
     # return the state variables (Damage , inelastic strains)
     # --------------------------------------------------------
-    def _get_state_variables(self, eps_Emab,
+    def _x_get_state_variables(self, eps_Emab,
                              int_var, eps_aux):
 
         e_N_arr = self._get_e_N_Emn_2(eps_Emab)

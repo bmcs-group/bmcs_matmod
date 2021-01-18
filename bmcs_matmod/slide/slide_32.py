@@ -261,6 +261,8 @@ f_2 = f_1.subs(subs_Q)
 f_3 = f_2.subs(subs_tau_eff)
 f_ = f_3.subs(fdc.symb.tau_bar, (bartau+Z))
 
+norm_Q_fn = norm_Q.subs(subs_Q).subs(subs_tau_eff)
+
 # **Executable code generation** $f(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$
 # 
 # Note that this is a function of both the forces and kinematic state variables
@@ -270,13 +272,59 @@ f_ = f_3.subs(fdc.symb.tau_bar, (bartau+Z))
 df_dSig_ = f_.diff(Sig)
 ddf_dEps_ = f_.diff(Eps)
 
-phi_s_ext = (1-omega_s)**c_s * (Y_s**2 / S_s + eta * (Y_s * Y_w) / sp.sqrt(S_s * S_w))
-phi_w_ext = (1-omega_w)**c_w * (Y_w**2 / S_w + H(sig_pi) * eta * (Y_s * Y_w) / sp.sqrt(S_s * S_w))
+phi_s_ext = (1-omega_s)**c_s * (Y_s**2 / S_s + eta * (Y_s * Y_w) / (2 * S_w) )
+phi_w_ext = (1-omega_w)**c_w * (Y_w**2 / S_w + eta * (Y_s * Y_w) / (2 * S_s) ) # * H(sig_pi)
 
+Y_T, Y_N = Y_s, Y_w
+S_T, S_N = S_s, S_w
+omega_T, omega_N = omega_s, omega_w
+c_T, c_N = c_s, c_w
+
+# version with geometric mean
+phi_N_ext = (1-omega_N)**c_N * (
+    (Y_N**2 + eta * (Y_T * Y_N)) /
+    (2*(S_N - eta * (S_N - sp.sqrt(S_N * S_T))))
+) * H(sig_pi)
+
+phi_T_ext = (1-omega_T)**c_T * (
+    (Y_T**2 + eta * (Y_T * Y_N)) /
+    (2*(S_T - eta * (S_T - sp.sqrt(S_N * S_T))))
+)
+
+######################################################################
+# version with arithmetic mean
+phi_N_ext = (1-omega_N)**c_N * (
+    (Y_N**2 + eta * (Y_T * Y_N)) /
+    (2*(S_N - eta * (S_N - (S_N + S_T)/2)))
+)
+phi_T_ext = (1-omega_T)**c_T * (
+    (Y_T**2 + eta * (Y_T * Y_N)) /
+    (2*(S_T - eta * (S_T - (S_N + S_T)/2)))
+)
 # The flow potential $\varphi(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$ reads
 
-phi_ = f_ + phi_s_ext + phi_w_ext
+phi_ = f_ + phi_T_ext + phi_N_ext
 phi_
+
+########################################################################
+
+if True:
+    a,b,c,d = sp.symbols('a,b,c,d')
+    H_switch = sp.symbols(r'H(\sigma^\pi)', real=True)
+    phi_ext = a * Y_N**2 + b * eta * Y_N*(Y_N + Y_T) + c * Y_T**2 + d * eta * Y_T*(Y_T+Y_N)
+    d_phi_N_0 = phi_ext.diff(Y_N).subs(eta,0)
+    a_solved = sp.solve( sp.Eq( d_phi_N_0, (1 - omega_N)**c_N * Y_N / S_N * H_switch ), a )[0]
+    d_phi_T_0 = phi_ext.diff(Y_T).subs(eta,0)
+    c_solved = sp.solve( sp.Eq( d_phi_T_0, (1 - omega_T)**c_T * Y_T / S_T ), c )[0]
+    phi_ext_ac = phi_ext.subs({a: a_solved, c: c_solved})
+    d_phi_N_1 = phi_ext_ac.diff(Y_N).subs(eta,1)
+    d_phi_T_1 = phi_ext_ac.diff(Y_T).subs(eta,1)
+    d_phi_1_req = (1 - (omega_N + omega_T)/2)**((c_N+c_T)/2) * (Y_N + Y_T) / (S_N + S_T)
+    bd_solved = sp.solve({sp.Eq(d_phi_N_1, d_phi_1_req), sp.Eq(d_phi_T_1, d_phi_1_req)},[b,d])
+    phi_abcd = phi_ext_ac.subs(bd_solved).subs(H_switch, H(sig_pi))
+    phi_ = f_ + sp.simplify(phi_abcd)
+
+###########################################################################
 
 # and the corresponding directions of flow given as a product of the sign operator $\Upsilon$ and of the derivatives with respect to state variables
 # $\boldsymbol{\Upsilon} \, \partial_{\boldsymbol{\mathcal{S}}} \varphi$
@@ -324,6 +372,8 @@ class Slide23Expr(bu.SymbExpr):
     phi_ = phi_
     Phi_ = Phi_
 
+    norm_Q_ = norm_Q_fn
+
     # List of expressions for which the methods `get_`
     symb_expressions = [
         ('Sig_', ('s_x', 's_y', 'w', 'Sig', 'Eps')),
@@ -333,6 +383,7 @@ class Slide23Expr(bu.SymbExpr):
         ('ddf_dEps_', ('Eps', 'Sig')),
         ('phi_', ('Eps', 'Sig')),
         ('Phi_', ('Eps', 'Sig')),
+        ('norm_Q_', ('Eps', 'Sig'))
     ]
 
 #get_Sig_C = ccode('get_Sig',Sig_,'SLIDE1_3')
@@ -501,10 +552,10 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Sig_ts[3:,...] = Sig[3:,np.newaxis,np.newaxis]
         Eps_ts[...] = Eps[:,np.newaxis,np.newaxis]
         f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts)])
-        phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts)])
+        #phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts)])
         ax.set_title('threshold function');
         ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0, colors=('red',))
-        ax.contour(sig_ts, tau_x_ts, phi_ts[0, ...])
+        #ax.contour(sig_ts, tau_x_ts, phi_ts[0, ...])
         ax.plot(sig, tau, marker='H', color='red')
         ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
         ax.plot([0, 0], [lower_tau, upper_tau], color='black', lw=0.4)
