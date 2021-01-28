@@ -237,20 +237,38 @@ if False:
     phi_ = f_ + phi_T_ext + phi_N_ext
 
 ########################################################################
+damage_interaction = 'geometric'
 
-a,b,c,d = sp.symbols('a,b,c,d')
-phi_ext = a * Y_N**2 + b * eta * Y_N*(Y_N + Y_T) + c * Y_T**2 + d * eta * Y_T*(Y_T+Y_N)
-d_phi_N_0 = phi_ext.diff(Y_N).subs(eta,0)
-a_solved = sp.solve( sp.Eq( d_phi_N_0, (1 - omega_N)**c_N * Y_N / S_N * H_switch ), a )[0]
-d_phi_T_0 = phi_ext.diff(Y_T).subs(eta,0)
-c_solved = sp.solve( sp.Eq( d_phi_T_0, (1 - omega_T)**c_T * Y_T / S_T ), c )[0]
-phi_ext_ac = phi_ext.subs({a: a_solved, c: c_solved})
-d_phi_N_1 = phi_ext_ac.diff(Y_N).subs(eta,1)
-d_phi_T_1 = phi_ext_ac.diff(Y_T).subs(eta,1)
-d_phi_1_req = (1 - (omega_N + omega_T)/2)**((c_N+c_T)/2) * (Y_N + Y_T) / (S_N + S_T)
-bd_solved = sp.solve({sp.Eq(d_phi_N_1, d_phi_1_req), sp.Eq(d_phi_T_1, d_phi_1_req)},[b,d])
-phi_abcd = phi_ext_ac.subs(bd_solved) # .subs(H_switch, H(sig_pi))
-phi_ = f_ + sp.simplify(phi_abcd)
+if damage_interaction == 'arithmetic':
+    a,b,c,d = sp.symbols('a,b,c,d')
+    phi_ext = a * Y_N**2 + b * eta * Y_N*(Y_N + Y_T) + c * Y_T**2 + d * eta * Y_T*(Y_T+Y_N)
+    d_phi_N_0 = phi_ext.diff(Y_N).subs(eta,0)
+    a_solved = sp.solve( sp.Eq( d_phi_N_0, (1 - omega_N)**c_N * Y_N / S_N * H_switch ), a )[0]
+    d_phi_T_0 = phi_ext.diff(Y_T).subs(eta,0)
+    c_solved = sp.solve( sp.Eq( d_phi_T_0, (1 - omega_T)**c_T * Y_T / S_T ), c )[0]
+    phi_ext_ac = phi_ext.subs({a: a_solved, c: c_solved})
+    d_phi_N_1 = phi_ext_ac.diff(Y_N).subs(eta,1)
+    d_phi_T_1 = phi_ext_ac.diff(Y_T).subs(eta,1)
+    d_phi_1_req = (1 - (omega_N + omega_T)/2)**((c_N+c_T)/2) * (Y_N + Y_T) / (S_N + S_T)
+    bd_solved = sp.solve({sp.Eq(d_phi_N_1, d_phi_1_req), sp.Eq(d_phi_T_1, d_phi_1_req)},[b,d])
+    phi_abcd = phi_ext_ac.subs(bd_solved) # .subs(H_switch, H(sig_pi))
+    phi_ = f_ + sp.simplify(phi_abcd)
+elif damage_interaction == 'geometric':
+    a, b, c, d = sp.symbols('a,b,c,d')
+    phi2_ext = a * Y_N ** 2 + b * eta * Y_N * (Y_N + Y_T) + c * Y_T ** 2 + d * eta * Y_T * (Y_N + Y_T)
+    d_phi2_N_0 = phi2_ext.diff(Y_N).subs(eta,0)
+    a2_solved = sp.solve( sp.Eq( d_phi2_N_0, (1 - omega_N)**c_N * Y_N / S_N * H_switch ), a )[0]
+    d_phi2_T_0 = phi2_ext.diff(Y_T).subs(eta,0)
+    c2_solved = sp.solve( sp.Eq( d_phi2_T_0, (1 - omega_T)**c_T * Y_T / S_T ), c )[0]
+    phi2_ext_ac = phi2_ext.subs({a: a2_solved, c: c2_solved})
+    d_phi2_N_1 = phi2_ext_ac.diff(Y_N).subs(eta,1)
+    d_phi2_T_1 = phi2_ext_ac.diff(Y_T).subs(eta,1)
+    c_NT = sp.sqrt(c_N*c_T)
+    S_NT = sp.sqrt(S_N*S_T)
+    d_phi_2_req = (1 - sp.sqrt(omega_N*omega_T))**(c_NT) * (Y_N+Y_T) / (2*S_NT)
+    bd2_solved = sp.solve({sp.Eq(d_phi2_N_1, d_phi_2_req), sp.Eq(d_phi2_T_1, d_phi_2_req)},[b,d])
+    phi2_abcd = phi2_ext_ac.subs(bd2_solved)
+    phi_ = f_ + sp.simplify(phi2_abcd)
 
 ###########################################################################
 
@@ -466,6 +484,8 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         upper = self.f_t + 0.05 * self.f_c
         lower_tau = -self.bartau * 2
         upper_tau = self.bartau * 2
+        lower_tau = 0
+        upper_tau = 10
         tau_x, tau_y, sig = Sig[:3]
         tau = np.sqrt(tau_x**2 + tau_y**2)
         sig_ts, tau_x_ts  = np.mgrid[lower:upper:201j,lower_tau:upper_tau:201j]
@@ -477,13 +497,22 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Eps_ts[...] = Eps[:,np.newaxis,np.newaxis]
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
         f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts, H_sig_pi)])
+
         #phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts)])
         ax.set_title('threshold function');
+
+        omega_N = Eps_ts[-1,:]
+        omega_T = Eps_ts[-2,:]
+        sig_ts_eff = sig_ts / (1 - omega_N)
+        tau_x_ts_eff = tau_x_ts / (1 - omega_T)
+        ax.contour(sig_ts_eff, tau_x_ts_eff, f_ts[0,...], levels=0, colors=('green',))
+
         ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0, colors=('red',))
         #ax.contour(sig_ts, tau_x_ts, phi_ts[0, ...])
         ax.plot(sig, tau, marker='H', color='red')
         ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
         ax.plot([0, 0], [lower_tau, upper_tau], color='black', lw=0.4)
+        ax.set_ylim(ymin=0, ymax=10)
 
     def plot_f(self, ax):
         lower = -self.f_c * 1.05
