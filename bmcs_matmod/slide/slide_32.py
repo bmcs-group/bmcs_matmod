@@ -13,8 +13,10 @@
 # as symbolic equations using the sympy package. The time-stepping algorithm gets generated automatically within the thermodynamically framework. The derived  evolution equations and return-mapping to the yield surface is performed using Newton scheme.  
 
 import sympy as sp
-import matplotlib.pyplot as plt
+import traits.api as tr
 import numpy as np
+from bmcs_matmod.slide.f_double_cap import FDoubleCap
+import bmcs_utils.api as bu
 
 H_switch = sp.symbols(r'H(\sigma^\pi)', real=True)
 H = lambda x: sp.Piecewise( (0, x <=0 ), (1, True) )
@@ -174,9 +176,6 @@ subs_tau_eff = {tau_eff_x: tau_pi_x / (1-omega_s),
 
 # **Smooth yield function**
 
-from bmcs_matmod.slide.f_double_cap import FDoubleCap
-import bmcs_utils.api as bu
-
 fdc = FDoubleCap()
 f_t = fdc.symb.f_t
 f_c = fdc.symb.f_c
@@ -236,39 +235,6 @@ if False:
 
     phi_ = f_ + phi_T_ext + phi_N_ext
 
-########################################################################
-damage_interaction = 'geometric'
-
-if damage_interaction == 'arithmetic':
-    a,b,c,d = sp.symbols('a,b,c,d')
-    phi_ext = a * Y_N**2 + b * eta * Y_N*(Y_N + Y_T) + c * Y_T**2 + d * eta * Y_T*(Y_T+Y_N)
-    d_phi_N_0 = phi_ext.diff(Y_N).subs(eta,0)
-    a_solved = sp.solve( sp.Eq( d_phi_N_0, (1 - omega_N)**c_N * Y_N / S_N * H_switch ), a )[0]
-    d_phi_T_0 = phi_ext.diff(Y_T).subs(eta,0)
-    c_solved = sp.solve( sp.Eq( d_phi_T_0, (1 - omega_T)**c_T * Y_T / S_T ), c )[0]
-    phi_ext_ac = phi_ext.subs({a: a_solved, c: c_solved})
-    d_phi_N_1 = phi_ext_ac.diff(Y_N).subs(eta,1)
-    d_phi_T_1 = phi_ext_ac.diff(Y_T).subs(eta,1)
-    d_phi_1_req = (1 - (omega_N + omega_T)/2)**((c_N+c_T)/2) * (Y_N + Y_T) / (S_N + S_T)
-    bd_solved = sp.solve({sp.Eq(d_phi_N_1, d_phi_1_req), sp.Eq(d_phi_T_1, d_phi_1_req)},[b,d])
-    phi_abcd = phi_ext_ac.subs(bd_solved) # .subs(H_switch, H(sig_pi))
-    phi_ = f_ + sp.simplify(phi_abcd)
-elif damage_interaction == 'geometric':
-    a, b, c, d = sp.symbols('a,b,c,d')
-    phi2_ext = a * Y_N ** 2 + b * eta * Y_N * (Y_N + Y_T) + c * Y_T ** 2 + d * eta * Y_T * (Y_N + Y_T)
-    d_phi2_N_0 = phi2_ext.diff(Y_N).subs(eta,0)
-    a2_solved = sp.solve( sp.Eq( d_phi2_N_0, (1 - omega_N)**c_N * Y_N / S_N * H_switch ), a )[0]
-    d_phi2_T_0 = phi2_ext.diff(Y_T).subs(eta,0)
-    c2_solved = sp.solve( sp.Eq( d_phi2_T_0, (1 - omega_T)**c_T * Y_T / S_T ), c )[0]
-    phi2_ext_ac = phi2_ext.subs({a: a2_solved, c: c2_solved})
-    d_phi2_N_1 = phi2_ext_ac.diff(Y_N).subs(eta,1)
-    d_phi2_T_1 = phi2_ext_ac.diff(Y_T).subs(eta,1)
-    c_NT = sp.sqrt(c_N*c_T)
-    S_NT = sp.sqrt(S_N*S_T)
-    d_phi_2_req = (1 - sp.sqrt(omega_N*omega_T))**(c_NT) * (Y_N+Y_T) / (2*S_NT)
-    bd2_solved = sp.solve({sp.Eq(d_phi2_N_1, d_phi_2_req), sp.Eq(d_phi2_T_1, d_phi_2_req)},[b,d])
-    phi2_abcd = phi2_ext_ac.subs(bd2_solved)
-    phi_ = f_ + sp.simplify(phi2_abcd)
 
 ###########################################################################
 
@@ -278,8 +244,6 @@ elif damage_interaction == 'geometric':
 # \begin{align}
 # \boldsymbol{\Phi} = - \Upsilon \frac{\partial \varphi}{\partial \boldsymbol{\mathcal{S}}} 
 # \end{align}
-
-Phi_ = -Sig_signs * phi_.diff(Sig)
 
 class Slide23Expr(bu.SymbExpr):
 
@@ -304,6 +268,7 @@ class Slide23Expr(bu.SymbExpr):
     m = m
     eta = eta
     H_switch = H_switch
+    Sig_signs = Sig_signs
 
     symb_model_params = [
         'E_s', 'gamma_s', 'K_s', 'S_s', 'c_s', 'bartau',
@@ -316,8 +281,55 @@ class Slide23Expr(bu.SymbExpr):
     f_ = f_
     df_dSig_ = df_dSig_
     ddf_dEps_ = ddf_dEps_
-    phi_ = phi_
-    Phi_ = Phi_
+
+    phi_ari_ = tr.Property()
+    @tr.cached_property
+    def _get_phi_ari_(self):
+        a, b, c, d = sp.symbols('a,b,c,d')
+        phi_ext = a * Y_N ** 2 + b * eta * Y_N * (Y_N + Y_T) + c * Y_T ** 2 + d * eta * Y_T * (Y_T + Y_N)
+        d_phi_N_0 = phi_ext.diff(Y_N).subs(eta, 0)
+        a_solved = sp.solve(sp.Eq(d_phi_N_0, (1 - omega_N) ** c_N * Y_N / S_N * H_switch), a)[0]
+        d_phi_T_0 = phi_ext.diff(Y_T).subs(eta, 0)
+        c_solved = sp.solve(sp.Eq(d_phi_T_0, (1 - omega_T) ** c_T * Y_T / S_T), c)[0]
+        phi_ext_ac = phi_ext.subs({a: a_solved, c: c_solved})
+        d_phi_N_1 = phi_ext_ac.diff(Y_N).subs(eta, 1)
+        d_phi_T_1 = phi_ext_ac.diff(Y_T).subs(eta, 1)
+        d_phi_1_req = (1 - (omega_N + omega_T) / 2) ** ((c_N + c_T) / 2) * (Y_N + Y_T) / (S_N + S_T)
+        bd_solved = sp.solve({sp.Eq(d_phi_N_1, d_phi_1_req), sp.Eq(d_phi_T_1, d_phi_1_req)}, [b, d])
+        phi_abcd = phi_ext_ac.subs(bd_solved)  # .subs(H_switch, H(sig_pi))
+        phi_ = f_ + sp.simplify(phi_abcd)
+        return phi_
+
+    Phi_ari_ = tr.Property()
+    @tr.cached_property
+    def _get_Phi_ari_(self):
+        return -self.Sig_signs * self.phi_ari_.diff(self.Sig)
+
+    phi_geo_ = tr.Property()
+    @tr.cached_property
+    def _get_phi_geo_(self):
+        a, b, c, d = sp.symbols('a,b,c,d')
+        phi2_ext = a * Y_N ** 2 + b * eta * Y_N * (Y_N + Y_T) + c * Y_T ** 2 + d * eta * Y_T * (Y_N + Y_T)
+        d_phi2_N_0 = phi2_ext.diff(Y_N).subs(eta, 0)
+        a2_solved = sp.solve(sp.Eq(d_phi2_N_0, (1 - omega_N) ** c_N * Y_N / S_N * H_switch), a)[0]
+        d_phi2_T_0 = phi2_ext.diff(Y_T).subs(eta, 0)
+        c2_solved = sp.solve(sp.Eq(d_phi2_T_0, (1 - omega_T) ** c_T * Y_T / S_T), c)[0]
+        phi2_ext_ac = phi2_ext.subs({a: a2_solved, c: c2_solved})
+        d_phi2_N_1 = phi2_ext_ac.diff(Y_N).subs(eta, 1)
+        d_phi2_T_1 = phi2_ext_ac.diff(Y_T).subs(eta, 1)
+        c_NT = sp.sqrt(c_N * c_T)
+        S_NT = sp.sqrt(S_N * S_T)
+        d_phi_2_req = (1 - sp.sqrt(omega_N * omega_T)) ** (c_NT) * (Y_N + Y_T) / (2 * S_NT)
+        bd2_solved = sp.solve({sp.Eq(d_phi2_N_1, d_phi_2_req), sp.Eq(d_phi2_T_1, d_phi_2_req)}, [b, d])
+        phi2_abcd = phi2_ext_ac.subs(bd2_solved)
+        phi_ = f_ + sp.simplify(phi2_abcd)
+        return phi_
+
+    Phi_geo_ = tr.Property()
+    @tr.cached_property
+    def _get_Phi_geo_(self):
+        return -self.Sig_signs * self.phi_geo_.diff(self.Sig)
+
     H_sig_pi_ = H(sig_pi)
 
     tau_eff_x_ = tau_pi_x / (1 - omega_s)
@@ -331,8 +343,10 @@ class Slide23Expr(bu.SymbExpr):
         ('f_', ('Eps', 'Sig', 'H_switch')),
         ('df_dSig_', ('Eps', 'Sig', 'H_switch')),
         ('ddf_dEps_', ('Eps', 'Sig', 'H_switch')),
-        ('phi_', ('Eps', 'Sig', 'H_switch')),
-        ('Phi_', ('Eps', 'Sig', 'H_switch')),
+        ('phi_ari_', ('Eps', 'Sig', 'H_switch')),
+        ('Phi_ari_', ('Eps', 'Sig', 'H_switch')),
+        ('phi_geo_', ('Eps', 'Sig', 'H_switch')),
+        ('Phi_geo_', ('Eps', 'Sig', 'H_switch')),
         ('H_sig_pi_', ('Sig',))
     ]
 
@@ -420,6 +434,22 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         bu.Item('eta', minmax=(0, 1))
     )
 
+    damage_interaction = tr.Enum('geometric','arithmetic')
+
+    get_phi_ = tr.Property
+    def _get_get_phi_(self):
+        if self.damage_interaction == 'geometric':
+            return self.symb.get_phi_geo_
+        elif self.damage_interaction == 'arithmetic':
+            return self.symb.get_phi_ari_
+
+    get_Phi_ = tr.Property
+    def _get_get_Phi_(self):
+        if self.damage_interaction == 'geometric':
+            return self.symb.get_Phi_geo_
+        elif self.damage_interaction == 'arithmetic':
+            return self.symb.get_Phi_ari_
+
     def get_f_df(self, s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k):
         Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)[0]
         dSig_dEps_k = self.symb.get_dSig_dEps_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
@@ -429,7 +459,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         ddf_dEps_k = self.symb.get_ddf_dEps_(Eps_k, Sig_k, H_sig_pi)
         df_dEps_k = np.einsum(
             'ik,ji->jk', df_dSig_k, dSig_dEps_k) + ddf_dEps_k
-        Phi_k = self.symb.get_Phi_(Eps_k, Sig_k, H_sig_pi)
+        Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi)
         dEps_dlambda_k = Phi_k
         df_dlambda = np.einsum(
             'ki,kj->ij', df_dEps_k, dEps_dlambda_k)
@@ -443,7 +473,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         '''
         Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)[0]
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
-        Phi_k = self.symb.get_Phi_(Eps_k, Sig_k, H_sig_pi)
+        Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi)
         Eps_k1 = Eps_n + lam_k * Phi_k[:, 0]
         return Eps_k1
 
@@ -526,7 +556,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Eps_ts = np.zeros_like(Sig_ts)
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
         f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts, H_sig_pi)])
-        phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts, H_sig_pi)])
+        phi_ts = np.array([self.get_phi_(Eps_ts, Sig_ts, H_sig_pi)])
         ax.set_title('threshold function');
         ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0)
         ax.contour(sig_ts, tau_x_ts, phi_ts[0, ...])
@@ -544,7 +574,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Sig_ts[2,:] = Y_T
         Eps_ts = np.zeros_like(Sig_ts)
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
-        phi_ts = np.array([self.symb.get_phi_(Eps_ts, Sig_ts, H_sig_pi)])
+        phi_ts = np.array([self.get_phi_(Eps_ts, Sig_ts, H_sig_pi)])
         ax.set_title('potential function');
         ax.contour(Y_N, Y_T, phi_ts[0,...]) #, levels=0)
 
