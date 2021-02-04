@@ -289,6 +289,10 @@ class MS1(MATS3DEval, InteractiveModel):
                                 ((sig_pi_trial[..., 1] - X[..., 1]) /
                                  (1.0 - omega_T_Emn)) / norm_2
 
+        eps_T_pi_Emna[..., 2] +=  plas_1 * delta_lamda * \
+                                ((sig_pi_trial[..., 2] - X[..., 2]) /
+                                 (1.0 - omega_T_Emn)) / norm_2
+
         omega_T_Emn += ((1 - omega_T_Emn) ** self.c_T) * \
                        (delta_lamda * (Y / self.S_T) ** self.r_T) * \
                        (self.sigma_T_0 / (self.sigma_T_0 + self.m_T * sigma_N_Emn)) ** self.p_T
@@ -298,6 +302,9 @@ class MS1(MATS3DEval, InteractiveModel):
                                (sig_pi_trial[..., 0] - X[..., 0]) / norm_2
         alpha_T_Emna[..., 1] += plas_1 * delta_lamda * \
                                (sig_pi_trial[..., 1] - X[..., 1]) / norm_2
+
+        alpha_T_Emna[..., 2] += plas_1 * delta_lamda * \
+                               (sig_pi_trial[..., 2] - X[..., 2]) / norm_2
 
         z_T_Emn += delta_lamda
 
@@ -554,7 +561,7 @@ class MS13D(MS1):
     def _get_lame_params(self):
         la = self.E * self.nu / ((1. + self.nu) * (1. - 2. * self.nu))
         # second Lame parameter (shear modulus)
-        mu = self.E / (1 + self.nu)
+        mu = self.E / (2. + 2.* self.nu)
         return la, mu
 
     D_abef = tr.Property(tr.Array, depends_on='+input')
