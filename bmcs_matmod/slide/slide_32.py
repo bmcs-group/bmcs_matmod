@@ -38,24 +38,6 @@ def ccode(cfun_name, sp_expr, cfile):
     '''
     return codegen((cfun_name, sp_expr), 'C89', cfile + '_' + cfun_name)
 
-
-# ## TODO
-#  - The current implementation uses the threshold function linearized along $\lambda$ to represent the consistency condition. 
-#  - As the next step include the fully linearized set of evolution equations and threshold functions. This might be important for SLIDE 3.x, 2D and 3D problems (von Mises, Drucker-Prager). In the current one-dimensional problem it probably has no effect - this feature will be included in SLIDE-core notebook which should be able to generate all the other problems by configuring the thermodynamic inputs symbolically.  
-#  - Put the derived get_methods into a class and let the predictor-corrector implementation just access them. With this, the iteration scheme becomes completely generic. Any kind of model can be implemented then using the thermodynamic framework.
-#  - Verification - check to see if the parameters controlling interaction between tension and shear have an effect and for which range of values
-#  - Think of more flat profile of the f function to reduce the number of iterations during return mapping
-#  - Visualize the iteration within the yield potential space for elementary loading scenarios.
-#  - Check the reset of the interactive app upon change of the material parameters. Sometimes it is not replotted directly.
-
-# &nbsp;<font color='blue'>
-# **Naming conventions:**
-#  - Variables with trailing underscore (e.g. `f_`, or `Sig_`) denote `sympy` expressions. 
-#  - Variables denoting `sympy` symbols (e.g. `Sig` have no underscore at the end and have an the name which is close to the mathematical symbol
-#  - Mathematical symbols defined as string in `sp.symbols(r'\tau^{\pi}')` use `latex` syntax to introduce Greek symbols, super and subindexes. This makes the pretty printing of expression possible.
-#  - In an implemented algorithm at the end of the notebook, the Python variables containing the numerical values of the material parameters $E_b$, $\tau_\mathrm{Y}$, etc. are denoted with a leading underscore `_E_b` and `_tau_Y` to avoid name collisions within the notebook
-# </font>
-
 # ## Material parameters
 
 E_s = sp.Symbol('E_s', real=True, nonnegative=True)
@@ -208,6 +190,7 @@ Y_T, Y_N = Y_s, Y_w
 S_T, S_N = S_s, S_w
 omega_T, omega_N = omega_s, omega_w
 c_T, c_N = c_s, c_w
+r = sp.symbols(r'r')
 
 if False:
     # version with geometric mean
@@ -267,12 +250,13 @@ class Slide23Expr(bu.SymbExpr):
     f_c0 = f_c0
     m = m
     eta = eta
+    r = r
     H_switch = H_switch
     Sig_signs = Sig_signs
 
     symb_model_params = [
         'E_s', 'gamma_s', 'K_s', 'S_s', 'c_s', 'bartau',
-        'E_w', 'S_w', 'c_w', 'm', 'f_t', 'f_c', 'f_c0', 'eta'
+        'E_w', 'S_w', 'c_w', 'm', 'f_t', 'f_c', 'f_c0', 'eta', 'r'
     ]
 
     # expressions
@@ -325,10 +309,37 @@ class Slide23Expr(bu.SymbExpr):
         phi_ = f_ + sp.simplify(phi2_abcd)
         return phi_
 
+
     Phi_geo_ = tr.Property()
     @tr.cached_property
     def _get_Phi_geo_(self):
         return -self.Sig_signs * self.phi_geo_.diff(self.Sig)
+
+    phi_final_ = tr.Property()
+    @tr.cached_property
+    def _get_phi_final_(self):
+        def ari(var1, var2):
+            return (var1 + var2) / 2
+        def geo(var1, var2):
+            return np.sqrt(var1*var2)
+        def max(var1, var2):
+            return sp.Piecewise( (var1, var1 > var2),
+                                 (var2, True))
+        def avg(var1, var2):
+            return ari(var1, var2)
+        c_NT = avg(c_N, c_T)
+        S_NT = avg(S_N, S_T)
+        omega_NT = ari(omega_N, omega_T)
+        phi_N = (1 - omega_N)**(c_N) * S_N/(r+1) * (Y_N/S_N)**(r+1) * H_switch
+        phi_T = (1 - omega_T)**(c_T) * S_T/(r+1) * (Y_T/S_T)**(r+1)
+        phi_NT  = (1 - omega_NT)**(c_NT) * S_NT/(r+1) * ((Y_N+Y_T)/S_NT)**(r+1)
+        phi_ = f_ + (1 - eta) * (phi_N + phi_T) + eta * phi_NT
+        return phi_.subs(r,1) # @TODO - fix the passing of the parameter - it damages the T response
+
+    Phi_final_ = tr.Property()
+    @tr.cached_property
+    def _get_Phi_final_(self):
+        return -self.Sig_signs * self.phi_final_.diff(self.Sig)
 
     H_sig_pi_ = H(sig_pi)
 
@@ -343,10 +354,12 @@ class Slide23Expr(bu.SymbExpr):
         ('f_', ('Eps', 'Sig', 'H_switch')),
         ('df_dSig_', ('Eps', 'Sig', 'H_switch')),
         ('ddf_dEps_', ('Eps', 'Sig', 'H_switch')),
-        ('phi_ari_', ('Eps', 'Sig', 'H_switch')),
-        ('Phi_ari_', ('Eps', 'Sig', 'H_switch')),
-        ('phi_geo_', ('Eps', 'Sig', 'H_switch')),
-        ('Phi_geo_', ('Eps', 'Sig', 'H_switch')),
+        # ('phi_ari_', ('Eps', 'Sig', 'H_switch')),
+        # ('Phi_ari_', ('Eps', 'Sig', 'H_switch')),
+        # ('phi_geo_', ('Eps', 'Sig', 'H_switch')),
+        # ('Phi_geo_', ('Eps', 'Sig', 'H_switch')),
+        ('phi_final_', ('Eps', 'Sig', 'H_switch')),
+        ('Phi_final_', ('Eps', 'Sig', 'H_switch')),
         ('H_sig_pi_', ('Sig',))
     ]
 
@@ -380,6 +393,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
     f_c = bu.Float(30, MAT=True)
     f_c0 = bu.Float(20, MAT=True)
     eta = bu.Float(0.5, MAT=True)
+    r = bu.Float(1, MAT=True)
 
     def C_codegen(self):
 
@@ -431,24 +445,31 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         bu.Item('f_t', minmax=(0.1, 10)),
         bu.Item('f_c', latex=r'f_\mathrm{c}', minmax=(1, 200)),
         bu.Item('f_c0', latex=r'f_\mathrm{c0}', minmax=(1, 100)),
-        bu.Item('eta', minmax=(0, 1))
+        bu.Item('eta', minmax=(0, 1)),
+        bu.Item('r')
     )
 
-    damage_interaction = tr.Enum('geometric','arithmetic')
+    damage_interaction = tr.Enum('final', 'geometric','arithmetic')
 
     get_phi_ = tr.Property
     def _get_get_phi_(self):
-        if self.damage_interaction == 'geometric':
-            return self.symb.get_phi_geo_
-        elif self.damage_interaction == 'arithmetic':
-            return self.symb.get_phi_ari_
+        if self.damage_interaction == 'final':
+            return self.symb.get_phi_final_
+        # elif self.damage_interaction == 'geometric':
+        #     print('get geo')
+        #     return self.symb.get_phi_geo_
+        # elif self.damage_interaction == 'arithmetic':
+        #     return self.symb.get_phi_ari_
 
     get_Phi_ = tr.Property
     def _get_get_Phi_(self):
-        if self.damage_interaction == 'geometric':
-            return self.symb.get_Phi_geo_
-        elif self.damage_interaction == 'arithmetic':
-            return self.symb.get_Phi_ari_
+        if self.damage_interaction == 'final':
+            return self.symb.get_Phi_final_
+        # elif self.damage_interaction == 'geometric':
+        #     print('get geo')
+        #     return self.symb.get_Phi_geo_
+        # elif self.damage_interaction == 'arithmetic':
+        #     return self.symb.get_Phi_ari_
 
     def get_f_df(self, s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k):
         Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)[0]
