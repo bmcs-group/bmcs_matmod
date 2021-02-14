@@ -40,64 +40,58 @@ def ccode(cfun_name, sp_expr, cfile):
 
 # ## Material parameters
 
-E_s = sp.Symbol('E_s', real=True, nonnegative=True)
-gamma_s = sp.Symbol('gamma_s', real=True, nonnegative=True)
-K_s = sp.Symbol('K_s', real=True)
-S_s = sp.Symbol('S_s', real=True)
-r_s = sp.Symbol('r_s', real=True)
-c_s = sp.Symbol('c_s', real=True)
+E_T = sp.Symbol('E_T', real=True, nonnegative=True)
+gamma_T = sp.Symbol('gamma_T', real=True, nonnegative=True)
+K_T = sp.Symbol('K_T', real=True)
+S_T = sp.Symbol('S_T', real=True)
+c_T = sp.Symbol('c_T', real=True)
 bartau = sp.Symbol(r'\bar{\tau}', real=True, nonnegative=True)
-#bartau = sp.Symbol(r'tau_Y', real=True, nonnegative=True)
 
-E_w = sp.Symbol('E_w', real=True, nonnegative=True)
-S_w = sp.Symbol('S_w', real=True)
-r_w = sp.Symbol('r_w', real=True)
-c_w = sp.Symbol('c_w', real=True)
+E_N = sp.Symbol('E_N', real=True, nonnegative=True)
+S_N = sp.Symbol('S_N', real=True)
+c_N = sp.Symbol('c_N', real=True)
+
 eta = sp.Symbol('eta', real=True, nonnegative=True)
 
 # ## State variables
 
 s_x, s_y = sp.symbols('s_x, s_y', real=True)
-omega_s = sp.Symbol('omega_s', real=True, nonnegative=True)
+omega_T = sp.Symbol('omega_T', real=True, nonnegative=True)
 s_pi_x, s_pi_y = sp.symbols(r's^{\pi}_x, s^{\pi}_y', real=True)
-#s_pi_x, s_pi_y = sp.symbols(r's_pi_x, s_pi_y', real=True)
 alpha_x, alpha_y = sp.symbols('alpha_x, alpha_y', real=True)
 z = sp.Symbol('z', real=True)
 
 w = sp.symbols('w', real=True)
-omega_w = sp.Symbol('omega_w', real=True, nonnegative=True)
+omega_N = sp.Symbol('omega_N', real=True, nonnegative=True)
 w_pi = sp.symbols(r'w^{\pi}', real=True)
-#w_pi = sp.symbols(r'w_pi', real=True)
 
-Eps = sp.Matrix([s_pi_x, s_pi_y, w_pi, z, alpha_x, alpha_y, omega_s, omega_w])
+Eps = sp.Matrix([s_pi_x, s_pi_y, w_pi, z, alpha_x, alpha_y, omega_T, omega_N])
 
 tau_x, tau_y = sp.symbols('tau_x, tau_y', real=True)
 tau_pi_x, tau_pi_y = sp.symbols(r'\tau^\pi_x, \tau^\pi_y', real=True)
-#tau_pi_x, tau_pi_y = sp.symbols(r'tau_pi_x, tau_pi_y', real=True)
 X_x, X_y = sp.symbols('X_x, X_y', real=True)
 Z = sp.Symbol('Z', real=True, nonnegative=True)
-Y_s = sp.Symbol('Y_s', real=True)
+Y_T = sp.Symbol('Y_T', real=True)
 
 sig = sp.symbols('\sigma', real=True)
 sig_pi = sp.symbols(r'\sigma^\pi', real=True)
-#sig_pi = sp.symbols(r'sigma_pi', real=True)
-Y_w = sp.Symbol('Y_w', real=True)
+Y_N = sp.Symbol('Y_N', real=True)
 
-Sig = sp.Matrix([tau_pi_x, tau_pi_y, sig_pi, Z, X_x, X_y, Y_s, Y_w])
+Sig = sp.Matrix([tau_pi_x, tau_pi_y, sig_pi, Z, X_x, X_y, Y_T, Y_N])
 
 # ## Helmholtz free energy
 
-rho_psi_s_ = sp.Rational(1,2)* (
-    (1-omega_s)*E_s*(s_x-s_pi_x)**2 +
-    (1-omega_s)*E_s*(s_y-s_pi_y)**2 +
-    K_s * z**2 +
-    gamma_s * alpha_x**2 +
-    gamma_s * alpha_y**2
+rho_psi_T_ = sp.Rational(1,2)* (
+    (1-omega_T)*E_T*(s_x-s_pi_x)**2 +
+    (1-omega_T)*E_T*(s_y-s_pi_y)**2 +
+    K_T * z**2 +
+    gamma_T * alpha_x**2 +
+    gamma_T * alpha_y**2
 )
 
-rho_psi_w_ = sp.Rational(1,2) * (1 - H(sig_pi) * omega_w) * E_w * (w - w_pi)**2
+rho_psi_N_ = sp.Rational(1,2) * (1 - H(sig_pi) * omega_N) * E_N * (w - w_pi)**2
 
-rho_psi_ = rho_psi_s_ + rho_psi_w_
+rho_psi_ = rho_psi_T_ + rho_psi_N_
 
 # The introduce the thermodynamic forces we have to differentiate Hemholtz free energy
 # with respect to the kinematic state variables
@@ -146,13 +140,13 @@ norm_Q = sp.sqrt(Q_x*Q_x + Q_y*Q_y)
 
 subs_Q = {Q_x: tau_eff_x - X_x, Q_y: tau_eff_y - X_y}
 
-tau_eff_x_ = tau_pi_x / (1-omega_s)
-tau_eff_y_ = tau_pi_y / (1-omega_s)
-sig_eff_ = sig_pi / (1- H(sig_pi) * omega_w)
+tau_eff_x_ = tau_pi_x / (1-omega_T)
+tau_eff_y_ = tau_pi_y / (1-omega_T)
+sig_eff_ = sig_pi / (1- H(sig_pi) * omega_N)
 
-subs_tau_eff = {tau_eff_x: tau_pi_x / (1-omega_s),
-                tau_eff_y: tau_pi_y / (1-omega_s),
-                sig_eff: sig_pi / (1- H_switch * omega_w)}
+subs_tau_eff = {tau_eff_x: tau_pi_x / (1-omega_T),
+                tau_eff_y: tau_pi_y / (1-omega_T),
+                sig_eff: sig_pi / (1- H_switch * omega_N)}
 
 # After substitutions the yield function reads
 
@@ -182,42 +176,7 @@ f_eff_ = f_2.subs(fdc.symb.tau_bar, (bartau+Z))
 
 df_dSig_ = f_.diff(Sig)
 ddf_dEps_ = f_.diff(Eps)
-
-# phi_s_ext = (1-omega_s)**c_s * (Y_s**2 / S_s + eta * (Y_s * Y_w) / (2 * S_w) )
-# phi_w_ext = (1-omega_w)**c_w * (Y_w**2 / S_w + eta * (Y_s * Y_w) / (2 * S_s) ) # * H(sig_pi)
-
-Y_T, Y_N = Y_s, Y_w
-S_T, S_N = S_s, S_w
-omega_T, omega_N = omega_s, omega_w
-c_T, c_N = c_s, c_w
-r = sp.symbols(r'r')
-
-if False:
-    # version with geometric mean
-    phi_N_ext = (1-omega_N)**c_N * (
-        (Y_N**2 + eta * (Y_T * Y_N)) /
-        (2*(S_N - eta * (S_N - sp.sqrt(S_N * S_T))))
-    ) * H(sig_pi)
-
-    phi_T_ext = (1-omega_T)**c_T * (
-        (Y_T**2 + eta * (Y_T * Y_N)) /
-        (2*(S_T - eta * (S_T - sp.sqrt(S_N * S_T))))
-    )
-
-    ######################################################################
-    # version with arithmetic mean
-    phi_N_ext = (1-omega_N)**c_N * (
-        (Y_N**2 + eta * (Y_T * Y_N)) /
-        (2*(S_N - eta * (S_N - (S_N + S_T)/2)))
-    )
-    phi_T_ext = (1-omega_T)**c_T * (
-        (Y_T**2 + eta * (Y_T * Y_N)) /
-        (2*(S_T - eta * (S_T - (S_N + S_T)/2)))
-    )
-    # The flow potential $\varphi(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$ reads
-
-    phi_ = f_ + phi_T_ext + phi_N_ext
-
+r = sp.symbols(r'r', positive=True)
 
 ###########################################################################
 
@@ -234,17 +193,15 @@ class Slide23Expr(bu.SymbExpr):
     s_x, s_y, w, Eps, Sig = s_x, s_y, w, Eps, Sig
 
     # model parameters
-    E_s = E_s
-    gamma_s = gamma_s
-    K_s = K_s
-    S_s = S_s
-    r_s = r_s
-    c_s = c_s
+    E_T = E_T
+    gamma_T = gamma_T
+    K_T = K_T
+    S_T = S_T
+    c_T = c_T
     bartau = bartau
-    E_w = E_w
-    S_w = S_w
-    r_w = r_w
-    c_w = c_w
+    E_N = E_N
+    S_N = S_N
+    c_N = c_N
     f_t = f_t
     f_c = f_c
     f_c0 = f_c0
@@ -254,66 +211,12 @@ class Slide23Expr(bu.SymbExpr):
     H_switch = H_switch
     Sig_signs = Sig_signs
 
-    symb_model_params = [
-        'E_s', 'gamma_s', 'K_s', 'S_s', 'c_s', 'bartau',
-        'E_w', 'S_w', 'c_w', 'm', 'f_t', 'f_c', 'f_c0', 'eta', 'r'
-    ]
-
     # expressions
     Sig_ = Sig_.T
     dSig_dEps_ = dSig_dEps_
     f_ = f_
     df_dSig_ = df_dSig_
     ddf_dEps_ = ddf_dEps_
-
-    phi_ari_ = tr.Property()
-    @tr.cached_property
-    def _get_phi_ari_(self):
-        a, b, c, d = sp.symbols('a,b,c,d')
-        phi_ext = a * Y_N ** 2 + b * eta * Y_N * (Y_N + Y_T) + c * Y_T ** 2 + d * eta * Y_T * (Y_T + Y_N)
-        d_phi_N_0 = phi_ext.diff(Y_N).subs(eta, 0)
-        a_solved = sp.solve(sp.Eq(d_phi_N_0, (1 - omega_N) ** c_N * Y_N / S_N * H_switch), a)[0]
-        d_phi_T_0 = phi_ext.diff(Y_T).subs(eta, 0)
-        c_solved = sp.solve(sp.Eq(d_phi_T_0, (1 - omega_T) ** c_T * Y_T / S_T), c)[0]
-        phi_ext_ac = phi_ext.subs({a: a_solved, c: c_solved})
-        d_phi_N_1 = phi_ext_ac.diff(Y_N).subs(eta, 1)
-        d_phi_T_1 = phi_ext_ac.diff(Y_T).subs(eta, 1)
-        d_phi_1_req = (1 - (omega_N + omega_T) / 2) ** ((c_N + c_T) / 2) * (Y_N + Y_T) / (S_N + S_T)
-        bd_solved = sp.solve({sp.Eq(d_phi_N_1, d_phi_1_req), sp.Eq(d_phi_T_1, d_phi_1_req)}, [b, d])
-        phi_abcd = phi_ext_ac.subs(bd_solved)  # .subs(H_switch, H(sig_pi))
-        phi_ = f_ + sp.simplify(phi_abcd)
-        return phi_
-
-    Phi_ari_ = tr.Property()
-    @tr.cached_property
-    def _get_Phi_ari_(self):
-        return -self.Sig_signs * self.phi_ari_.diff(self.Sig)
-
-    phi_geo_ = tr.Property()
-    @tr.cached_property
-    def _get_phi_geo_(self):
-        a, b, c, d = sp.symbols('a,b,c,d')
-        phi2_ext = a * Y_N ** 2 + b * eta * Y_N * (Y_N + Y_T) + c * Y_T ** 2 + d * eta * Y_T * (Y_N + Y_T)
-        d_phi2_N_0 = phi2_ext.diff(Y_N).subs(eta, 0)
-        a2_solved = sp.solve(sp.Eq(d_phi2_N_0, (1 - omega_N) ** c_N * Y_N / S_N * H_switch), a)[0]
-        d_phi2_T_0 = phi2_ext.diff(Y_T).subs(eta, 0)
-        c2_solved = sp.solve(sp.Eq(d_phi2_T_0, (1 - omega_T) ** c_T * Y_T / S_T), c)[0]
-        phi2_ext_ac = phi2_ext.subs({a: a2_solved, c: c2_solved})
-        d_phi2_N_1 = phi2_ext_ac.diff(Y_N).subs(eta, 1)
-        d_phi2_T_1 = phi2_ext_ac.diff(Y_T).subs(eta, 1)
-        c_NT = sp.sqrt(c_N * c_T)
-        S_NT = sp.sqrt(S_N * S_T)
-        d_phi_2_req = (1 - sp.sqrt(omega_N * omega_T)) ** (c_NT) * (Y_N + Y_T) / (2 * S_NT)
-        bd2_solved = sp.solve({sp.Eq(d_phi2_N_1, d_phi_2_req), sp.Eq(d_phi2_T_1, d_phi_2_req)}, [b, d])
-        phi2_abcd = phi2_ext_ac.subs(bd2_solved)
-        phi_ = f_ + sp.simplify(phi2_abcd)
-        return phi_
-
-
-    Phi_geo_ = tr.Property()
-    @tr.cached_property
-    def _get_Phi_geo_(self):
-        return -self.Sig_signs * self.phi_geo_.diff(self.Sig)
 
     phi_final_ = tr.Property()
     @tr.cached_property
@@ -334,7 +237,7 @@ class Slide23Expr(bu.SymbExpr):
         phi_T = (1 - omega_T)**(c_T) * S_T/(r+1) * (Y_T/S_T)**(r+1)
         phi_NT  = (1 - omega_NT)**(c_NT) * S_NT/(r+1) * ((Y_N+Y_T)/S_NT)**(r+1)
         phi_ = f_ + (1 - eta) * (phi_N + phi_T) + eta * phi_NT
-        return phi_.subs(r,1) # @TODO - fix the passing of the parameter - it damages the T response
+        return phi_ # .subs(r,1) # @TODO - fix the passing of the parameter - it damages the T response
 
     Phi_final_ = tr.Property()
     @tr.cached_property
@@ -343,9 +246,14 @@ class Slide23Expr(bu.SymbExpr):
 
     H_sig_pi_ = H(sig_pi)
 
-    tau_eff_x_ = tau_pi_x / (1 - omega_s)
-    tau_eff_y_ = tau_pi_y / (1 - omega_s)
-    sig_eff_ = sig_pi / (1 - H(sig_pi) * omega_w)
+    tau_eff_x_ = tau_pi_x / (1 - omega_T)
+    tau_eff_y_ = tau_pi_y / (1 - omega_T)
+    sig_eff_ = sig_pi / (1 - H(sig_pi) * omega_N)
+
+    symb_model_params = [
+        'E_T', 'gamma_T', 'K_T', 'S_T', 'c_T', 'bartau',
+        'E_N', 'S_N', 'c_N', 'm', 'f_t', 'f_c', 'f_c0', 'eta', 'r'
+    ]
 
     # List of expressions for which the methods `get_`
     symb_expressions = [
@@ -354,10 +262,6 @@ class Slide23Expr(bu.SymbExpr):
         ('f_', ('Eps', 'Sig', 'H_switch')),
         ('df_dSig_', ('Eps', 'Sig', 'H_switch')),
         ('ddf_dEps_', ('Eps', 'Sig', 'H_switch')),
-        # ('phi_ari_', ('Eps', 'Sig', 'H_switch')),
-        # ('Phi_ari_', ('Eps', 'Sig', 'H_switch')),
-        # ('phi_geo_', ('Eps', 'Sig', 'H_switch')),
-        # ('Phi_geo_', ('Eps', 'Sig', 'H_switch')),
         ('phi_final_', ('Eps', 'Sig', 'H_switch')),
         ('Phi_final_', ('Eps', 'Sig', 'H_switch')),
         ('H_sig_pi_', ('Sig',))
@@ -376,18 +280,18 @@ class ConvergenceError(Exception):
 
 class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
 
-    name = 'Slide 3.2'
+    name = 'Slide 3.4'
     symb_class = Slide23Expr
 
-    E_s = bu.Float(28000, MAT=True)
-    gamma_s = bu.Float(10, MAT=True)
-    K_s = bu.Float(8, MAT=True)
-    S_s = bu.Float(1, MAT=True)
-    c_s = bu.Float(1, MAT=True)
+    E_T = bu.Float(28000, MAT=True)
+    gamma_T = bu.Float(10, MAT=True)
+    K_T = bu.Float(8, MAT=True)
+    S_T = bu.Float(1, MAT=True)
+    c_T = bu.Float(1, MAT=True)
     bartau = bu.Float(28000, MAT=True)
-    E_w = bu.Float(28000, MAT=True)
-    S_w =bu.Float(1, MAT=True)
-    c_w = bu.Float(1, MAT=True)
+    E_N = bu.Float(28000, MAT=True)
+    S_N = bu.Float(1, MAT=True)
+    c_N = bu.Float(1, MAT=True)
     m = bu.Float(0.1, MAT=True)
     f_t = bu.Float(3, MAT=True)
     f_c = bu.Float(30, MAT=True)
@@ -432,15 +336,15 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         c_f.close()
 
     ipw_view = bu.View(
-        bu.Item('E_s', latex='E_s', minmax=(0.5, 100)),
-        bu.Item('S_s', minmax=(.00001, 100)),
-        bu.Item('c_s', minmax=( 0.0001, 10)),
-        bu.Item('gamma_s', latex=r'\gamma_\mathrm{s}', minmax=(-20, 20)),
-        bu.Item('K_s', minmax=(-20, 20)),
+        bu.Item('E_T', latex='E_T', minmax=(0.5, 100)),
+        bu.Item('S_T', minmax=(.00001, 100)),
+        bu.Item('c_T', minmax=( 0.0001, 10)),
+        bu.Item('gamma_T', latex=r'\gamma_\mathrm{T}', minmax=(-20, 20)),
+        bu.Item('K_T', minmax=(-20, 20)),
         bu.Item('bartau', latex=r'\bar{\tau}', minmax=(0.5, 20)),
-        bu.Item('E_w', minmax=(0.5, 100)),
-        bu.Item('S_w', minmax=(0.0001, 100)),
-        bu.Item('c_w', minmax=(0.0001, 10)),
+        bu.Item('E_N', minmax=(0.5, 100)),
+        bu.Item('S_N', minmax=(0.0001, 100)),
+        bu.Item('c_N', minmax=(0.0001, 10)),
         bu.Item('m', minmax=(0.0001, 0.4)),
         bu.Item('f_t', minmax=(0.1, 10)),
         bu.Item('f_c', latex=r'f_\mathrm{c}', minmax=(1, 200)),
@@ -453,23 +357,11 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
 
     get_phi_ = tr.Property
     def _get_get_phi_(self):
-        if self.damage_interaction == 'final':
-            return self.symb.get_phi_final_
-        # elif self.damage_interaction == 'geometric':
-        #     print('get geo')
-        #     return self.symb.get_phi_geo_
-        # elif self.damage_interaction == 'arithmetic':
-        #     return self.symb.get_phi_ari_
+        return self.symb.get_phi_final_
 
     get_Phi_ = tr.Property
     def _get_get_Phi_(self):
-        if self.damage_interaction == 'final':
-            return self.symb.get_Phi_final_
-        # elif self.damage_interaction == 'geometric':
-        #     print('get geo')
-        #     return self.symb.get_Phi_geo_
-        # elif self.damage_interaction == 'arithmetic':
-        #     return self.symb.get_Phi_ari_
+        return self.symb.get_Phi_final_
 
     def get_f_df(self, s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k):
         Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)[0]
@@ -601,239 +493,3 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
 
     def update_plot(self, ax):
         self.plot_f(ax)
-
-
-# # Time integration scheme
-
-# ## Discrete yield condition
-# In a continuous case we consistency condition to explicitly glue the state onto the yield surface 
-# \begin{align}
-# \dot{f}(\boldsymbol{\mathcal{S}}(s, \boldsymbol{\mathcal{E}(\lambda)}), \boldsymbol{\mathcal{E}(\lambda)} ) &= 0 \end{align}
-# In discrete case, we relax this requirement. Indeed, by taking $f(s_{n+1}; \boldsymbol{\mathcal{E}_n}) $ as a first trial value we can obtain positive values.
-# 
-# &nbsp;<font color="green">
-# **We allow for "trial" states which lie beyond the admissible domain $f \le 0$ during iteration. This allows us to construct a "return mapping" algorithm that iteratively approaches an admissible state on the yield surface.**</font>
-
-# Given an inadmissible trial state $k$ with the yield condition $f_k > 0$, let us introduce a linearized approximation of its change along the plastic multiplier $\lambda$ around the state $k$. 
-# \begin{align}
-#  f_{k+1} &= f_{k} + \left. \frac{\partial f}{\partial \lambda} \right|_k \Delta \lambda
-# \end{align}
-# In this form, we can search for an admissible state $f_{n+1} = 0$ by iterating over $k$.
-# Note that in initial iteration $k = 0$ the state from previous step is reused, i.e. 
-# $f(s_{n+1}; \boldsymbol{\mathcal{E}_n}) $.
-
-# In the linearized form, we can transform the yield condition to a recurrent formula
-# \begin{align}
-# \left. \frac{\mathrm{d} f}{\mathrm{d} \lambda}\right|_k \Delta \lambda &= -f_k,
-# \hspace{1cm} f_k \rightarrow 0 \; \;\mathrm{for}\;\; k = 1\ldots\infty
-# \end{align}
-# This resembles the Newton method for iterative solution of a nonlinear equation. However, we need to consider the fact that the level of inadmissibility $f$ changes between iterations. 
-# ![image.png](attachment:image.png)
-# Note that the predictor is negative and $\Delta \lambda > 0$. In every step, the plastic multiplier is updated:
-# \begin{align}
-# \lambda_{k+1} &= \lambda_k + \Delta \lambda, \, \lambda_0 = 0 \nonumber \\ \nonumber
-# \end{align}
-
-# Two more questions must addressed to define a general numerical algorithm for plasticity:
-# <font color="brown">
-#  * **Update of state variables $\boldsymbol{\mathcal{E}}_{k+1}$ in each iteration**
-#  * **Expression of the predictor $\mathrm{d} f / \mathrm{d} \lambda$ in terms of the state variables**
-# </font>
-
-# ## State update
-# In every iteration step the state variables $\boldsymbol{\mathcal{E}}$ must be updated using the discrete evolution equations, i.e. 
-# \begin{align}
-# \boldsymbol{\mathcal{E}}_{k+1} &= 
-# \boldsymbol{\mathcal{E}}_k + \lambda_{k+1} 
-# \boldsymbol{\Phi}_k
-# \label{eq:discrete_evolution}
-# \end{align}
-# Which is used in the calculation of the threshold function in the next step. Note that $\boldsymbol{\Phi}_k$ is evaluated in the state $k$ and not $k+1$.
-
-# To reach an admissible state let us linearize the threshold function at an interim state $k$ as
-# \begin{align}
-# f_{k+1} = 
-# f_k 
-#  +
-# \left.
-# \frac
-# {\partial f}
-# {\partial \lambda}
-# \right|_k
-# \Delta \lambda
-# \end{align}
-
-# ## Predictor
-# \begin{align}
-# \left.
-# \frac{\partial f}{\partial{\lambda}}  
-# \right|_k 
-# &=
-# \left.
-# \frac{\partial f}{\partial{\boldsymbol{ \mathcal{E}}}}  
-# \right|_k 
-# \left.
-# \frac{\partial {\boldsymbol{ \mathcal{E}}}}{\partial \lambda}
-# \right|_k =
-# \left.
-# \frac{\partial f}{\partial{\boldsymbol{ \mathcal{E}}}}  
-# \right|_k 
-# \boldsymbol{\Phi}_k \\
-# \left.
-# \frac{\partial f}{\partial{\boldsymbol{ \mathcal{E}}}}  
-# \right|_k 
-# &=
-# \left. \frac{\partial f}{ \partial \boldsymbol{\mathcal{S}}}\right|_{k}
-# \left. \frac{\partial \boldsymbol{\mathcal{S}}}{\partial \boldsymbol{\mathcal{E}}}\right|_{k}
-# +
-# \left. \frac{\partial^{\mathrm{dir}} f}{ \partial^{\mathrm{dir}} \boldsymbol{\mathcal{E}}}\right|_{k}
-# \label{eq:df_dlambda}
-# \end{align}
-
-# **Remark 1:** The derivative $\partial^\mathrm{dir}$ denotes the direct derivative with respect to $\boldsymbol{\mathcal{E}}$
-
-# **Remark 2:** Note that $\displaystyle \frac{\partial \boldsymbol{\mathcal{E}}}{\partial \lambda}$ in equation $\eqref{eq:df_dlambda}$ can be obtained from the evolution equations $\eqref{eq:discrete_evolution}$
-# \begin{align}
-# \boldsymbol{\mathcal{E}}_k = \boldsymbol{\mathcal{E}}_n + \lambda \, \boldsymbol{\Phi}_k\; \implies
-# \left.
-# \frac{\partial {\boldsymbol{ \mathcal{E}}}}{\partial \lambda}
-# \right|_k = 
-# \boldsymbol{\Phi}_k
-# \end{align}
-
-# Thus, by rewriting the linearized equation as a recurrence formula, the iteration algorithm is obtained
-# \begin{align}
-# &
-# \left.
-# \frac{\partial f}{\partial{\lambda}}  
-# \right|_k 
-# \Delta \lambda
-# = - f^{(k)}\\
-# & \lambda_{k+1} = \lambda_{k} + \Delta \lambda \\
-# & \boldsymbol{\mathcal{E}}_{k+1} = \boldsymbol{\mathcal{E}}_{k} + 
-#  \lambda_{k} \, 
-# \frac{\partial {\boldsymbol{ \mathcal{E}}}}{\partial \lambda}
-#  \\
-# &k = k + 1
-# \end{align}
-
-# ## Implementation concept
-# The gradient operators needed for the time-stepping scheme have been derived above and are now available for the implementation of the numerical algorithm both in `Python` and `C89` languages
-# 
-# <table style="width:50%">
-# <tr>
-# <th>Symbol</th>
-# <th>Python</th>
-# <th>C89</th>
-# </tr>
-# <tr>
-# <td>$\mathcal{S}(s, \boldsymbol{\mathcal{E}}) $  
-# </td>
-# <td>get_Sig</td>
-# <td>get_Sig_C</td>
-# </tr>
-# <tr>
-# <td>$\partial_\boldsymbol{\mathcal{E}}  \boldsymbol{\mathcal{S}}(s, \boldsymbol{\mathcal{E}}) $</td>
-# <td>get_dSig_dEps</td>
-# <td>get_dSig_dEps_C</td>
-# </tr>
-# <tr>
-# <td>$ f(\boldsymbol{\mathcal{S}}, \boldsymbol{\mathcal{E}})$</td>
-# <td>get_f</td>
-# <td>get_f_C</td>
-# </tr>
-# <tr>
-# <td>$\partial_\boldsymbol{\mathcal{S}} f(\boldsymbol{\mathcal{S}}, \boldsymbol{\mathcal{E}}) $  
-# </td>
-# <td>get_df_dSig</td>
-# <td>get_df_dSig_C</td>
-# </tr>
-# <tr>
-# <td>$\partial_\boldsymbol{\mathcal{E}} f(\boldsymbol{\mathcal{S}}, \boldsymbol{\mathcal{E}}) $</td>
-# <td>get_df_dEps</td>
-# <td>get_df_dEps_C</td>
-# </tr>
-# <tr>
-# <td>$\partial_\boldsymbol{\mathcal{S}} \varphi(\boldsymbol{\mathcal{S}}, \boldsymbol{\mathcal{E}}) $</td>
-# <td>get_Phi</td>
-# <td>get_Phi_C</td>
-# </tr>
-# </table>
-
-# **Threshold and its derivatives:** To avoid repeated calculation of the same expressions, let us put the evaluation of $f$ and $\partial_\lambda f$ into a single procedure. The iteration loop can be constructed in such a way that the predictor for the next step is calculated along with the residuum. In case that the residuum is below the required tolerance, the overhead for an extra calculated derivative is negligible or, with some care, can be even reused in the next time step.  
-
-
-# # Code generation
-# See the docs for the code generation, the latexified  sympy symbols
-# must be substituted such that they can act as standard C variable names.
-# The issue with this substitution might have been partially fixed by the substitution
-# code defined by this code.
-#
-# The methods
-#  * `get_f_df()`, and
-#  * `get_Eps_n1` must be rewritten in C.
-#
-# **How to transform `einsum` to C?**
-#
-# The state arrays `Eps` and `Sig` must be prepared by the callee, i.e. the function to be
-# called from at a level of material point in a finite-element or lattice code.
-# All the state variable matrices are flattened in the generated C code so that index access operators must be constructed with the correct convention, i.e.
-# `i * n_row + j` or `i + n_col * j`.
-#
-# Let us consider the line
-# ```Python
-# df_dEps_k = np.einsum('ik,ji->jk', df_dSig_k, dSig_dEps_k) + ddf_dEps_k
-# ````
-#
-# To transform this systematically into the C loop it is proposed define
-# index directives specifying the size of the first dimension. Then, the
-# indexes from the `einsum` call can be systematically transferred to the
-# multi-loop running over the indexes and respecting their order. No more
-# thinking needed. The index operators below are prepared for arrays with
-# 2, 3, and 4 dimensions.
-# ```C
-# #define IJ(N_I,I,J) (N_I * J + I)
-# #define IJK(N_I,N_J,I,J,K) (N_I * IJ(N_J,J,K) + I)
-# #define IJKL(N_I,N_J,N_K,I,J,K,L) (N_I * IJK(N_J,N_K,J,K,L) + I)
-# ````
-# to perform the matrix multiplication
-# ```C
-# int k=0;
-# for(int i=0;i<N_I;i++)
-#     for(int j=0;j<N_J;j++)
-#         df_dEps_1[IJ(N_J,j,k)] += df_dSig_k[IJ(N_I(i,k)] * dSig_dEps_k[IJ(N_J,j,i)]
-#     df_dEps[IJ(N_I,i,k)] = df_dEps_1[IJ(N_J,j,k)] + ddSig_dEps(IJ(N_I,i,k)];
-# ````
-#
-# The whole material model is represented by the material method
-# that mimics the internal par of the `get_response` function defined above
-#
-#  1. Call `get_f_df()` to get the trial state
-#  2. Start the return mapping iteration loop
-#  3. If admissibility criterion fulfilled - admissible state found - return stress
-#  4. Evaluate delta of plastic multiplier and update it
-#  5. Update state variables using evolution equations `get_Eps_n1`
-#  6. Evaluate the residuum using `get_f_df()` and continuum with point 3.
-#
-
-# In[ ]:
-
-
-# C_code = get_Sig_C, get_dSig_dEps_C, get_f_C, get_df_dSig_C, get_ddf_dEps_C, get_Phi_C
-
-# In[ ]:
-
-
-# material_params = dict(
-#     E_s=1, gamma_s=5, K_s=5, S_s=0.6, c_s=1, bartau=1,
-#     E_w=1, S_w=0.6, c_w = 1, m = 0.01, f_t=1, f_c=-20, f_c0=-10, eta=0.5
-# )
-#
-# slide = Slide32(**material_params)
-#
-# Eps_1 = np.zeros((8,), dtype=np.float_) + 0.1
-# Eps_1[0] = 10
-# Eps_1[2] = 0
-#
-# f_val = slide.symb.get_f_(Eps_1, np.zeros_like(Eps_1))
-# print(f_val)
