@@ -27,8 +27,8 @@ class InelStateEvolution(bu.InteractiveModel):
     )
 
     def plot_omega_NT(self, ax, **kw):
-        s_x_pi_, s_y_pi_, w_pi_, z_, alpha_x_, alpha_y_, omega_s_, omega_w_ = self.Eps_arr.T
-        ax.plot(omega_w_,omega_s_, **kw)
+        s_x_pi_, s_y_pi_, w_pi_, z_, alpha_x_, alpha_y_, omega_T_, omega_N_ = self.Eps_arr.T
+        ax.plot(omega_N_,omega_T_, **kw)
         ax.set_xlabel(r'$\omega_\mathrm{N}$')
         ax.set_ylabel(r'$\omega_\mathrm{T}$')
 
@@ -36,8 +36,8 @@ class InelStateEvolution(bu.InteractiveModel):
         ax1, ax11, ax2, ax22, ax3, ax33, ax4, ax44 = axes
         colors = ['blue', 'red', 'green', 'black', 'magenta']
         t = self.t_arr
-        s_x_pi_, s_y_pi_, w_pi_, z_, alpha_x_, alpha_y_, omega_s_, omega_w_ = self.Eps_arr.T
-        tau_x_pi_, tau_y_pi_, sig_pi_, Z_, X_x_, X_y_, Y_s_, Y_w_ = self.Sig_arr.T
+        s_x_pi_, s_y_pi_, w_pi_, z_, alpha_x_, alpha_y_, omega_T_, omega_N_ = self.Eps_arr.T
+        tau_x_pi_, tau_y_pi_, sig_pi_, Z_, X_x_, X_y_, Y_T_, Y_N_ = self.Sig_arr.T
         n_step = len(s_x_pi_)
 
         idx = np.argmax(self.t_slider < self.t_arr)
@@ -72,16 +72,16 @@ class InelStateEvolution(bu.InteractiveModel):
         mpl_align_yaxis(ax1,0,ax11,0)
 
         ax2.set_title('energy release rate - damage');
-        ax2.plot(t, Y_w_, '--', color='darkgray', label=r'$Y_w$')
-        ax2.fill_between(t, Y_w_, 0, color='darkgray', alpha=0.15)
-        ax2.plot(t, Y_s_, '--', color='darkslategray', label=r'$Y_s$')
-        ax2.fill_between(t, Y_s_, 0, color='darkslategray', alpha=0.05)
+        ax2.plot(t, Y_N_, '--', color='darkgray', label=r'$Y_N$')
+        ax2.fill_between(t, Y_N_, 0, color='darkgray', alpha=0.15)
+        ax2.plot(t, Y_T_, '--', color='darkslategray', label=r'$Y_T$')
+        ax2.fill_between(t, Y_T_, 0, color='darkslategray', alpha=0.05)
         ax2.set_xlabel('$t$');
         ax2.set_ylabel('$Y$')
         ax2.plot(t[idx], 0, marker='H', color='red')
         ax2.legend()
-        ax22.plot(t, omega_w_, color='darkgray', label=r'$\omega_w$')
-        ax22.plot(t, omega_s_, color='darkslategray', label=r'$\omega_s$')
+        ax22.plot(t, omega_N_, color='darkgray', label=r'$\omega_N$')
+        ax22.plot(t, omega_T_, color='darkslategray', label=r'$\omega_T$')
         ax22.set_ylim(ymax=1)
         ax22.set_ylabel(r'$\omega$')
         ax22.legend()

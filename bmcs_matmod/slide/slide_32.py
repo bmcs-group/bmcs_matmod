@@ -237,7 +237,7 @@ class Slide23Expr(bu.SymbExpr):
         phi_T = (1 - omega_T)**(c_T) * S_T/(r+1) * (Y_T/S_T)**(r+1)
         phi_NT  = (1 - omega_NT)**(c_NT) * S_NT/(r+1) * ((Y_N+Y_T)/S_NT)**(r+1)
         phi_ = f_ + (1 - eta) * (phi_N + phi_T) + eta * phi_NT
-        return phi_ # .subs(r,1) # @TODO - fix the passing of the parameter - it damages the T response
+        return phi_.subs(r,1) # @TODO - fix the passing of the parameter - it damages the T response
 
     Phi_final_ = tr.Property()
     @tr.cached_property
@@ -446,7 +446,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
 
         omega_N = Eps_ts[-1,:]
         omega_T = Eps_ts[-2,:]
-        sig_ts_eff = sig_ts / (1 - omega_N)
+        sig_ts_eff = sig_ts / (1 - H_sig_pi*omega_N)
         tau_x_ts_eff = tau_x_ts / (1 - omega_T)
         ax.contour(sig_ts_eff, tau_x_ts_eff, f_ts[0,...], levels=0, colors=('green',))
 
