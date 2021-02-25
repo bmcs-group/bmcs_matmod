@@ -213,12 +213,15 @@ class Slide23Expr(bu.SymbExpr):
     H_switch = H_switch
     Sig_signs = Sig_signs
 
+    ONE = Cymbol(r'I')
+    ZERO = Cymbol(r'O')
+
     # expressions
     Sig_ = Sig_.T
-    dSig_dEps_ = dSig_dEps_
+    dSig_dEps_ = dSig_dEps_.subs(0,ZERO) * ONE
     f_ = f_
-    df_dSig_ = df_dSig_
-    ddf_dEps_ = ddf_dEps_
+    df_dSig_ = df_dSig_.subs(0,ZERO) * ONE
+    ddf_dEps_ = ddf_dEps_.subs(0,ZERO) * ONE
 
     phi_final_ = tr.Property()
     @tr.cached_property
@@ -260,12 +263,12 @@ class Slide23Expr(bu.SymbExpr):
     # List of expressions for which the methods `get_`
     symb_expressions = [
         ('Sig_', ('s_x', 's_y', 'w', 'Sig', 'Eps')),
-        ('dSig_dEps_', ('s_x', 's_y', 'w', 'Sig', 'Eps')),
+        ('dSig_dEps_', ('s_x', 's_y', 'w', 'Sig', 'Eps', 'ZERO', 'ONE')),
         ('f_', ('Eps', 'Sig', 'H_switch')),
-        ('df_dSig_', ('Eps', 'Sig', 'H_switch')),
-        ('ddf_dEps_', ('Eps', 'Sig', 'H_switch')),
+        ('df_dSig_', ('Eps', 'Sig', 'H_switch', 'ZERO', 'ONE')),
+        ('ddf_dEps_', ('Eps', 'Sig', 'H_switch', 'ZERO', 'ONE')),
         ('phi_final_', ('Eps', 'Sig', 'H_switch')),
-        ('Phi_final_', ('Eps', 'Sig', 'H_switch')),
+        ('Phi_final_', ('Eps', 'Sig', 'H_switch', 'ZERO', 'ONE')),
         ('H_sig_pi_', ('Sig',))
     ]
 
@@ -280,7 +283,7 @@ class ConvergenceError(Exception):
     def __str__(self):
         return f'{self.message} for state {self.state}'
 
-class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
+class Slide34(bu.InteractiveModel,bu.InjectSymbExpr):
 
     name = 'Slide 3.4'
     symb_class = Slide23Expr
@@ -366,18 +369,33 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         return self.symb.get_Phi_final_
 
     def get_f_df(self, s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k):
+        print('s_x_n1', s_x_n1.dtype, s_x_n1.shape)
+        print('s_y_n1', s_y_n1.dtype, s_y_n1.shape)
+        print('w_n1', w_n1.dtype,w_n1.shape)
+        print('Eps_k', Eps_k.dtype, Eps_k.shape)
+        print('Sig_k', Sig_k.dtype, Sig_k.shape)
+        ONES = np.ones_like(s_x_n1, dtype=np.float_)
+        print('ONES', ONES.dtype)
+        ZEROS = np.zeros_like(s_x_n1, dtype=np.float_)
+        print('ZEROS', ZEROS.dtype)
         Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)[0]
-        dSig_dEps_k = self.symb.get_dSig_dEps_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
+        print('Sig_k', Sig_k.dtype, Sig_k.shape)
+        dSig_dEps_k = self.symb.get_dSig_dEps_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k, ZEROS, ONES)
+        print('dSig_dEps_k', dSig_dEps_k.dtype)
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
+        print('H_sig_pi', H_sig_pi.dtype)
         f_k = np.array([self.symb.get_f_(Eps_k, Sig_k, H_sig_pi)])
-        df_dSig_k = self.symb.get_df_dSig_(Eps_k, Sig_k, H_sig_pi)
-        ddf_dEps_k = self.symb.get_ddf_dEps_(Eps_k, Sig_k, H_sig_pi)
+        print('f_k', f_k.dtype)
+        df_dSig_k = self.symb.get_df_dSig_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
+        print('df_dSig_k',df_dSig_k.dtype)
+        ddf_dEps_k = self.symb.get_ddf_dEps_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
+        print('ddf_dEps_k',ddf_dEps_k.dtype)
         df_dEps_k = np.einsum(
-            'ik,ji->jk', df_dSig_k, dSig_dEps_k) + ddf_dEps_k
-        Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi)
+            'ik...,ji...->jk...', df_dSig_k, dSig_dEps_k) + ddf_dEps_k
+        Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
         dEps_dlambda_k = Phi_k
         df_dlambda = np.einsum(
-            'ki,kj->ij', df_dEps_k, dEps_dlambda_k)
+            'ki...,kj...->ij...', df_dEps_k, dEps_dlambda_k)
         df_k = df_dlambda
         return f_k, df_k, Sig_k
 
@@ -386,9 +404,11 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         The update of state variables
         for an updated $\lambda_k$ is performed using this procedure.
         '''
+        ONES = np.ones_like(s_x_n1)
+        ZEROS = np.zeros_like(s_x_n1)
         Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)[0]
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
-        Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi)
+        Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
         Eps_k1 = Eps_n + lam_k * Phi_k[:, 0]
         return Eps_k1
 
@@ -397,7 +417,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
     to the tensile strength
     '''
 
-    def get_sig_n1(self, s_x_n1, s_y_n1, w_n1, Sig_n, Eps_n, k_max):
+    def get_sig_n1(self, s_x_n1, s_y_n1, w_n1, Sig_n, Eps_n):
         '''Return mapping iteration:
         This function represents a user subroutine in a finite element
         code or in a lattice model. The input is $s_{n+1}$ and the state variables
@@ -411,10 +431,9 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         f_k, df_k, Sig_k = self.get_f_df(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
         f_k_norm = np.linalg.norm(f_k)
         f_k_trial = f_k[0]
+        return f_k_trial, f_k_norm
         k = 0
-        while k < k_max:
-            # I = np.where(f_k_trial < 0)
-            # if I is empty - finished
+        while k < self.k_max:
             if f_k_trial < 0 or f_k_norm < self.f_t * self.rtol:
                 return Eps_k, Sig_k, k + 1
             dlam = np.linalg.solve(df_k, -f_k)
@@ -445,6 +464,66 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         method defined in Cymbol as well'''
         return {eps_name: () for eps_name in self.Eps_names + self.Sig_names}
 
+    k_max = bu.Int(100, ALG=True)
+    '''Maximum number of iterations'''
+
+    def get_corr_pred(self, eps_Ema, t_n1, **state):
+        '''Return mapping iteration:
+        This function represents a user subroutine in a finite element
+        code or in a lattice model. The input is $s_{n+1}$ and the state variables
+        representing the state in the previous solved step $\boldsymbol{\mathcal{E}}_n$.
+        The procedure returns the stresses and state variables of
+        $\boldsymbol{\mathcal{S}}_{n+1}$ and $\boldsymbol{\mathcal{E}}_{n+1}$
+        '''
+        s_x_n1, s_y_n1, w_n1 = np.einsum('...a->a...',eps_Ema)
+        # Transform state to Eps_k and Sig_k
+        Eps_n = np.array([ state[eps_name] for eps_name in self.Eps_names], dtype=np.float_)
+        Eps_k = np.copy(Eps_n)
+        Sig_k = np.array([state[sig_name] for sig_name in self.Sig_names], dtype=np.float_)
+        f_k, df_k, Sig_k = self.get_f_df(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
+        f_k, df_k = f_k[0,...], df_k[0,0,...]
+        f_k_trial = f_k
+        # indexes of inelastic entries
+        L = np.where(f_k_trial > 0)
+        # f norm in inelastic entries - to allow also positive values less the rtol
+        f_k_norm_I = np.fabs(f_k_trial[L])
+        lam_k = np.zeros_like(f_k_trial)
+        k = 0
+        while k < self.k_max:
+            print('k', k)
+            # which entries are above the tolerance
+            I = np.where(f_k_norm_I > (self.f_t * self.rtol))
+            print('f_k_norm_I', f_k_norm_I, self.f_t * self.rtol, len(I[0]))
+            if (len(I[0]) == 0):
+                # empty inelastic entries - accept state
+                return Eps_k, Sig_k, k + 1
+            print('I', I)
+            print('L', L)
+            LL = tuple(Li[I] for Li in L)
+            L = LL
+            print('new L', L)
+            print('f_k', f_k[L].shape,f_k[L].dtype)
+            print('df_k', df_k[L].shape,df_k[L].dtype)
+            # return mapping on inelastic entries
+            dlam_L = -f_k[L] / df_k[L] # np.linalg.solve(df_k[I], -f_k[I])
+            print('dlam_I',dlam_L,dlam_L.dtype)
+            lam_k[L] += dlam_L
+            print('lam_k_L',lam_k,lam_k.dtype, lam_k[L].shape)
+            Eps_k_L = self.get_Eps_k1(s_x_n1[L], s_y_n1[L], w_n1[L], Eps_n.T[L].T,
+                                      lam_k[L], Sig_k.T[L].T, Eps_k.T[L].T)
+            Eps_k.T[L] = Eps_k_L.T
+            f_k_L, df_k_L, Sig_k_L = self.get_f_df(s_x_n1[L], s_y_n1[L], w_n1[L], Sig_k.T[L].T, Eps_k_L)
+            f_k[L], df_k[L] = f_k_L[0, ...], df_k_L[0, 0, ...]
+            Sig_k.T[L] = Sig_k_L.T
+            print('Sig_k',Sig_k)
+            print('f_k', f_k)
+            f_k_norm_I = np.fabs(f_k[L])
+            k += 1
+        else:
+            raise ConvergenceError('no convergence for entries', [L, s_x_n1[I], s_y_n1[I], w_n1[I]])
+        # add the algorithmic stiffness
+        # recalculate df_k and -f_k for a unit increment of epsilon and solve for lambda
+        #
 
     def plot_f_state(self, ax, Eps, Sig):
         lower = -self.f_c * 1.05
