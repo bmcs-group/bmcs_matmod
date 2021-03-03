@@ -13,7 +13,7 @@ class Cymbol(sp.Symbol):
     inspect.getsource(lambdified_function)
     '''
     def __init__(self, name, codename='', **assumptions):
-        super(Cymbol, self).__init__()#name=name, **assumptions)
+        super(Cymbol, self).__init__()
         if codename:
             self.codename = codename
         else:

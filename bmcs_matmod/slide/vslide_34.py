@@ -37,7 +37,7 @@ H = lambda x: sp.Piecewise( (0, x <=0 ), (1, True) )
 # ## Material parameters
 
 E_T = Cymbol('E_T', real=True, nonnegative=True)
-gamma_T = sp.Symbol('gamma_T', real=True, nonnegative=True)
+gamma_T = Cymbol('gamma_T', real=True, nonnegative=True)
 K_T = Cymbol('K_T', real=True)
 S_T = Cymbol('S_T', real=True)
 c_T = Cymbol('c_T', real=True)
@@ -189,7 +189,7 @@ r = sp.symbols(r'r', positive=True)
 # \boldsymbol{\Phi} = - \Upsilon \frac{\partial \varphi}{\partial \boldsymbol{\mathcal{S}}} 
 # \end{align}
 
-class Slide23Expr(bu.SymbExpr):
+class Slide34Expr(bu.SymbExpr):
 
     # control and state variables
     s_x, s_y, w, Eps, Sig = s_x, s_y, w, Eps, Sig
@@ -286,7 +286,7 @@ class ConvergenceError(Exception):
 class Slide34(bu.InteractiveModel,bu.InjectSymbExpr):
 
     name = 'Slide 3.4'
-    symb_class = Slide23Expr
+    symb_class = Slide34Expr
 
     E_T = bu.Float(28000, MAT=True)
     gamma_T = bu.Float(10, MAT=True)
@@ -417,34 +417,6 @@ class Slide34(bu.InteractiveModel,bu.InjectSymbExpr):
     to the tensile strength
     '''
 
-    def get_sig_n1(self, s_x_n1, s_y_n1, w_n1, Sig_n, Eps_n):
-        '''Return mapping iteration:
-        This function represents a user subroutine in a finite element
-        code or in a lattice model. The input is $s_{n+1}$ and the state variables
-        representing the state in the previous solved step $\boldsymbol{\mathcal{E}}_n$.
-        The procedure returns the stresses and state variables of
-        $\boldsymbol{\mathcal{S}}_{n+1}$ and $\boldsymbol{\mathcal{E}}_{n+1}$
-        '''
-        Eps_k = np.copy(Eps_n)
-        Sig_k = np.copy(Sig_n)
-        lam_k = 0
-        f_k, df_k, Sig_k = self.get_f_df(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
-        f_k_norm = np.linalg.norm(f_k)
-        f_k_trial = f_k[0]
-        return f_k_trial, f_k_norm
-        k = 0
-        while k < self.k_max:
-            if f_k_trial < 0 or f_k_norm < self.f_t * self.rtol:
-                return Eps_k, Sig_k, k + 1
-            dlam = np.linalg.solve(df_k, -f_k)
-            lam_k += dlam
-            Eps_k = self.get_Eps_k1(s_x_n1, s_y_n1, w_n1, Eps_n, lam_k, Sig_k, Eps_k)
-            f_k, df_k, Sig_k = self.get_f_df(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
-            f_k_norm = np.linalg.norm(f_k)
-            k += 1
-        else:
-            raise ConvergenceError('no convergence for step', [s_x_n1, s_y_n1, w_n1])
-
     Eps_names = tr.Property
     @tr.cached_property
     def _get_Eps_names(self):
@@ -479,6 +451,7 @@ class Slide34(bu.InteractiveModel,bu.InjectSymbExpr):
         # Transform state to Eps_k and Sig_k
         Eps_n = np.array([ state[eps_name] for eps_name in self.Eps_names], dtype=np.float_)
         Eps_k = np.copy(Eps_n)
+        #Sig_k = self.symb.get_Sig_(Eps_k)
         Sig_k = np.array([state[sig_name] for sig_name in self.Sig_names], dtype=np.float_)
         f_k, df_k, Sig_k = self.get_f_df(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
         f_k, df_k = f_k[0,...], df_k[0,0,...]

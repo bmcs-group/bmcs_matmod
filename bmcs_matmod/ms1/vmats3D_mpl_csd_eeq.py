@@ -15,9 +15,14 @@ import numpy as np
 import traits.api as tr
 from ibvpy.tmodel.mats3D.mats3D_eval import MATS3DEval
 
+class MicroplaneNT(MATS3DEval):
+    pass
+
 
 class MATS3DMplCSDEEQ(MATS3DEval):
     concrete_type = tr.Int
+
+    slide = tr.Instance(MicroplaneNT)
 
     gamma_T = tr.Float(100000.,
                        label="Gamma",
