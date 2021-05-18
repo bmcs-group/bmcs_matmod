@@ -21,9 +21,8 @@ class InelStateEvolution(bu.InteractiveModel):
     iter_t = tr.DelegatesTo('slider_exp')
 
     ipw_view = bu.View(
-        bu.Item('t_slider', latex=r't',
-                editor=bu.FloatRangeEditor(low=0, high_name='t_max', n_steps=50)),
-        bu.Item('t_max', latex=r't_{\max}'),
+        bu.Item('t_max', latex=r't_{\max}', readonly=True),
+        time_editor=bu.HistoryEditor(var='t_slider', low=0, high_name='t_max', n_steps=50)
     )
 
     def plot_omega_NT(self, ax, **kw):

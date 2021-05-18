@@ -18,6 +18,7 @@ import traits.api as tr
 import numpy as np
 from bmcs_matmod.slide.f_double_cap import FDoubleCap
 import bmcs_utils.api as bu
+from ibvpy.tmodel import MATSEval
 
 H_switch = Cymbol(r'H(\sigma^\pi)', real=True)
 H = lambda x: sp.Piecewise( (0, x <=0 ), (1, True) )
@@ -283,7 +284,7 @@ class ConvergenceError(Exception):
     def __str__(self):
         return f'{self.message} for state {self.state}'
 
-class Slide34(bu.InteractiveModel,bu.InjectSymbExpr):
+class Slide34(MATSEval,bu.InjectSymbExpr):
 
     name = 'Slide 3.4'
     symb_class = Slide34Expr
@@ -303,6 +304,8 @@ class Slide34(bu.InteractiveModel,bu.InjectSymbExpr):
     f_c0 = bu.Float(20, MAT=True)
     eta = bu.Float(0.5, MAT=True)
     r = bu.Float(1, MAT=True)
+
+    debug = bu.Bool(False)
 
     def C_codegen(self):
 
@@ -369,27 +372,36 @@ class Slide34(bu.InteractiveModel,bu.InjectSymbExpr):
         return self.symb.get_Phi_final_
 
     def get_f_df(self, s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k):
-        print('s_x_n1', s_x_n1.dtype, s_x_n1.shape)
-        print('s_y_n1', s_y_n1.dtype, s_y_n1.shape)
-        print('w_n1', w_n1.dtype,w_n1.shape)
-        print('Eps_k', Eps_k.dtype, Eps_k.shape)
-        print('Sig_k', Sig_k.dtype, Sig_k.shape)
+        if self.debug:
+            print('s_x_n1', s_x_n1.dtype, s_x_n1.shape)
+            print('s_y_n1', s_y_n1.dtype, s_y_n1.shape)
+            print('w_n1', w_n1.dtype,w_n1.shape)
+            print('Eps_k', Eps_k.dtype, Eps_k.shape)
+            print('Sig_k', Sig_k.dtype, Sig_k.shape)
         ONES = np.ones_like(s_x_n1, dtype=np.float_)
-        print('ONES', ONES.dtype)
+        if self.debug:
+            print('ONES', ONES.dtype)
         ZEROS = np.zeros_like(s_x_n1, dtype=np.float_)
-        print('ZEROS', ZEROS.dtype)
+        if self.debug:
+            print('ZEROS', ZEROS.dtype)
         Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)[0]
-        print('Sig_k', Sig_k.dtype, Sig_k.shape)
+        if self.debug:
+            print('Sig_k', Sig_k.dtype, Sig_k.shape)
         dSig_dEps_k = self.symb.get_dSig_dEps_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k, ZEROS, ONES)
-        print('dSig_dEps_k', dSig_dEps_k.dtype)
+        if self.debug:
+            print('dSig_dEps_k', dSig_dEps_k.dtype)
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
-        print('H_sig_pi', H_sig_pi.dtype)
+        if self.debug:
+            print('H_sig_pi', H_sig_pi.dtype)
         f_k = np.array([self.symb.get_f_(Eps_k, Sig_k, H_sig_pi)])
-        print('f_k', f_k.dtype)
+        if self.debug:
+            print('f_k', f_k.dtype)
         df_dSig_k = self.symb.get_df_dSig_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
-        print('df_dSig_k',df_dSig_k.dtype)
+        if self.debug:
+            print('df_dSig_k',df_dSig_k.dtype)
         ddf_dEps_k = self.symb.get_ddf_dEps_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
-        print('ddf_dEps_k',ddf_dEps_k.dtype)
+        if self.debug:
+            print('ddf_dEps_k',ddf_dEps_k.dtype)
         df_dEps_k = np.einsum(
             'ik...,ji...->jk...', df_dSig_k, dSig_dEps_k) + ddf_dEps_k
         Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
@@ -439,6 +451,10 @@ class Slide34(bu.InteractiveModel,bu.InjectSymbExpr):
     k_max = bu.Int(100, ALG=True)
     '''Maximum number of iterations'''
 
+    sup = np.testing.suppress_warnings()
+    sup.filter(module=np.ma.core)  # module must match exactly
+    sup.filter(RuntimeWarning, "Some text")
+    @sup
     def get_corr_pred(self, eps_Ema, t_n1, **state):
         '''Return mapping iteration:
         This function represents a user subroutine in a finite element
@@ -447,7 +463,24 @@ class Slide34(bu.InteractiveModel,bu.InjectSymbExpr):
         The procedure returns the stresses and state variables of
         $\boldsymbol{\mathcal{S}}_{n+1}$ and $\boldsymbol{\mathcal{E}}_{n+1}$
         '''
-        s_x_n1, s_y_n1, w_n1 = np.einsum('...a->a...',eps_Ema)
+        eps_aEm = np.einsum('...a->a...',eps_Ema)
+        dim = len(eps_aEm)
+
+        if dim == 2: # hack - only one slip considered - 2D version
+            select_idx = (0, 2)
+            s_x_n1, w_n1 = eps_aEm
+            s_y_n1 = np.zeros_like(s_x_n1)
+        else:
+            select_idx = (0, 1, 2)
+            s_x_n1, s_y_n1, w_n1 = eps_aEm
+
+        ONES = np.ones_like(s_x_n1, dtype=np.float_)
+        if self.debug:
+            print('ONES', ONES.dtype)
+        ZEROS = np.zeros_like(s_x_n1, dtype=np.float_)
+        if self.debug:
+            print('ZEROS', ZEROS.dtype)
+
         # Transform state to Eps_k and Sig_k
         Eps_n = np.array([ state[eps_name] for eps_name in self.Eps_names], dtype=np.float_)
         Eps_k = np.copy(Eps_n)
@@ -463,33 +496,57 @@ class Slide34(bu.InteractiveModel,bu.InjectSymbExpr):
         lam_k = np.zeros_like(f_k_trial)
         k = 0
         while k < self.k_max:
-            print('k', k)
+            if self.debug:
+                print('k', k)
             # which entries are above the tolerance
             I = np.where(f_k_norm_I > (self.f_t * self.rtol))
-            print('f_k_norm_I', f_k_norm_I, self.f_t * self.rtol, len(I[0]))
+            if self.debug:
+                print('f_k_norm_I', f_k_norm_I, self.f_t * self.rtol, len(I[0]))
             if (len(I[0]) == 0):
                 # empty inelastic entries - accept state
-                return Eps_k, Sig_k, k + 1
-            print('I', I)
-            print('L', L)
+                #return Eps_k, Sig_k, k + 1
+                dSig_dEps_k = self.symb.get_dSig_dEps_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k, ZEROS, ONES)
+                ix1, ix2 = np.ix_(select_idx, select_idx)
+                D_ = np.einsum('ab...->...ab',dSig_dEps_k[ix1, ix2, ...])
+                sig_ = np.einsum('a...->...a',Sig_k[select_idx,...])
+                # quick fix
+                D_ = np.zeros(sig_.shape + (sig_.shape[-1],))
+                D_[...,0,0] = self.E_T
+                if dim == 2:
+                    D_[...,1,1] = self.E_N
+                else:
+                    D_[...,1,1] = self.E_T
+                    D_[...,2,2] = self.E_N
+                return sig_, D_
+
+            if self.debug:
+                print('I', I)
+                print('L', L)
             LL = tuple(Li[I] for Li in L)
             L = LL
-            print('new L', L)
-            print('f_k', f_k[L].shape,f_k[L].dtype)
-            print('df_k', df_k[L].shape,df_k[L].dtype)
+            if self.debug:
+                print('new L', L)
+                print('f_k', f_k[L].shape,f_k[L].dtype)
+                print('df_k', df_k[L].shape,df_k[L].dtype)
             # return mapping on inelastic entries
             dlam_L = -f_k[L] / df_k[L] # np.linalg.solve(df_k[I], -f_k[I])
-            print('dlam_I',dlam_L,dlam_L.dtype)
+            if self.debug:
+                print('dlam_I',dlam_L,dlam_L.dtype)
             lam_k[L] += dlam_L
-            print('lam_k_L',lam_k,lam_k.dtype, lam_k[L].shape)
-            Eps_k_L = self.get_Eps_k1(s_x_n1[L], s_y_n1[L], w_n1[L], Eps_n.T[L].T,
-                                      lam_k[L], Sig_k.T[L].T, Eps_k.T[L].T)
-            Eps_k.T[L] = Eps_k_L.T
-            f_k_L, df_k_L, Sig_k_L = self.get_f_df(s_x_n1[L], s_y_n1[L], w_n1[L], Sig_k.T[L].T, Eps_k_L)
+            if self.debug:
+                print('lam_k_L',lam_k,lam_k.dtype, lam_k[L].shape)
+            L_slice = (slice(None),) + L
+            Eps_k_L = self.get_Eps_k1(s_x_n1[L], s_y_n1[L], w_n1[L],
+                                      Eps_n[L_slice],
+                                      lam_k[L], Sig_k[L_slice], Eps_k[L_slice])
+            Eps_k[L_slice] = Eps_k_L
+            f_k_L, df_k_L, Sig_k_L = self.get_f_df(s_x_n1[L], s_y_n1[L], w_n1[L],
+                                                   Sig_k[L_slice], Eps_k_L)
             f_k[L], df_k[L] = f_k_L[0, ...], df_k_L[0, 0, ...]
-            Sig_k.T[L] = Sig_k_L.T
-            print('Sig_k',Sig_k)
-            print('f_k', f_k)
+            Sig_k[L_slice] = Sig_k_L
+            if self.debug:
+                print('Sig_k',Sig_k)
+                print('f_k', f_k)
             f_k_norm_I = np.fabs(f_k[L])
             k += 1
         else:

@@ -7,22 +7,24 @@ from bmcs_matmod.slide.energy_dissipation import EnergyDissipation
 from bmcs_matmod.slide.inel_state_evolution import InelStateEvolution
 from bmcs_matmod.time_fn.time_function import TimeFunction
 
-class SlideExplorer(bu.InteractiveModel):
+class SlideExplorer(bu.Model):
     name = 'Explorer'
 
-    slide_model = tr.Instance(Slide32, ())
+    tree = ['slide_model', 'inel_state_evolution', 'energy_dissipation', 'time_fn']
 
-    energy_dissipation = tr.Instance(EnergyDissipation)
+    slide_model = bu.Instance(Slide32, (), tree=True)
+
+    energy_dissipation = bu.Instance(EnergyDissipation, tree=True)
     '''Viewer to the energy dissipation'''
     def _energy_dissipation_default(self):
         return EnergyDissipation(slider_exp=self)
 
-    inel_state_evolution = tr.Instance(InelStateEvolution)
+    inel_state_evolution = bu.Instance(InelStateEvolution, tree=True)
     '''Viewer to the inelastic state evolution'''
     def _inel_state_evolution_default(self):
         return InelStateEvolution(slider_exp=self)
 
-    time_fn = tr.Instance(TimeFunction, ())
+    time_fn = bu.Instance(TimeFunction, (), tree=True)
 
     def __init__(self, *args, **kw):
         super(SlideExplorer, self).__init__(*args, **kw)
@@ -57,13 +59,19 @@ class SlideExplorer(bu.InteractiveModel):
         bu.Item('w_1', latex=r'w', minmax=(-4, 4)),
         bu.Item('n_steps'),
         bu.Item('k_max'),
-        simulator='run',
-        reset_simulator='reset'
+        time_editor=bu.ProgressEditor(run_method='run',
+                                   reset_method='reset',
+                                   interrupt_var='sim_stop',
+                                   time_var='t',
+                                   time_max='t_max',
+                                   )
     )
 
     def reset_i(self):
         self.s_x_0, self.s_y_0, self.w_0 = 0, 0, 0
         self.t0 = 0
+        self.t = 0
+        self.t_max = 1
         self.Sig_arr = np.zeros((0, self.n_Eps))
         self.Eps_arr = np.zeros((0, self.n_Eps))
         self.Sig_record = []
@@ -77,12 +85,16 @@ class SlideExplorer(bu.InteractiveModel):
         self.s_y_1 = 0
         self.w_1 = 0
 
+    t = bu.Float(0)
+    t_max = bu.Float(1)
+
     def get_response_i(self, update_progress=lambda t: t):
         # global Eps_record, Sig_record, iter_record
         # global t_arr, s_x_t, s_y_t, w_t, s_x_0, s_y_0, w_0, t0, Eps_n1
         n_steps = self.n_steps
         t_i = np.linspace(0,1, n_steps+1)
         t1 = self.t0 + 1
+        self.t_max = t1
         ti_arr = np.linspace(self.t0, t1, n_steps + 1)
         si_x_t = np.linspace(self.s_x_0, self.s_x_1, n_steps + 1) + 1e-9
         si_y_t = np.linspace(self.s_y_0, self.s_y_1, n_steps + 1) + 1e-9
@@ -97,7 +109,7 @@ class SlideExplorer(bu.InteractiveModel):
             self.Sig_record.append(self.Sig_n1)
             self.Eps_record.append(self.Eps_n1)
             self.iter_record.append(k)
-            update_progress(t)
+            self.t = t
 
         self.Sig_arr = np.array(self.Sig_record, dtype=np.float_)
         self.Eps_arr = np.array(self.Eps_record, dtype=np.float_)
