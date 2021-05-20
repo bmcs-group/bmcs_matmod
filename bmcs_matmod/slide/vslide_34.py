@@ -451,10 +451,6 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
     k_max = bu.Int(100, ALG=True)
     '''Maximum number of iterations'''
 
-    sup = np.testing.suppress_warnings()
-    sup.filter(module=np.ma.core)  # module must match exactly
-    sup.filter(RuntimeWarning, "Some text")
-    @sup
     def get_corr_pred(self, eps_Ema, t_n1, **state):
         '''Return mapping iteration:
         This function represents a user subroutine in a finite element
@@ -510,13 +506,15 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
                 D_ = np.einsum('ab...->...ab',dSig_dEps_k[ix1, ix2, ...])
                 sig_ = np.einsum('a...->...a',Sig_k[select_idx,...])
                 # quick fix
+                omega_T = Eps_k[..., 6]
+                omega_N = Eps_k[..., 7]
                 D_ = np.zeros(sig_.shape + (sig_.shape[-1],))
-                D_[...,0,0] = self.E_T
+                D_[...,0,0] = self.E_T * (1 - omega_T)
                 if dim == 2:
-                    D_[...,1,1] = self.E_N
+                    D_[...,1,1] = self.E_N * (1 - omega_N)
                 else:
-                    D_[...,1,1] = self.E_T
-                    D_[...,2,2] = self.E_N
+                    D_[...,1,1] = self.E_T * (1 - omega_T)
+                    D_[...,2,2] = self.E_N * (1 - omega_N)
                 return sig_, D_
 
             if self.debug:
