@@ -58,7 +58,12 @@ def get_K_OP(D_abcd):
 # map the primary variable to from vector to field
 # map the residuum field to evctor (assembly operator)
 # map the gradient of the residuum field to system matrix
-
+MPW = np.array([.0160714276, .0160714276, .0160714276, .0160714276, .0204744730,
+                     .0204744730, .0204744730, .0204744730, .0204744730, .0204744730,
+                     .0204744730, .0204744730, .0204744730, .0204744730, .0204744730,
+                     .0204744730, .0158350505, .0158350505, .0158350505, .0158350505,
+                     .0158350505, .0158350505, .0158350505, .0158350505, .0158350505,
+                     .0158350505, .0158350505, .0158350505]) * 6.0
 
 def get_UF_t(F, n_t, load, S_max1, S_max2, S_min1, n_mp, loading_scenario):
 
@@ -80,13 +85,14 @@ def get_UF_t(F, n_t, load, S_max1, S_max2, S_min1, n_mp, loading_scenario):
     U_k_O = np.zeros((n_O,), dtype=np.float_)
     U_P = np.zeros((n_O,), np.float_)
     eps_aux = get_eps_ab(U_k_O)
+    dissip_energy = np.zeros(2, np.float_)
     # Setup the system matrix with displacement constraints
     # Time stepping parameters
     t_aux, t_n1, t_max, t_step = 0, 0, len(F), 1 / n_t
     # Iteration parameters
     k_max, R_acc = 1000, 1e-3
     # Record solutions
-    U_t_list, F_t_list, F_t_int_list, U_P_list = [np.copy(U_k_O)], [np.copy(F_O)], [np.copy(F_O_int)], [np.copy(U_P)]
+    U_t_list, F_t_list, F_t_int_list, U_P_list, dissip_energy_list = [np.copy(U_k_O)], [np.copy(F_O)], [np.copy(F_O_int)], [np.copy(U_P)], [np.copy(dissip_energy)]
 
     # Load increment loop
     while t_n1 <= t_max - 1:
@@ -128,7 +134,7 @@ def get_UF_t(F, n_t, load, S_max1, S_max2, S_min1, n_mp, loading_scenario):
             break
 
         # Update states variables after convergence
-        int_var = m._get_state_variables(eps_ab, int_var, eps_aux)
+        int_var = m._x_get_state_variables(eps_ab, int_var, eps_aux)
 
         # Definition internal variables / forces per column:  1) damage N, 2)iso N, 3)kin N, 4) consolidation N, 5) eps p N,
         # 6) sigma N, 7) iso F N, 8) kin F N, 9) energy release N, 10) damage T, 11) iso T, 12-14) kin T, 15-17) eps p T,
@@ -137,14 +143,52 @@ def get_UF_t(F, n_t, load, S_max1, S_max2, S_min1, n_mp, loading_scenario):
         # Definition dissipation components per column: 1) damage N, 2) damage T, 3) eps p N, 4) eps p T, 5) iso N
         # 6) iso T, 7) kin N, 8) kin T
 
-        dissip[:, 0] += np.einsum('...n,...n->...n', int_var[:, 0] - int_var_aux[:, 0], int_var[:, 8])
-        dissip[:, 1] += np.einsum('...n,...n->...n', int_var[:, 9] - int_var_aux[:, 9], int_var[:, 20])
-        dissip[:, 2] += np.einsum('...n,...n->...n', int_var[:, 4] - int_var_aux[:, 4], int_var[:, 5])
-        dissip[:, 3] += np.einsum('...n,...n->...', int_var[:, 14:17] - int_var_aux[:, 14:17], int_var[:, 17:20])
-        dissip[:, 4] += np.einsum('...n,...n->...n', int_var[:, 1] - int_var_aux[:, 1], int_var[:, 6])
-        dissip[:, 5] += np.einsum('...n,...n->...n', int_var[:, 10] - int_var_aux[:, 10], int_var[:, 17])
-        dissip[:, 6] += np.einsum('...n,...n->...n', int_var[:, 2] - int_var_aux[:, 2], int_var[:, 7])
-        dissip[:, 7] += np.einsum('...n,...n->...', int_var[:, 11:14] - int_var_aux[:, 11:14], int_var[:, 21:24])
+        omega_N_Emn_dot = int_var[:, 0] - int_var_aux[:, 0]
+        z_N_Emn_dot = int_var[:, 1] - int_var_aux[:, 1]
+        alpha_N_Emn_dot = int_var[:, 2] - int_var_aux[:, 2]
+        eps_N_p_Emn_dot = int_var[:, 4] - int_var_aux[:, 4]
+
+        sigma_N_Emn = int_var[:, 5]
+        Z_n = int_var[:, 6]
+        X_n = int_var[:, 7]
+        Y_n = int_var[:, 8]
+
+        omega_T_Emn_dot = int_var[:, 9] - int_var_aux[:, 9]
+        z_T_Emn_dot = int_var[:, 10] - int_var_aux[:, 10]
+        alpha_T_Emna_dot = int_var[:, 11:14] - int_var_aux[:, 11:14]
+        eps_T_pi_Emna_dot = int_var[:, 14:17] - int_var_aux[:, 14:17]
+
+        sigma_T_Emna = int_var[:, 17:20]
+        Z_T = int_var[:, 20]
+        X_T = int_var[:, 21:24]
+        Y_T = int_var[:, 24]
+
+        iso_free_N = np.einsum('...,...->...', Z_n, z_N_Emn_dot)
+        kin_free_N = np.einsum('...,...->...', X_n, alpha_N_Emn_dot)
+        plast_work_N = np.einsum('...,...->...', sigma_N_Emn, eps_N_p_Emn_dot)
+        plast_dissip_N = plast_work_N - iso_free_N - kin_free_N
+
+
+        iso_free_T = np.einsum('...,...->...', Z_T, z_T_Emn_dot)
+        kin_free_T = np.einsum('...n,...n->...', X_T, alpha_T_Emna_dot)
+        plast_work_T = np.einsum('...n,...n->...', sigma_T_Emna, eps_T_pi_Emna_dot)
+        plast_dissip_T = plast_work_T - iso_free_T - kin_free_T
+        plast_diss = np.einsum('...n,...n->...', MPW,
+                                            plast_dissip_N + plast_dissip_T)
+
+        dissip_energy[0] += plast_diss
+
+        damage_diss_N = np.einsum('...,...->...', Y_n, omega_N_Emn_dot)
+        damage_diss_T = np.einsum('...,...->...', Y_T, omega_T_Emn_dot)
+        damage_diss = np.einsum('...n,...n->...', MPW, damage_diss_N + damage_diss_T)
+
+        dissip_energy[1] += damage_diss
+
+        if plast_diss < -1e-5:
+            print('second law violation - plast')
+
+        if damage_diss < -1e-5:
+            print('second law violation - damage')
 
         int_var_aux = int_var * 1
 
@@ -154,11 +198,14 @@ def get_UF_t(F, n_t, load, S_max1, S_max2, S_min1, n_mp, loading_scenario):
                 save = np.concatenate((int_var, dissip), axis=1)
 
                 df = pd.DataFrame(save)
-                df.to_hdf(path, 'middle' + np.str(t_aux), append=True)
+                df.to_hdf(path, 'middle' + str(t_aux), append=True)
 
                 U_t_list.append(np.copy(U_k_O))
                 F_t_list.append(F_O)
                 F_t_int_list.append(F_O_int)
+                if F[t_n1] == S_max1 * load:
+                    dissip_energy_list.append(dissip_energy)
+                    dissip_energy = np.zeros(2, np.float_)
                 eps_aux = get_eps_ab(U_k_O)
                 t_aux += 1
 
@@ -190,8 +237,8 @@ def get_UF_t(F, n_t, load, S_max1, S_max2, S_min1, n_mp, loading_scenario):
             t_aux += 1
         t_n1 += 1
 
-    U_t, F_t = np.array(U_t_list), np.array(F_t_list)
-    return U_t, F_t, t_n1 / t_max, t_aux
+    U_t, F_t, dissip_energy = np.array(U_t_list), np.array(F_t_list), np.array(dissip_energy_list)
+    return U_t, F_t, dissip_energy, t_n1 / t_max, t_aux
 
 def get_int_var(path, size, n_mp):  # unpacks saved data
 
@@ -236,7 +283,7 @@ def get_int_var(path, size, n_mp):  # unpacks saved data
            Disip_iso_T_Emn, Disip_kin_N_Emn, Disip_kin_T_Emn
 
 
-concrete_type= 0        # 0:C40MA, 1:C80MA, 2:120MA, 3:Tensile, 4:Compressive, 5:Biaxial
+concrete_type= 1        # 0:C40MA, 1:C80MA, 2:120MA, 3:Tensile, 4:Compressive, 5:Biaxial
 
 Concrete_Type_string = ['C40MA', 'C80MA','C120MA', 'Tensile', 'Compressive', 'Biaxial']
 
@@ -247,9 +294,9 @@ M_plot = 1  # Plot microplanes polar graphs. 1: yes, 0: no
 t_steps_cycle = 100
 n_mp = 28
 
-S_max1 = 0.65          # maximum loading level
-S_min1 = 0.05           # minimum loading level
-n_cycles1 = 1000        # number of applied cycles
+S_max1 = 0.85          # maximum loading level
+S_min1 = 0.20           # minimum loading level
+n_cycles1 = 2000        # number of applied cycles
 
 # For sequence order effect
 
@@ -258,7 +305,7 @@ cycles1 = 20           # fatigue life first level
 
 S_max2 = 0.85            # maximum loading level second level
 cycles2 = 221         # fatigue life second level
-n_cycles2 = np.int(1e3 - np.floor(eta1*cycles1)) # number of applied cycles second level
+n_cycles2 = int(1e3 - np.floor(eta1*cycles1)) # number of applied cycles second level
 
 # For increasing loading levels
 
@@ -278,7 +325,7 @@ path = os.path.join(
 
 # FINAL LOADINGS
 
-load_options = [-60, -91.48124175031421, -120.68460619830213]
+load_options = [-60.58945931264715, -93.73515724992052]
 
 load = load_options[concrete_type]
 
@@ -403,17 +450,17 @@ start = time.time()
 
 
 
-U, F, cyc, number_cyc = get_UF_t(
+U, F, dissip_energy, cyc, number_cyc = get_UF_t(
     sin_load, t_steps, load, S_max1, S_max2, S_min1, n_mp, loading_scenario)
 
 end = time.time()
 print(end - start, 'seconds')
 
 
-[omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, Z_N_Emn, X_N_Emn, Y_N_Emn, omega_T_Emn, z_T_Emn,
- alpha_T_Emna, eps_T_pi_Emna, sigma_T_Emna, Z_T_pi_Emn, X_T_pi_Emna, Y_T_pi_Emn, Disip_omena_N_Emn, Disip_omena_T_Emn,
- Disip_eps_p_N_Emn, Disip_eps_p_T_Emn, Disip_iso_N_Emn, Disip_iso_T_Emn, Disip_kin_N_Emn, Disip_kin_T_Emn] \
-    = get_int_var(path, len(F), n_mp)
+# [omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, Z_N_Emn, X_N_Emn, Y_N_Emn, omega_T_Emn, z_T_Emn,
+#  alpha_T_Emna, eps_T_pi_Emna, sigma_T_Emna, Z_T_pi_Emn, X_T_pi_Emna, Y_T_pi_Emn, Disip_omena_N_Emn, Disip_omena_T_Emn,
+#  Disip_eps_p_N_Emn, Disip_eps_p_T_Emn, Disip_iso_N_Emn, Disip_iso_T_Emn, Disip_kin_N_Emn, Disip_kin_T_Emn] \
+#     = get_int_var(path, len(F), n_mp)
 
 font = {'family': 'DejaVu Sans',
         'size': 18}
@@ -447,6 +494,27 @@ if loading_scenario == 'constant':
     ax.set_title('creep fatigue Smax=' + str(S_max1) + 'Smin=' + str(S_min1))
     plt.show()
 
+    f, (ax) = plt.subplots(1, 1, figsize=(5, 4))
+
+    ax.plot((np.arange(len(dissip_energy))) / len(dissip_energy),
+            dissip_energy, linewidth=2.5)
+
+    ax.set_xlabel(r'$N / N_f $|', fontsize=25)
+    ax.set_ylabel(r'$|\varepsilon_{11}^{max}$|', fontsize=25)
+    ax.set_title('creep fatigue Smax=' + str(S_max1) + 'Smin=' + str(S_min1))
+    plt.show()
+
+    f, (ax) = plt.subplots(1, 1, figsize=(5, 4))
+
+    ax.plot((np.arange(len(dissip_energy))) / len(dissip_energy),
+            np.cumsum(dissip_energy[:,0]), linewidth=2.5)
+    ax.plot((np.arange(len(dissip_energy))) / len(dissip_energy),
+            np.cumsum(dissip_energy[:,1]), linewidth=2.5)
+
+    ax.set_xlabel(r'$N / N_f $|', fontsize=25)
+    ax.set_ylabel(r'$|\varepsilon_{11}^{max}$|', fontsize=25)
+    ax.set_title('creep fatigue Smax=' + str(S_max1) + 'Smin=' + str(S_min1))
+    plt.show()
 
 if loading_scenario == 'order':
 
