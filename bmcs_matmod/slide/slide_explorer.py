@@ -5,12 +5,13 @@ import traits.api as tr
 from bmcs_matmod.slide.slide_32 import Slide32, ConvergenceError
 from bmcs_matmod.slide.energy_dissipation import EnergyDissipation
 from bmcs_matmod.slide.inel_state_evolution import InelStateEvolution
-from bmcs_matmod.time_fn.time_function import TimeFunction
+#from bmcs_matmod.time_fn.time_function import TimeFunction
+from ibvpy.tfunction import TimeFunction, TFSelector
 
 class SlideExplorer(bu.Model):
     name = 'Explorer'
 
-    tree = ['slide_model', 'inel_state_evolution', 'energy_dissipation', 'time_fn']
+    tree = ['slide_model', 'inel_state_evolution', 'energy_dissipation', 'tf_s_x', 'tf_s_y', 'tf_w']
 
     slide_model = bu.Instance(Slide32, (), tree=True)
 
@@ -38,6 +39,18 @@ class SlideExplorer(bu.Model):
     s_x_1 = bu.Float(0, INC=True)
     s_y_1 = bu.Float(0, INC=True)
     w_1 = bu.Float(0, INC=True)
+
+    tf_s_x = bu.Instance(TimeFunction, TIME=True)
+    def _tf_s_x_default(self):
+        return TFSelector()
+
+    tf_s_y = bu.Instance(TimeFunction, TIME=True)
+    def _tf_s_y_default(self):
+        return TFSelector()
+
+    tf_w = bu.Instance(TimeFunction, TIME=True)
+    def _tf_w_default(self):
+        return TFSelector()
 
     n_steps = bu.Int(10, ALG=True)
     k_max = bu.Int(20, ALG=True)
@@ -96,9 +109,16 @@ class SlideExplorer(bu.Model):
         t1 = self.t0 + 1
         self.t_max = t1
         ti_arr = np.linspace(self.t0, t1, n_steps + 1)
-        si_x_t = np.linspace(self.s_x_0, self.s_x_1, n_steps + 1) + 1e-9
-        si_y_t = np.linspace(self.s_y_0, self.s_y_1, n_steps + 1) + 1e-9
-        wi_t = np.linspace(self.w_0, self.w_1, n_steps + 1) + 1e-9
+        delta_t =  t1 - self.t0
+        tf_s_x = self.tf_s_x(np.linspace(0,delta_t,n_steps + 1))
+        tf_s_y = self.tf_s_y(np.linspace(0,delta_t,n_steps + 1))
+        tf_w = self.tf_w(np.linspace(0,delta_t,n_steps + 1))
+        # si_x_t = tf_s_x * np.linspace(self.s_x_0, self.s_x_1, n_steps + 1) + 1e-9
+        # si_y_t = tf_s_y * np.linspace(self.s_y_0, self.s_y_1, n_steps + 1) + 1e-9
+        # wi_t = tf_w * np.linspace(self.w_0, self.w_1, n_steps + 1) + 1e-9
+        si_x_t = self.s_x_0 + tf_s_x * (self.s_x_1 - self.s_x_0) + 1e-9
+        si_y_t = self.s_y_0 + tf_s_y * (self.s_y_1 - self.s_y_0) + 1e-9
+        wi_t = self.w_0 + tf_w * (self.w_1 - self.w_0) + 1e-9
         for t, s_x_n1, s_y_n1, w_n1 in zip(t_i, si_x_t, si_y_t, wi_t):
             try: self.Eps_n1, self.Sig_n1, k = self.slide_model.get_sig_n1(
                     s_x_n1, s_y_n1, w_n1, self.Sig_n1, self.Eps_n1, self.k_max
@@ -135,7 +155,7 @@ class SlideExplorer(bu.Model):
     def plot3d_Sig_Eps(self, ax3d):
         tau_x, tau_y = self.Sig_arr.T[:2, ...]
         tau = np.sqrt(tau_x ** 2 + tau_y ** 2)
-        ax3d.plot3D(self.s_x_t, self.s_y_t, tau, color='orange', lw=3)
+        ax3d.plot3D(self.s_x_t, self.s_y_t, tau, color='orange', lw=2)
 
     def run(self, update_progress=lambda t: t):
         try:
@@ -148,9 +168,10 @@ class SlideExplorer(bu.Model):
         self.reset_i()
 
     def subplots(self, fig):
-        ax_sxy = fig.add_subplot(1, 2, 1, projection='3d')
-        ax_sig = fig.add_subplot(1, 2, 2)
-        return ax_sxy, ax_sig
+        ax = fig.add_gridspec(1, 3)
+        ax1 = fig.add_subplot(ax[0, 0:2], projection='3d')
+        ax2 = fig.add_subplot(ax[0:, -1])
+        return ax1, ax2
 
     def update_plot(self, axes):
         ax_sxy, ax_sig = axes
@@ -159,8 +180,8 @@ class SlideExplorer(bu.Model):
         ax_sig.set_ylabel(r'$\sigma$ [MPa]');
 
         #    plot_tau_s(ax1, Eps_arr[-1,...],s_max,500,get_g3,**kw)
+        ax_sxy.plot(self.s_x_t, self.s_y_t, 0, color='red', lw=1)
         self.plot3d_Sig_Eps(ax_sxy)
-        ax_sxy.plot(self.s_x_t, self.s_y_t, 0, color='red')
         ax_sxy.set_xlabel(r'$s_x$ [mm]');
         ax_sxy.set_ylabel(r'$s_y$ [mm]');
         ax_sxy.set_zlabel(r'$\| \tau \| = \sqrt{\tau_x^2 + \tau_y^2}$ [MPa]');
