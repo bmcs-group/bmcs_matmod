@@ -26,8 +26,8 @@ class EnergyDissipation(bu.InteractiveModel):
     w_t = tr.DelegatesTo('slider_exp')
     iter_t = tr.DelegatesTo('slider_exp')
 
-    show_iter = bu.Bool(True)
-    E_plastic_work = bu.Bool(True)
+    show_iter = bu.Bool(False)
+    E_plastic_work = bu.Bool(False)
     E_iso_free_energy = bu.Bool(True)
     E_kin_free_energy = bu.Bool(True)
     E_app_plastic_diss = bu.Bool(True)
