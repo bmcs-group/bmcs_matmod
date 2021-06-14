@@ -20,6 +20,7 @@ class InelStateEvolution(bu.InteractiveModel):
     w_t = tr.DelegatesTo('slider_exp')
     iter_t = tr.DelegatesTo('slider_exp')
 
+
     ipw_view = bu.View(
         bu.Item('t_max', latex=r't_{\max}', readonly=True),
         time_editor=bu.HistoryEditor(var='t_slider', low=0, high_name='t_max', n_steps=50)
