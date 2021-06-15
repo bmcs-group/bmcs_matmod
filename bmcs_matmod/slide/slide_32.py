@@ -180,6 +180,8 @@ df_dSig_ = f_.diff(Sig)
 ddf_dEps_ = f_.diff(Eps)
 r = sp.symbols(r'r', positive=True)
 
+c_NT, S_NT = sp.symbols(r'c_NT, S_NT')
+
 ###########################################################################
 
 # and the corresponding directions of flow given as a product of the sign operator $\Upsilon$ and of the derivatives with respect to state variables
@@ -212,6 +214,8 @@ class Slide23Expr(bu.SymbExpr):
     r = r
     H_switch = H_switch
     Sig_signs = Sig_signs
+    c_NT = c_NT
+    S_NT = S_NT
 
     # expressions
     Sig_ = Sig_.T
@@ -225,15 +229,6 @@ class Slide23Expr(bu.SymbExpr):
     def _get_phi_final_(self):
         def ari(var1, var2):
             return (var1 + var2) / 2
-        def geo(var1, var2):
-            return np.sqrt(var1*var2)
-        def max(var1, var2):
-            return sp.Piecewise( (var1, var1 > var2),
-                                 (var2, True))
-        def avg(var1, var2):
-            return ari(var1, var2)
-        c_NT = avg(c_N, c_T)
-        S_NT = avg(S_N, S_T)
         omega_NT = ari(omega_N, omega_T)
         phi_N = (1 - omega_N)**(c_N) * S_N/(r+1) * (Y_N/S_N)**(r+1) * H_switch
         phi_T = (1 - omega_T)**(c_T) * S_T/(r+1) * (Y_T/S_T)**(r+1)
@@ -254,7 +249,8 @@ class Slide23Expr(bu.SymbExpr):
 
     symb_model_params = [
         'E_T', 'gamma_T', 'K_T', 'S_T', 'c_T', 'bartau',
-        'E_N', 'S_N', 'c_N', 'm', 'f_t', 'f_c', 'f_c0', 'eta', 'r'
+        'E_N', 'S_N', 'c_N', 'm', 'f_t', 'f_c', 'f_c0', 'eta', 'r',
+        'c_NT', 'S_NT'
     ]
 
     # List of expressions for which the methods `get_`
@@ -300,6 +296,27 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
     f_c0 = bu.Float(20, MAT=True)
     eta = bu.Float(0.5, MAT=True)
     r = bu.Float(1, MAT=True)
+    average_NT = bu.Enum(options=['ari','geo','max'])
+
+    def avg(self, var1, var2):
+        if self.average_NT == 'ari':
+            return (var1 + var2) / 2
+        elif self.average_NT == 'geo':
+            return np.sqrt(var1*var2)
+        elif self.average_NT == 'max':
+            return np.max([var1, var2])
+        else:
+            raise ValueError('wrong averaging key')
+
+    c_NT = tr.Property(bu.Float, depends_on='state_changed')
+    @tr.cached_property
+    def _get_c_NT(self):
+        return self.avg(self.c_N, self.c_T)
+
+    S_NT = tr.Property(bu.Float, depends_on='state_changed')
+    @tr.cached_property
+    def _get_S_NT(self):
+        return self.avg(self.S_N, self.S_T)
 
     def C_codegen(self):
 
@@ -338,19 +355,20 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         c_f.close()
 
     ipw_view = bu.View(
-        bu.Item('E_T', latex='E_T', minmax=(0.5, 100)),
-        bu.Item('S_T', minmax=(.00001, 100)),
-        bu.Item('c_T', minmax=( 0.0001, 10)),
-        bu.Item('gamma_T', latex=r'\gamma_\mathrm{T}', minmax=(-20, 20)),
-        bu.Item('K_T', minmax=(-20, 20)),
-        bu.Item('bartau', latex=r'\bar{\tau}', minmax=(0.5, 20)),
-        bu.Item('E_N', minmax=(0.5, 100)),
-        bu.Item('S_N', minmax=(0.0001, 100)),
-        bu.Item('c_N', minmax=(0.0001, 10)),
-        bu.Item('m', minmax=(0.0001, 0.4)),
-        bu.Item('f_t', minmax=(0.1, 10)),
-        bu.Item('f_c', latex=r'f_\mathrm{c}', minmax=(1, 200)),
-        bu.Item('f_c0', latex=r'f_\mathrm{c0}', minmax=(1, 100)),
+        bu.Item('average_NT'),
+        bu.Item('E_T', latex='E_T'),
+        bu.Item('S_T'),
+        bu.Item('c_T'),
+        bu.Item('gamma_T', latex=r'\gamma_\mathrm{T}'),
+        bu.Item('K_T'),
+        bu.Item('bartau', latex=r'\bar{\tau}'),
+        bu.Item('E_N'),
+        bu.Item('S_N'),
+        bu.Item('c_N'),
+        bu.Item('m'),
+        bu.Item('f_t'),
+        bu.Item('f_c', latex=r'f_\mathrm{c}'),
+        bu.Item('f_c0', latex=r'f_\mathrm{c0}'),
         bu.Item('eta', minmax=(0, 1)),
         bu.Item('r')
     )
@@ -472,8 +490,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         omega_T = Eps_ts[-2,:]
         sig_ts_eff = sig_ts / (1 - H_sig_pi*omega_N)
         tau_x_ts_eff = tau_x_ts / (1 - omega_T)
-        ax.contour(sig_ts_eff, tau_x_ts_eff, f_ts[0,...], levels=0, colors=('green',))
-
+        #ax.contour(sig_ts_eff, tau_x_ts_eff, f_ts[0,...], levels=0, colors=('green',))
         ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0, colors=('red',))
         #ax.contour(sig_ts, tau_x_ts, phi_ts[0, ...])
         ax.plot(sig, tau, marker='H', color='red')

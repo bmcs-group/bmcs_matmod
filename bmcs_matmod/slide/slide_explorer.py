@@ -3,6 +3,7 @@ import bmcs_utils.api as bu
 import numpy as np
 import traits.api as tr
 from bmcs_matmod.slide.slide_32 import Slide32, ConvergenceError
+from bmcs_matmod.slide.vslide_34 import Slide34, ConvergenceError
 from bmcs_matmod.slide.energy_dissipation import EnergyDissipation
 from bmcs_matmod.slide.inel_state_evolution import InelStateEvolution
 #from bmcs_matmod.time_fn.time_function import TimeFunction
@@ -14,6 +15,7 @@ class SlideExplorer(bu.Model):
     tree = ['slide_model', 'inel_state_evolution', 'energy_dissipation', 'tf_s_x', 'tf_s_y', 'tf_w']
 
     slide_model = bu.Instance(Slide32, (), tree=True)
+#    slide_model = bu.Instance(Slide34, (), tree=True)
 
     energy_dissipation = bu.Instance(EnergyDissipation, tree=True)
     '''Viewer to the energy dissipation'''
