@@ -8,6 +8,7 @@
 
 import sympy as sp
 import numpy as np
+import k3d
 
 # ![image.png](attachment:image.png)
 
@@ -66,7 +67,6 @@ eq3 = sp.Eq( ( -df_cap_dx_ / df_cap_dy_).subs({x:x_0, y:y_bar}), -m)
 # Solve for $a, b$ and $x_c$
 
 abx_subs = sp.solve({eq1,eq2,eq3},{a,b,x_c})[0]
-abx_subs
 
 # # Continuity between $f_\mathrm{mid}$ and $f_\mathrm{cap}$
 # 
@@ -149,7 +149,7 @@ max_f_c = 100
 max_f_t = 10
 max_tau_bar = 10
 
-class FDoubleCap(bu.InteractiveModel,bu.InjectSymbExpr):
+class FDoubleCap(bu.Model,bu.InjectSymbExpr):
 
     name = 'Threshold'
 
@@ -160,23 +160,47 @@ class FDoubleCap(bu.InteractiveModel,bu.InjectSymbExpr):
     f_c0 = bu.Float(30, MAT=True)
     tau_bar = bu.Float(5, MAT=True)
     m = bu.Float(0.1, MAT=True)
+    z_scale = bu.Float(1)
 
     ipw_view = bu.View(
         bu.Item('f_t', editor=bu.FloatRangeEditor(low=1, high=max_f_t)),
         bu.Item('f_c', editor=bu.FloatRangeEditor(low=10, high=max_f_c)),
         bu.Item('f_c0', latex='f_{c0}', editor=bu.FloatRangeEditor(low=5, high=0.9*max_f_c)),
         bu.Item('tau_bar', latex=r'\bar{\tau}', editor=bu.FloatRangeEditor(low=1, high=max_tau_bar)),
-        bu.Item('m', minmax=(0.0001, 0.5))
+        bu.Item('m', minmax=(0.0001, 0.5)),
+        bu.Item('z_scale', latex=r'\eta_{z}', editor=bu.FloatRangeEditor(low=0, high=1)),
     )
 
-    def subplots(self, fig):
-        ax = fig.subplots(1, 1)
-#        ax = fig.add_subplot(1, 1, 1, projection='3d')
-        return ax
+    plot_backend = 'k3d'
 
+    def setup_plot(self, pb):
+        max_f_c = self.f_c
+        max_f_t = self.f_t
+        max_tau_bar = self.tau_bar
+        X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
+        Z_a = self.symb.get_f_solved(X_a, Y_a) * self.z_scale
+        #ax.contour(X_a, Y_a, Z_a, levels=8)
+        Z_0 = np.zeros_like(Z_a)
+        self.surface = k3d.surface(Z_a.astype(np.float32))
+        pb.plot_fig += self.surface
+        self.surface0 = k3d.surface(Z_0.astype(np.float32),color=0xbbbbbe)
+        pb.plot_fig += self.surface0
+
+    def update_plot(self, pb):
+        X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
+        Z_a = self.symb.get_f_solved(X_a, Y_a) * self.z_scale
+        Z_0 = np.zeros_like(Z_a)
+        self.surface.heights = Z_a.astype(np.float32)
+        self.surface0.heights = Z_0.astype(np.float32)
+
+    def subplots(self, fig):
+        #ax = fig.subplots(1, 1)
+        ax = fig.add_subplot(1, 1, 1, projection='3d')
+        return ax
+#
     def plot_3d(self, ax):
         X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
-        Z_a = self.symb.get_f_solved(X_a, Y_a)
+        Z_a = self.symb.get_f_solved(X_a, Y_a) * self.z_scale
         #ax.contour(X_a, Y_a, Z_a, levels=8)
         Z_0 = np.zeros_like(Z_a)
         ax.plot_surface(X_a, Y_a, Z_a, rstride=1, cstride=1,
@@ -191,6 +215,6 @@ class FDoubleCap(bu.InteractiveModel,bu.InjectSymbExpr):
         ax.set_title('threshold function');
 
 
-    def update_plot(self, ax):
+    def xupdate_plot(self, ax):
         # Evaluate the threshold function within an orthogonal grid
-        self.plot_contour(ax)
+        self.plot_3d(ax)

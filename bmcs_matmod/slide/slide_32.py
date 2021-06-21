@@ -18,6 +18,7 @@ import traits.api as tr
 import numpy as np
 from bmcs_matmod.slide.f_double_cap import FDoubleCap
 import bmcs_utils.api as bu
+import k3d
 
 H_switch = Cymbol(r'H(\sigma^\pi)', real=True)
 H = lambda x: sp.Piecewise( (0, x <=0 ), (1, True) )
@@ -227,6 +228,8 @@ class Slide23Expr(bu.SymbExpr):
     phi_final_ = tr.Property()
     @tr.cached_property
     def _get_phi_final_(self):
+        def geo(var1, var2):
+            return (1-sp.sqrt((1-var1)*(1-var2)))
         def ari(var1, var2):
             return (var1 + var2) / 2
         def g_ari_integrity(var1, var2):
@@ -472,7 +475,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         upper = self.f_t + 0.05 * self.f_c
         lower_tau = -self.bartau * 2
         upper_tau = self.bartau * 2
-        lower_tau = 0
+        lower_tau = -10
         upper_tau = 10
         tau_x, tau_y, sig = Sig[:3]
         tau = np.sqrt(tau_x**2 + tau_y**2)
@@ -482,7 +485,13 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Sig_ts[0,...] = tau_x_ts
         Sig_ts[2,...] = sig_ts
         Sig_ts[3:,...] = Sig[3:,np.newaxis,np.newaxis]
+        Sig_ts[4,...] = np.sqrt(Sig_ts[4,...]**2+Sig_ts[5,...]**2)
+        Sig_ts[5,...] = 0
         Eps_ts[...] = Eps[:,np.newaxis,np.newaxis]
+        Eps_ts[0,...] = np.sqrt(Eps_ts[0,...]**2+Eps_ts[1,...]**2)
+        Eps_ts[1,...] = 0
+        Eps_ts[4,...] = np.sqrt(Eps_ts[4,...]**2+Eps_ts[5,...]**2)
+        Eps_ts[5,...] = 0
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
         f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts, H_sig_pi)])
 
@@ -494,12 +503,12 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         sig_ts_eff = sig_ts / (1 - H_sig_pi*omega_N)
         tau_x_ts_eff = tau_x_ts / (1 - omega_T)
         #ax.contour(sig_ts_eff, tau_x_ts_eff, f_ts[0,...], levels=0, colors=('green',))
-        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0, colors=('red',))
+        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], [0], colors=('red',))
         #ax.contour(sig_ts, tau_x_ts, phi_ts[0, ...])
         ax.plot(sig, tau, marker='H', color='red')
         ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
         ax.plot([0, 0], [lower_tau, upper_tau], color='black', lw=0.4)
-        ax.set_ylim(ymin=0, ymax=10)
+        ax.set_ylim(ymin=lower_tau, ymax=upper_tau)
 
     def plot_f(self, ax):
         lower = -self.f_c * 1.05
@@ -537,3 +546,29 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
 
     def update_plot(self, ax):
         self.plot_f(ax)
+
+    def plot3d(self, pb):
+        lower = -self.f_c * 1.05
+        upper = self.f_t + 0.05 * self.f_c
+        lower_tau = -self.bartau * 2
+        upper_tau = self.bartau * 2
+        sig_ts, tau_x_ts  = np.mgrid[lower:upper:201j,lower_tau:upper_tau:201j]
+        Sig_ts = np.zeros((len(self.symb.Eps),) + tau_x_ts.shape)
+        Sig_ts[0,:] = tau_x_ts
+        Sig_ts[2,:] = sig_ts
+        Eps_ts = np.zeros_like(Sig_ts)
+        H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
+        f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts, H_sig_pi)])
+
+        # max_f_c = self.f_c
+        # max_f_t = self.f_t
+        # max_tau_bar = self.bartau
+        # X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
+        # Z_a = self.symb.get_f_solved(X_a, Y_a) * self.z_scale
+        # #ax.contour(X_a, Y_a, Z_a, levels=8)
+        Z_0 = np.zeros_like(f_ts)
+        self.surface = k3d.surface(f_ts.astype(np.float32))
+        pb.plot_fig += self.surface
+        self.surface0 = k3d.surface(Z_0.astype(np.float32),color=0xbbbbbe)
+        pb.plot_fig += self.surface0
+

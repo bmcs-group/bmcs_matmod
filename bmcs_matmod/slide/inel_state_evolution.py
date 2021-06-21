@@ -33,7 +33,7 @@ class InelStateEvolution(bu.InteractiveModel):
         ax.set_ylabel(r'$\omega_\mathrm{T}$')
 
     def plot_Sig_Eps(self, axes):
-        ax1, ax11, ax2, ax22, ax3, ax33, ax4, ax44 = axes
+        ax1, ax11, ax2, ax22, ax3, ax33, ax4 = axes
         colors = ['blue', 'red', 'green', 'black', 'magenta']
         t = self.t_arr
         s_x_pi_, s_y_pi_, w_pi_, z_, alpha_x_, alpha_y_, omega_T_, omega_N_ = self.Eps_arr.T
@@ -111,8 +111,7 @@ class InelStateEvolution(bu.InteractiveModel):
         ax11 = ax1.twinx()
         ax22 = ax2.twinx()
         ax33 = ax3.twinx()
-        ax44 = ax4.twinx()
-        return ax1, ax11, ax2, ax22, ax3, ax33, ax4, ax44
+        return ax1, ax11, ax2, ax22, ax3, ax33, ax4
 
     def update_plot(self, axes):
         self.plot_Sig_Eps(axes)
