@@ -302,22 +302,11 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
     f_c0 = bu.Float(20, MAT=True)
     eta = bu.Float(0.5, MAT=True)
     r = bu.Float(1, MAT=True)
-    average_NT = bu.Enum(options=['ari','geo','max'])
-
-    def avg(self, var1, var2):
-        if self.average_NT == 'ari':
-            return (var1 + var2) / 2
-        elif self.average_NT == 'geo':
-            return np.sqrt(var1*var2)
-        elif self.average_NT == 'max':
-            return np.max([var1, var2])
-        else:
-            raise ValueError('wrong averaging key')
 
     c_NT = tr.Property(bu.Float, depends_on='state_changed')
     @tr.cached_property
     def _get_c_NT(self):
-        return self.avg(self.c_N, self.c_T)
+        return np.sqrt(self.c_N * self.c_T)
 
     S_NT = tr.Property(bu.Float, depends_on='state_changed')
     @tr.cached_property
@@ -361,7 +350,6 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         c_f.close()
 
     ipw_view = bu.View(
-        bu.Item('average_NT'),
         bu.Item('E_T', latex='E_T'),
         bu.Item('S_T'),
         bu.Item('c_T'),
