@@ -69,11 +69,12 @@ class SlideExplorer(bu.Model):
         return self.Eps_arr
 
     ipw_view = bu.View(
-        bu.Item('s_x_1', latex=r's_x', minmax=(-4, 4)),
-        bu.Item('s_y_1', latex=r's_y', minmax=(-4, 4)),
-        bu.Item('w_1', latex=r'w', minmax=(-4, 4)),
+        bu.Item('s_x_1', latex=r's_x'),
+        bu.Item('s_y_1', latex=r's_y'),
+        bu.Item('w_1', latex=r'w'),
         bu.Item('n_steps'),
         bu.Item('k_max'),
+        bu.Item('t_max', readonly=True),
         time_editor=bu.ProgressEditor(run_method='run',
                                    reset_method='reset',
                                    interrupt_var='sim_stop',
@@ -102,6 +103,8 @@ class SlideExplorer(bu.Model):
 
     t = bu.Float(0)
     t_max = bu.Float(1)
+    def _t_max_changed(self):
+        self.inel_state_evolution.t_max = self.t_max
 
     def get_response_i(self, update_progress=lambda t: t):
         # global Eps_record, Sig_record, iter_record

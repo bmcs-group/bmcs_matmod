@@ -23,7 +23,7 @@ class InelStateEvolution(bu.InteractiveModel):
 
     ipw_view = bu.View(
         bu.Item('t_max', latex=r't_{\max}', readonly=True),
-        time_editor=bu.HistoryEditor(var='t_slider', low=0, high_name='t_max', n_steps=50)
+        time_editor=bu.HistoryEditor(var='t_slider', low=0, max_var='t_max', n_steps=50)
     )
 
     def plot_omega_NT(self, ax, **kw):
