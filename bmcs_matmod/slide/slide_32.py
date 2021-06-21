@@ -18,6 +18,7 @@ import traits.api as tr
 import numpy as np
 from bmcs_matmod.slide.f_double_cap import FDoubleCap
 import bmcs_utils.api as bu
+import k3d
 
 H_switch = Cymbol(r'H(\sigma^\pi)', real=True)
 H = lambda x: sp.Piecewise( (0, x <=0 ), (1, True) )
@@ -180,6 +181,8 @@ df_dSig_ = f_.diff(Sig)
 ddf_dEps_ = f_.diff(Eps)
 r = sp.symbols(r'r', positive=True)
 
+c_NT, S_NT = sp.symbols(r'c_NT, S_NT')
+
 ###########################################################################
 
 # and the corresponding directions of flow given as a product of the sign operator $\Upsilon$ and of the derivatives with respect to state variables
@@ -212,6 +215,8 @@ class Slide23Expr(bu.SymbExpr):
     r = r
     H_switch = H_switch
     Sig_signs = Sig_signs
+    c_NT = c_NT
+    S_NT = S_NT
 
     # expressions
     Sig_ = Sig_.T
@@ -223,17 +228,10 @@ class Slide23Expr(bu.SymbExpr):
     phi_final_ = tr.Property()
     @tr.cached_property
     def _get_phi_final_(self):
+        def geo(var1, var2):
+            return (1-sp.sqrt((1-var1)*(1-var2)))
         def ari(var1, var2):
             return (var1 + var2) / 2
-        def geo(var1, var2):
-            return np.sqrt(var1*var2)
-        def max(var1, var2):
-            return sp.Piecewise( (var1, var1 > var2),
-                                 (var2, True))
-        def avg(var1, var2):
-            return ari(var1, var2)
-        c_NT = avg(c_N, c_T)
-        S_NT = avg(S_N, S_T)
         omega_NT = ari(omega_N, omega_T)
         phi_N = (1 - omega_N)**(c_N) * S_N/(r+1) * (Y_N/S_N)**(r+1) * H_switch
         phi_T = (1 - omega_T)**(c_T) * S_T/(r+1) * (Y_T/S_T)**(r+1)
@@ -254,7 +252,8 @@ class Slide23Expr(bu.SymbExpr):
 
     symb_model_params = [
         'E_T', 'gamma_T', 'K_T', 'S_T', 'c_T', 'bartau',
-        'E_N', 'S_N', 'c_N', 'm', 'f_t', 'f_c', 'f_c0', 'eta', 'r'
+        'E_N', 'S_N', 'c_N', 'm', 'f_t', 'f_c', 'f_c0', 'eta', 'r',
+        'c_NT', 'S_NT'
     ]
 
     # List of expressions for which the methods `get_`
@@ -300,6 +299,27 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
     f_c0 = bu.Float(20, MAT=True)
     eta = bu.Float(0.5, MAT=True)
     r = bu.Float(1, MAT=True)
+    average_NT = bu.Enum(options=['ari','geo','max'])
+
+    def avg(self, var1, var2):
+        if self.average_NT == 'ari':
+            return (var1 + var2) / 2
+        elif self.average_NT == 'geo':
+            return np.sqrt(var1*var2)
+        elif self.average_NT == 'max':
+            return np.max([var1, var2])
+        else:
+            raise ValueError('wrong averaging key')
+
+    c_NT = tr.Property(bu.Float, depends_on='state_changed')
+    @tr.cached_property
+    def _get_c_NT(self):
+        return self.avg(self.c_N, self.c_T)
+
+    S_NT = tr.Property(bu.Float, depends_on='state_changed')
+    @tr.cached_property
+    def _get_S_NT(self):
+        return self.avg(self.S_N, self.S_T)
 
     def C_codegen(self):
 
@@ -338,19 +358,20 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         c_f.close()
 
     ipw_view = bu.View(
-        bu.Item('E_T', latex='E_T', minmax=(0.5, 100)),
-        bu.Item('S_T', minmax=(.00001, 100)),
-        bu.Item('c_T', minmax=( 0.0001, 10)),
-        bu.Item('gamma_T', latex=r'\gamma_\mathrm{T}', minmax=(-20, 20)),
-        bu.Item('K_T', minmax=(-20, 20)),
-        bu.Item('bartau', latex=r'\bar{\tau}', minmax=(0.5, 20)),
-        bu.Item('E_N', minmax=(0.5, 100)),
-        bu.Item('S_N', minmax=(0.0001, 100)),
-        bu.Item('c_N', minmax=(0.0001, 10)),
-        bu.Item('m', minmax=(0.0001, 0.4)),
-        bu.Item('f_t', minmax=(0.1, 10)),
-        bu.Item('f_c', latex=r'f_\mathrm{c}', minmax=(1, 200)),
-        bu.Item('f_c0', latex=r'f_\mathrm{c0}', minmax=(1, 100)),
+        bu.Item('average_NT'),
+        bu.Item('E_T', latex='E_T'),
+        bu.Item('S_T'),
+        bu.Item('c_T'),
+        bu.Item('gamma_T', latex=r'\gamma_\mathrm{T}'),
+        bu.Item('K_T'),
+        bu.Item('bartau', latex=r'\bar{\tau}'),
+        bu.Item('E_N'),
+        bu.Item('S_N'),
+        bu.Item('c_N'),
+        bu.Item('m'),
+        bu.Item('f_t'),
+        bu.Item('f_c', latex=r'f_\mathrm{c}'),
+        bu.Item('f_c0', latex=r'f_\mathrm{c0}'),
         bu.Item('eta', minmax=(0, 1)),
         bu.Item('r')
     )
@@ -451,7 +472,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         upper = self.f_t + 0.05 * self.f_c
         lower_tau = -self.bartau * 2
         upper_tau = self.bartau * 2
-        lower_tau = 0
+        lower_tau = -10
         upper_tau = 10
         tau_x, tau_y, sig = Sig[:3]
         tau = np.sqrt(tau_x**2 + tau_y**2)
@@ -461,7 +482,13 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         Sig_ts[0,...] = tau_x_ts
         Sig_ts[2,...] = sig_ts
         Sig_ts[3:,...] = Sig[3:,np.newaxis,np.newaxis]
+        Sig_ts[4,...] = np.sqrt(Sig_ts[4,...]**2+Sig_ts[5,...]**2)
+        Sig_ts[5,...] = 0
         Eps_ts[...] = Eps[:,np.newaxis,np.newaxis]
+        Eps_ts[0,...] = np.sqrt(Eps_ts[0,...]**2+Eps_ts[1,...]**2)
+        Eps_ts[1,...] = 0
+        Eps_ts[4,...] = np.sqrt(Eps_ts[4,...]**2+Eps_ts[5,...]**2)
+        Eps_ts[5,...] = 0
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
         f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts, H_sig_pi)])
 
@@ -472,14 +499,13 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         omega_T = Eps_ts[-2,:]
         sig_ts_eff = sig_ts / (1 - H_sig_pi*omega_N)
         tau_x_ts_eff = tau_x_ts / (1 - omega_T)
-        ax.contour(sig_ts_eff, tau_x_ts_eff, f_ts[0,...], levels=0, colors=('green',))
-
-        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0, colors=('red',))
+        #ax.contour(sig_ts_eff, tau_x_ts_eff, f_ts[0,...], levels=0, colors=('green',))
+        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], [0], colors=('red',))
         #ax.contour(sig_ts, tau_x_ts, phi_ts[0, ...])
         ax.plot(sig, tau, marker='H', color='red')
         ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
         ax.plot([0, 0], [lower_tau, upper_tau], color='black', lw=0.4)
-        ax.set_ylim(ymin=0, ymax=10)
+        ax.set_ylim(ymin=lower_tau, ymax=upper_tau)
 
     def plot_f(self, ax):
         lower = -self.f_c * 1.05
@@ -517,3 +543,29 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
 
     def update_plot(self, ax):
         self.plot_f(ax)
+
+    def plot3d(self, pb):
+        lower = -self.f_c * 1.05
+        upper = self.f_t + 0.05 * self.f_c
+        lower_tau = -self.bartau * 2
+        upper_tau = self.bartau * 2
+        sig_ts, tau_x_ts  = np.mgrid[lower:upper:201j,lower_tau:upper_tau:201j]
+        Sig_ts = np.zeros((len(self.symb.Eps),) + tau_x_ts.shape)
+        Sig_ts[0,:] = tau_x_ts
+        Sig_ts[2,:] = sig_ts
+        Eps_ts = np.zeros_like(Sig_ts)
+        H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
+        f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts, H_sig_pi)])
+
+        # max_f_c = self.f_c
+        # max_f_t = self.f_t
+        # max_tau_bar = self.bartau
+        # X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
+        # Z_a = self.symb.get_f_solved(X_a, Y_a) * self.z_scale
+        # #ax.contour(X_a, Y_a, Z_a, levels=8)
+        Z_0 = np.zeros_like(f_ts)
+        self.surface = k3d.surface(f_ts.astype(np.float32))
+        pb.plot_fig += self.surface
+        self.surface0 = k3d.surface(Z_0.astype(np.float32),color=0xbbbbbe)
+        pb.plot_fig += self.surface0
+

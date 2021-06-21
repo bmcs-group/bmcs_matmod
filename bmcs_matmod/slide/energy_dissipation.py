@@ -26,8 +26,8 @@ class EnergyDissipation(bu.InteractiveModel):
     w_t = tr.DelegatesTo('slider_exp')
     iter_t = tr.DelegatesTo('slider_exp')
 
-    show_iter = bu.Bool(True)
-    E_plastic_work = bu.Bool(True)
+    show_iter = bu.Bool(False)
+    E_plastic_work = bu.Bool(False)
     E_iso_free_energy = bu.Bool(True)
     E_kin_free_energy = bu.Bool(True)
     E_app_plastic_diss = bu.Bool(True)
@@ -59,7 +59,7 @@ class EnergyDissipation(bu.InteractiveModel):
                 self.Sig_arr[:, 2] * w_el_t / 2.0
         )
         G_arr = W_arr - U_arr
-        ax.plot(self.t_arr, W_arr, lw=2, color='black', label=r'$W$ - Input work')
+        ax.plot(self.t_arr, W_arr, lw=0.5, color='black', label=r'$W$ - Input work')
         ax.plot(self.t_arr, G_arr, '--', color='black', lw = 0.5, label=r'$W^\mathrm{inel}$ - Inelastic work')
         ax.fill_between(self.t_arr, W_arr, G_arr,
                         color=self.colors['stored_energy'], alpha=0.2)
@@ -70,51 +70,58 @@ class EnergyDissipation(bu.InteractiveModel):
         E_i = cumtrapz(self.Sig_arr, self.Eps_arr, initial=0, axis=0)
         E_s_x_pi_, E_s_y_pi_, E_w_pi_, E_z_, E_alpha_x_, E_alpha_y_, E_omega_s_, E_omega_w_ = E_i.T
 
-        E_plastic_work = E_s_x_pi_ + E_s_y_pi_ + E_w_pi_
+        E_plastic_work_s = E_s_x_pi_ + E_s_y_pi_
+        E_plastic_work_w = E_w_pi_
+        E_plastic_work = E_plastic_work_s + E_plastic_work_w
         E_iso_free_energy = E_z_
         E_kin_free_energy = E_alpha_x_ + E_alpha_y_
-        E_app_plastic_diss = E_plastic_work - E_iso_free_energy - E_kin_free_energy
+        E_plastic_diss_s = E_plastic_work_s - E_iso_free_energy - E_kin_free_energy
+        E_plastic_diss_w = E_plastic_work_w
+        E_app_plastic_diss = E_plastic_diss_s + E_plastic_diss_w
         E_damage_diss = E_omega_s_ + E_omega_w_
 
 
         E_level = 0
         if self.E_damage_diss:
             ax.plot(self.t_arr, E_damage_diss + E_level, color='black', lw=1)
-            ax.fill_between(self.t_arr, E_damage_diss + E_level, E_level, color='gray',
-                            alpha=0.3);
             ax_i.plot(self.t_arr, E_damage_diss, color='gray', lw=2,
                       label=r'damage diss.: $Y\dot{\omega}$')
             ax.fill_between(self.t_arr, E_omega_w_ + E_level, E_level, color='black',
-                            alpha=0.3);
+                            hatch='|');
             E_d_level = E_level + E_omega_w_
-            ax.fill_between(self.t_arr, E_omega_s_ + E_d_level, E_d_level, color='blue',
+            ax.fill_between(self.t_arr, E_omega_s_ + E_d_level, E_d_level, color='gray',
                             alpha=0.3);
         E_level = E_damage_diss
         if self.E_plastic_work:
-            ax.plot(self.t_arr, E_plastic_work + E_level, lw=1, color='red')
-            ax.fill_between(self.t_arr, E_plastic_work + E_level, E_level, color='red', alpha=0.3)
+            ax.plot(self.t_arr, E_plastic_work + E_level, lw=0.5, color='black')
+            # ax.fill_between(self.t_arr, E_plastic_work + E_level, E_level, color='red', alpha=0.3)
             label = r'plastic work: $\sigma \dot{\varepsilon}^\pi$'
             ax_i.plot(self.t_arr, E_plastic_work, color='red', lw=2,label=label)
-            ax.fill_between(self.t_arr, E_w_pi_ + E_level, E_level, color='black',
+            ax.fill_between(self.t_arr, E_plastic_work_w + E_level, E_level, color='orange',
                             alpha=0.3);
-            E_p_level = E_level + E_w_pi_
-            ax.fill_between(self.t_arr, E_s_x_pi_ + E_s_y_pi_ + E_p_level, E_p_level, color='brown',
+            E_p_level = E_level + E_plastic_work_w
+            ax.fill_between(self.t_arr, E_plastic_work_s + E_p_level, E_p_level, color='red',
                             alpha=0.3);
         if self.E_app_plastic_diss:
-            ax.plot(self.t_arr, E_app_plastic_diss + E_level, lw=1, color='magenta')
-            ax.fill_between(self.t_arr, E_app_plastic_diss + E_level, E_level, color='magenta', alpha=0.3)
+            ax.plot(self.t_arr, E_app_plastic_diss + E_level, lw=.4, color='black')
             label = r'apparent pl. diss.: $\sigma \dot{\varepsilon}^\pi - X\dot{\alpha} - Z\dot{z}$'
-            ax_i.plot(self.t_arr, E_app_plastic_diss, color='magenta', lw=2, label=label)
-        E_level += E_app_plastic_diss
+            ax_i.plot(self.t_arr, E_app_plastic_diss, color='red', lw=2, label=label)
+            ax.fill_between(self.t_arr, E_plastic_diss_w + E_level, E_level, color='red',
+                            hatch='-');
+            E_d_level = E_level + E_plastic_diss_w
+            ax.fill_between(self.t_arr, E_plastic_diss_s + E_d_level, E_d_level, color='red',
+                            alpha=0.3);
+            E_level += E_app_plastic_diss
         if self.E_iso_free_energy:
-            ax.plot(self.t_arr, E_iso_free_energy + E_level, '-.', lw=1, color='black')
-            ax.fill_between(self.t_arr, E_iso_free_energy + E_level, E_level, color='orange', alpha=0.3)
-            ax_i.plot(self.t_arr, -E_iso_free_energy, '-.', color='orange', lw=2,
+            ax.plot(self.t_arr, E_iso_free_energy + E_level, '-.', lw=0.5, color='black')
+            ax.fill_between(self.t_arr, E_iso_free_energy + E_level, E_level, color='royalblue',
+                            hatch='|')
+            ax_i.plot(self.t_arr, -E_iso_free_energy, '-.', color='royalblue', lw=2,
                       label=r'iso. diss.: $Z\dot{z}$')
         E_level += E_iso_free_energy
         if self.E_kin_free_energy:
-            ax.plot(self.t_arr, E_kin_free_energy + E_level, '-.', color='black', lw=1)
-            ax.fill_between(self.t_arr, E_kin_free_energy + E_level, E_level, color='blue', alpha=0.2);
+            ax.plot(self.t_arr, E_kin_free_energy + E_level, '-.', color='black', lw=0.5)
+            ax.fill_between(self.t_arr, E_kin_free_energy + E_level, E_level, color='royalblue', alpha=0.2);
             ax_i.plot(self.t_arr, -E_kin_free_energy, '-.', color='blue', lw=2,
                       label=r'free energy: $X\dot{\alpha}$')
 
