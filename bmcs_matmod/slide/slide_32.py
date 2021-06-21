@@ -505,7 +505,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         ax.plot(sig, tau, marker='H', color='red')
         ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
         ax.plot([0, 0], [lower_tau, upper_tau], color='black', lw=0.4)
-        ax.set_ylim(ymin=lower_tau, ymax=upper_tau)
+        ax.set_ylim(ymin=0, ymax=upper_tau)
 
     def plot_f(self, ax):
         lower = -self.f_c * 1.05
