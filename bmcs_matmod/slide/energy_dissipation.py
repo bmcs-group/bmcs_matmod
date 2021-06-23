@@ -3,6 +3,7 @@ import bmcs_utils.api as bu
 import traits.api as tr
 from scipy.integrate import cumtrapz
 import numpy as np
+from types import SimpleNamespace
 
 class EnergyDissipation(bu.InteractiveModel):
     name='Energy'
@@ -30,7 +31,7 @@ class EnergyDissipation(bu.InteractiveModel):
     E_plastic_work = bu.Bool(False)
     E_iso_free_energy = bu.Bool(True)
     E_kin_free_energy = bu.Bool(True)
-    E_app_plastic_diss = bu.Bool(True)
+    E_plastic_diss = bu.Bool(True)
     E_damage_diss = bu.Bool(True)
 
     ipw_view = bu.View(
@@ -39,8 +40,63 @@ class EnergyDissipation(bu.InteractiveModel):
         bu.Item('E_plastic_work'),
         bu.Item('E_iso_free_energy'),
         bu.Item('E_kin_free_energy'),
-        bu.Item('E_app_plastic_diss'),
+        bu.Item('E_plastic_diss'),
     )
+
+    WUG_t = tr.Property
+    def _get_W_t(self):
+        W_arr = (
+                cumtrapz(self.Sig_arr[:, 0], self.s_x_t, initial=0) +
+                cumtrapz(self.Sig_arr[:, 1], self.s_y_t, initial=0) +
+                cumtrapz(self.Sig_arr[:, 2], self.w_t, initial=0)
+        )
+        s_x_el_t = (self.s_x_t - self.Eps_arr[:, 0])
+        s_y_el_t = (self.s_y_t - self.Eps_arr[:, 1])
+        w_el_t = (self.w_t - self.Eps_arr[:, 2])
+        U_arr = (
+                self.Sig_arr[:, 0] * s_x_el_t / 2.0 +
+                self.Sig_arr[:, 1] * s_y_el_t / 2.0 +
+                self.Sig_arr[:, 2] * w_el_t / 2.0
+        )
+        G_arr = W_arr - U_arr
+        return W_arr, U_arr, G_arr
+
+    Eps = tr.Property
+    """Energy dissipated in associatiation with individual internal variables 
+    """
+    def _get_Eps(self):
+        Eps_names = self.slider_exp.slide_model.Eps_names
+        E_i = cumtrapz(self.Sig_arr, self.Eps_arr, initial=0, axis=0)
+        return SimpleNamespace(**{Eps_name: E for Eps_name, E in zip(Eps_names, E_i.T)})
+
+    mechanisms = tr.Property
+    """Energy in association with mechanisms (damage and plastic dissipation)
+    or free energy
+    """
+    def _get_mechanisms(self):
+        E_i = cumtrapz(self.Sig_arr, self.Eps_arr, initial=0, axis=0)
+        E_T_x_pi_, E_T_y_pi_, E_N_pi_, E_z_, E_alpha_x_, E_alpha_y_, E_omega_T_, E_omega_N_ = E_i.T
+        E_plastic_work_T = E_T_x_pi_ + E_T_y_pi_
+        E_plastic_work_N = E_N_pi_
+        E_plastic_work = E_plastic_work_T + E_plastic_work_N
+        E_iso_free_energy = E_z_
+        E_kin_free_energy = E_alpha_x_ + E_alpha_y_
+        E_plastic_diss_T = E_plastic_work_T - E_iso_free_energy - E_kin_free_energy
+        E_plastic_diss_N = E_plastic_work_N
+        E_plastic_diss = E_plastic_diss_T + E_plastic_diss_N
+        E_damage_diss = E_omega_T_ + E_omega_N_
+
+        return SimpleNamespace(**{'plastic_work_N': E_plastic_work_N,
+                                  'plastic_work_T': E_plastic_work_T,
+                                  'plastic_work': E_plastic_work,
+                                  'iso_free_energy': E_iso_free_energy,
+                                  'kin_free_energy': E_kin_free_energy,
+                                  'plastic_diss_N': E_plastic_diss_N,
+                                  'plastic_diss_T': E_plastic_diss_T,
+                                  'plastic_diss': E_plastic_diss,
+                                  'damage_diss_N': E_omega_N_,
+                                  'damage_diss_T': E_omega_T_,
+                                  'damage_diss': E_damage_diss})
 
     def plot_energy(self, ax, ax_i):
 
@@ -68,28 +124,26 @@ class EnergyDissipation(bu.InteractiveModel):
         ax.legend()
 
         E_i = cumtrapz(self.Sig_arr, self.Eps_arr, initial=0, axis=0)
-        E_s_x_pi_, E_s_y_pi_, E_w_pi_, E_z_, E_alpha_x_, E_alpha_y_, E_omega_s_, E_omega_w_ = E_i.T
-
-        E_plastic_work_s = E_s_x_pi_ + E_s_y_pi_
-        E_plastic_work_w = E_w_pi_
-        E_plastic_work = E_plastic_work_s + E_plastic_work_w
+        E_T_x_pi_, E_T_y_pi_, E_N_pi_, E_z_, E_alpha_x_, E_alpha_y_, E_omega_T_, E_omega_N_ = E_i.T
+        E_plastic_work_T = E_T_x_pi_ + E_T_y_pi_
+        E_plastic_work_N = E_N_pi_
+        E_plastic_work = E_plastic_work_T + E_plastic_work_N
         E_iso_free_energy = E_z_
         E_kin_free_energy = E_alpha_x_ + E_alpha_y_
-        E_plastic_diss_s = E_plastic_work_s - E_iso_free_energy - E_kin_free_energy
-        E_plastic_diss_w = E_plastic_work_w
-        E_app_plastic_diss = E_plastic_diss_s + E_plastic_diss_w
-        E_damage_diss = E_omega_s_ + E_omega_w_
-
+        E_plastic_diss_T = E_plastic_work_T - E_iso_free_energy - E_kin_free_energy
+        E_plastic_diss_N = E_plastic_work_N
+        E_plastic_diss = E_plastic_diss_T + E_plastic_diss_N
+        E_damage_diss = E_omega_T_ + E_omega_N_
 
         E_level = 0
         if self.E_damage_diss:
             ax.plot(self.t_arr, E_damage_diss + E_level, color='black', lw=1)
             ax_i.plot(self.t_arr, E_damage_diss, color='gray', lw=2,
                       label=r'damage diss.: $Y\dot{\omega}$')
-            ax.fill_between(self.t_arr, E_omega_w_ + E_level, E_level, color='black',
+            ax.fill_between(self.t_arr, E_omega_N_ + E_level, E_level, color='black',
                             hatch='|');
-            E_d_level = E_level + E_omega_w_
-            ax.fill_between(self.t_arr, E_omega_s_ + E_d_level, E_d_level, color='gray',
+            E_d_level = E_level + E_omega_N_
+            ax.fill_between(self.t_arr, E_omega_T_ + E_d_level, E_d_level, color='gray',
                             alpha=0.3);
         E_level = E_damage_diss
         if self.E_plastic_work:
@@ -97,21 +151,21 @@ class EnergyDissipation(bu.InteractiveModel):
             # ax.fill_between(self.t_arr, E_plastic_work + E_level, E_level, color='red', alpha=0.3)
             label = r'plastic work: $\sigma \dot{\varepsilon}^\pi$'
             ax_i.plot(self.t_arr, E_plastic_work, color='red', lw=2,label=label)
-            ax.fill_between(self.t_arr, E_plastic_work_w + E_level, E_level, color='orange',
+            ax.fill_between(self.t_arr, E_plastic_work_N + E_level, E_level, color='orange',
                             alpha=0.3);
-            E_p_level = E_level + E_plastic_work_w
-            ax.fill_between(self.t_arr, E_plastic_work_s + E_p_level, E_p_level, color='red',
+            E_p_level = E_level + E_plastic_work_N
+            ax.fill_between(self.t_arr, E_plastic_work_T + E_p_level, E_p_level, color='red',
                             alpha=0.3);
-        if self.E_app_plastic_diss:
-            ax.plot(self.t_arr, E_app_plastic_diss + E_level, lw=.4, color='black')
+        if self.E_plastic_diss:
+            ax.plot(self.t_arr, E_plastic_diss + E_level, lw=.4, color='black')
             label = r'apparent pl. diss.: $\sigma \dot{\varepsilon}^\pi - X\dot{\alpha} - Z\dot{z}$'
-            ax_i.plot(self.t_arr, E_app_plastic_diss, color='red', lw=2, label=label)
-            ax.fill_between(self.t_arr, E_plastic_diss_w + E_level, E_level, color='red',
+            ax_i.plot(self.t_arr, E_plastic_diss, color='red', lw=2, label=label)
+            ax.fill_between(self.t_arr, E_plastic_diss_N + E_level, E_level, color='red',
                             hatch='-');
-            E_d_level = E_level + E_plastic_diss_w
-            ax.fill_between(self.t_arr, E_plastic_diss_s + E_d_level, E_d_level, color='red',
+            E_d_level = E_level + E_plastic_diss_N
+            ax.fill_between(self.t_arr, E_plastic_diss_T + E_d_level, E_d_level, color='red',
                             alpha=0.3);
-            E_level += E_app_plastic_diss
+            E_level += E_plastic_diss
         if self.E_iso_free_energy:
             ax.plot(self.t_arr, E_iso_free_energy + E_level, '-.', lw=0.5, color='black')
             ax.fill_between(self.t_arr, E_iso_free_energy + E_level, E_level, color='royalblue',
