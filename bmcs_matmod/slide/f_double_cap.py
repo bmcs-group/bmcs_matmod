@@ -171,23 +171,14 @@ class FDoubleCap(bu.Model,bu.InjectSymbExpr):
         bu.Item('z_scale', latex=r'\eta_{z}', editor=bu.FloatRangeEditor(low=0, high=1)),
     )
 
-    plot_backend = 'k3d'
-
-    def setup_plot(self, pb):
-        max_f_c = self.f_c
-        max_f_t = self.f_t
-        max_tau_bar = self.tau_bar
-        X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
-        Z_a = self.symb.get_f_solved(X_a, Y_a) * self.z_scale
-        #ax.contour(X_a, Y_a, Z_a, levels=8)
-        Z_0 = np.zeros_like(Z_a)
-        self.surface = k3d.surface(Z_a.astype(np.float32))
-        pb.plot_fig += self.surface
-        self.surface0 = k3d.surface(Z_0.astype(np.float32),color=0xbbbbbe)
-        pb.plot_fig += self.surface0
+    plot_backend = 'mpl'
 
     def update_plot(self, pb):
-        X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
+        delta_f = 0.1 * self.f_t
+        max_tau_bar = self.tau_bar * 1.1
+        min_sig = -self.f_c - delta_f
+        max_sig = self.f_t + delta_f
+        X_a, Y_a = np.mgrid[-min_sig:max_sig:210j, -max_tau_bar:max_tau_bar:210j]
         Z_a = self.symb.get_f_solved(X_a, Y_a) * self.z_scale
         Z_0 = np.zeros_like(Z_a)
         self.surface.heights = Z_a.astype(np.float32)
@@ -197,11 +188,18 @@ class FDoubleCap(bu.Model,bu.InjectSymbExpr):
         #ax = fig.subplots(1, 1)
         ax = fig.add_subplot(1, 1, 1, projection='3d')
         return ax
-#
+
+    def get_XYZ_grid(self):#
+        delta_f = 2 * self.f_t
+        min_sig = -self.f_c - delta_f
+        max_sig = self.f_t + delta_f
+        max_tau_bar = self.tau_bar + self.m * self.f_c0 + delta_f
+        X_a, Y_a = np.mgrid[min_sig:max_sig:210j, -max_tau_bar:max_tau_bar:210j]
+        Z_a = self.symb.get_f_solved(X_a, Y_a)
+        return X_a, Y_a, Z_a
+
     def plot_3d(self, ax):
-        X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
-        Z_a = self.symb.get_f_solved(X_a, Y_a) * self.z_scale
-        #ax.contour(X_a, Y_a, Z_a, levels=8)
+        X_a, Y_a, Z_a = self.get_XYZ_grid()
         Z_0 = np.zeros_like(Z_a)
         ax.plot_surface(X_a, Y_a, Z_a, rstride=1, cstride=1,
                         cmap='winter', edgecolor='none')
@@ -209,12 +207,10 @@ class FDoubleCap(bu.Model,bu.InjectSymbExpr):
         ax.set_title('threshold function');
 
     def plot_contour(self, ax):
-        X_a, Y_a = np.mgrid[-1.05*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
-        Z_a = self.symb.get_f_solved(X_a, Y_a)
-        ax.contour(X_a, Y_a, Z_a, levels=0)
+        X_a, Y_a, Z_a = self.get_XYZ_grid()
+        ax.contour(X_a, Y_a, Z_a)#, levels=[0])
         ax.set_title('threshold function');
 
-
-    def xupdate_plot(self, ax):
+    def update_plot(self, ax):
         # Evaluate the threshold function within an orthogonal grid
-        self.plot_3d(ax)
+        self.plot_contour(ax)

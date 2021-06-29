@@ -231,9 +231,9 @@ class Slide34Expr(bu.SymbExpr):
     phi_final_ = tr.Property()
     @tr.cached_property
     def _get_phi_final_(self):
-        def ari(var1, var2):
-            return (var1 + var2) / 2
-        omega_NT = ari(omega_N, omega_T)
+        def g_ari_integrity(var1, var2):
+            return 1-sp.sqrt( (1-var1)*(1-var2))
+        omega_NT = g_ari_integrity(omega_N, omega_T)
         phi_N = (1 - omega_N)**(c_N) * S_N/(r+1) * (Y_N/S_N)**(r+1) * H_switch
         phi_T = (1 - omega_T)**(c_T) * S_T/(r+1) * (Y_T/S_T)**(r+1)
         phi_NT  = (1 - omega_NT)**(c_NT) * S_NT/(r+1) * ((Y_N+Y_T)/S_NT)**(r+1)
@@ -300,27 +300,16 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
     f_c0 = bu.Float(20, MAT=True)
     eta = bu.Float(0.5, MAT=True)
     r = bu.Float(1, MAT=True)
-    average_NT = bu.Enum(options=['ari','geo','max'])
-
-    def avg(self, var1, var2):
-        if self.average_NT == 'ari':
-            return (self.var1 + self.var2) / 2
-        elif self.average_NT == 'geo':
-            return np.sqrt(self.var1*self.var2)
-        elif self.average_NT == 'max':
-            return np.max([self.var1, self.var2])
-        else:
-            raise ValueError('wrong averaging key')
 
     c_NT = tr.Property(bu.Float, depends_on='state_changed')
     @tr.cached_property
     def _get_c_NT(self):
-        return self.avg(self.c_N, self.c_T)
+        return np.sqrt(self.c_N * self.c_T)
 
     S_NT = tr.Property(bu.Float, depends_on='state_changed')
     @tr.cached_property
     def _get_S_NT(self):
-        return self.avg(self.S_N, self.S_T)
+        return np.sqrt(self.S_N * self.S_T)
 
     debug = bu.Bool(False)
 

@@ -23,18 +23,6 @@ import k3d
 H_switch = Cymbol(r'H(\sigma^\pi)', real=True)
 H = lambda x: sp.Piecewise( (0, x <=0 ), (1, True) )
 
-# **Code generation** The derivation is adopted for the purpose of code generation both in Python and C utilizing the `codegen` package provided in `sympy`. The expressions that are part of the time stepping algorithm are transformed to an executable code directly at the place where they are derived. At the end of the notebook the C code can be exported to external files and applied in external tools. 
-
-# This code is needed to lambdify expressions named with latex symbols
-# it removes the backslashes and curly braces upon before code generation.
-# from sympy.utilities.codegen import codegen
-# import re
-# def _print_Symbol(self, expr):
-#     CodePrinter = sp.printing.codeprinter.CodePrinter
-#     name = super(CodePrinter, self)._print_Symbol(expr)
-#     return re.sub(r'[\{^}]','_',re.sub(r'[\\\{\}]', '', name))
-# sp.printing.codeprinter.CodePrinter._print_Symbol = _print_Symbol
-
 # ## Material parameters
 
 E_T = Cymbol('E_T', real=True, nonnegative=True)
@@ -409,6 +397,29 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
     to the tensile strength
     '''
 
+    f_lambda_recording = bu.Bool(False)
+
+    f_list = tr.List
+    lam_list = tr.List
+
+    lam_max = bu.Float(1)
+
+    def reset_flam_profile(self):
+        self.f_list = []
+        self.lam_list = []
+
+    def record_flam_profile(self, lam_k, s_x_n1, s_y_n1, w_n1, Sig_n, Eps_n):
+        Eps_k = np.copy(Eps_n)
+        Sig_k = np.copy(Sig_n)
+        lam_range = np.linspace(0, self.lam_max, 30)
+        f_range = np.zeros_like(lam_range)
+        for i, lam in enumerate(lam_range):
+            Eps_k = self.get_Eps_k1(s_x_n1, s_y_n1, w_n1, Eps_n, lam-lam_k, Sig_k, Eps_k)
+            f_k, df_k, Sig_k = self.get_f_df(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
+            f_range[i] = f_k
+        self.lam_list.append(lam_range)
+        self.f_list.append(np.array(f_range))
+
     def get_sig_n1(self, s_x_n1, s_y_n1, w_n1, Sig_n, Eps_n, k_max):
         '''Return mapping iteration:
         This function represents a user subroutine in a finite element
@@ -417,6 +428,8 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         The procedure returns the stresses and state variables of
         $\boldsymbol{\mathcal{S}}_{n+1}$ and $\boldsymbol{\mathcal{E}}_{n+1}$
         '''
+        if self.f_lambda_recording:
+            self.reset_flam_profile()
         Eps_k = np.copy(Eps_n)
         Sig_k = np.copy(Sig_n)
         lam_k = 0
@@ -425,8 +438,8 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         f_k_trial = f_k[0]
         k = 0
         while k < k_max:
-            # I = np.where(f_k_trial < 0)
-            # if I is empty - finished
+            if self.f_lambda_recording:
+                self.record_flam_profile(lam_k, s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
             if f_k_trial < 0 or f_k_norm < self.f_t * self.rtol:
                 return Eps_k, Sig_k, k + 1
             dlam = np.linalg.solve(df_k, -f_k)
@@ -536,8 +549,9 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         self.plot_f(ax)
 
     def plot3d(self, pb):
-        lower = -self.f_c * 1.05
-        upper = self.f_t + 0.05 * self.f_c
+        delta_f = self.f_t * 0.05
+        lower = -self.f_c - delta_f
+        upper = self.f_t + delta_f
         lower_tau = -self.bartau * 2
         upper_tau = self.bartau * 2
         sig_ts, tau_x_ts  = np.mgrid[lower:upper:201j,lower_tau:upper_tau:201j]
