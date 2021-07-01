@@ -471,7 +471,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         return {eps_name: () for eps_name in self.Eps_names + self.Sig_names}
 
 
-    def plot_f_state(self, ax, Eps, Sig):
+    def plot_f_state(self, ax, Eps, Sig, color='red'):
         lower = -self.f_c * 1.05
         upper = self.f_t + 0.05 * self.f_c
         lower_tau = -self.bartau * 2
@@ -503,8 +503,8 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         omega_T = Eps_ts[-2,:]
         sig_ts_eff = sig_ts / (1 - H_sig_pi*omega_N)
         tau_x_ts_eff = tau_x_ts / (1 - omega_T)
-        #ax.contour(sig_ts_eff, tau_x_ts_eff, f_ts[0,...], levels=0, colors=('green',))
-        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], [0], colors=('red',))
+        #ax.contour(sig_ts_eff, tau_x_ts_eff, f_ts[0,...], [0], colors=('green',))
+        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], [0], colors=(color,))
         #ax.contour(sig_ts, tau_x_ts, phi_ts[0, ...])
         ax.plot(sig, tau, marker='H', color='red')
         ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
