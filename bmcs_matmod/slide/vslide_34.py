@@ -350,7 +350,6 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
         c_f.close()
 
     ipw_view = bu.View(
-        bu.Item('average_NT'),
         bu.Item('E_T', latex='E_T'),
         bu.Item('S_T'),
         bu.Item('c_T'),
@@ -365,7 +364,9 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
         bu.Item('f_c', latex=r'f_\mathrm{c}'),
         bu.Item('f_c0', latex=r'f_\mathrm{c0}'),
         bu.Item('eta'),
-        bu.Item('r')
+        bu.Item('r'),
+        bu.Item('c_NT', readonly=True),
+        bu.Item('S_NT', readonly=True),
     )
 
     damage_interaction = tr.Enum('final', 'geometric','arithmetic')
@@ -470,12 +471,12 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
         dim = len(eps_aEm)
 
         if dim == 2: # hack - only one slip considered - 2D version
-            select_idx = (0, 2)
-            s_x_n1, w_n1 = eps_aEm
+            select_idx = (2, 0)
+            w_n1, s_x_n1  = eps_aEm
             s_y_n1 = np.zeros_like(s_x_n1)
         else:
-            select_idx = (0, 1, 2)
-            s_x_n1, s_y_n1, w_n1 = eps_aEm
+            select_idx = (2, 0, 1)
+            w_n1, s_x_n1, s_y_n1 = eps_aEm
 
         ONES = np.ones_like(s_x_n1, dtype=np.float_)
         if self.debug:
@@ -487,8 +488,8 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
         # Transform state to Eps_k and Sig_k
         Eps_n = np.array([ state[eps_name] for eps_name in self.Eps_names], dtype=np.float_)
         Eps_k = np.copy(Eps_n)
-        #Sig_k = self.symb.get_Sig_(Eps_k)
-        Sig_k = np.array([state[sig_name] for sig_name in self.Sig_names], dtype=np.float_)
+        #Sig_k = np.array([state[sig_name] for sig_name in self.Sig_names], dtype=np.float_)
+        Sig_k = np.zeros_like(Eps_k)
         f_k, df_k, Sig_k = self.get_f_df(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
         f_k, df_k = f_k[0,...], df_k[0,0,...]
         f_k_trial = f_k
@@ -515,12 +516,14 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
                 # quick fix
                 _, _, _, _, _, _, omega_T, omega_N = Eps_k
                 D_ = np.zeros(sig_.shape + (sig_.shape[-1],))
-                D_[...,0,0] = self.E_T# * (1 - omega_T)
-                if dim == 2:
-                    D_[...,1,1] = self.E_N# * (1 - omega_N)
-                else:
-                    D_[...,1,1] = self.E_T# * (1 - omega_T)
-                    D_[...,2,2] = self.E_N# * (1 - omega_N)
+                D_[...,0,0] = self.E_N * (1 - omega_N)
+                D_[...,1,1] = self.E_T * (1 - omega_T)
+                if dim == 3:
+                    D_[...,2,2] = self.E_T * (1 - omega_T)
+                for eps_name, Eps_ in zip(self.Eps_names, Eps_k):
+                    state[eps_name][...] = Eps_[...]
+                # for sig_name, Sig_ in zip(self.Sig_names, Sig_k):
+                #     state[sig_name][...] = Sig_[...]
                 return sig_, D_
 
             if self.debug:
@@ -628,5 +631,17 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
         ax.set_title('potential function');
         ax.contour(Y_N, Y_T, phi_ts[0,...]) #, levels=0)
 
-    def update_plot(self, ax):
-        self.plot_f(ax)
+    def plot_sig_w(self, ax):
+        pass
+
+    def plot_tau_s(self, ax):
+        pass
+
+    def subplots(self, fig):
+        return fig.subplots(2,2)
+
+    def update_plot(self, axes):
+        (ax_sig_w, ax_tau_s), (ax_f, _) = axes
+        self.plot_sig_w(ax_sig_w)
+        self.plot_tau_s(ax_tau_s)
+        self.plot_f(ax_f)
