@@ -104,13 +104,13 @@ rho_psi_ = rho_psi_T_ + rho_psi_N_
 
 d_rho_psi_ = sp.Matrix([rho_psi_.diff(eps) for eps in Eps])
 
-# To obtain consistent signs of the Helmholtz derivatives we define a sign switch operator so that all generalized forces are defined as positive for the respective conjugate state variable $\boldsymbol{\Upsilon}$.
+# To obtain consistent signs of the Helmholtz derivatives we define a sign switch operator so that all generalized forces are defined as positive for the respective conjugate state variable $\boldsymbol{\Upsilon}$. 
 
 Sig_signs = sp.diag(-1,-1,-1,1,1,1,-1,-1)
 
 # The constitutive laws between generalized force and kinematic variables then read
 # \begin{align}
-# \boldsymbol{\mathcal{S}} = \boldsymbol{\Upsilon}\frac{\rho \psi}{\partial\boldsymbol{\mathcal{E}}}
+# \boldsymbol{\mathcal{S}} = \boldsymbol{\Upsilon}\frac{\rho \psi}{\partial\boldsymbol{\mathcal{E}}} 
 # \end{align}
 
 Sig_ = Sig_signs * d_rho_psi_
@@ -122,7 +122,7 @@ Sig_ = Sig_signs * d_rho_psi_
 # \end{align}
 
 dSig_dEps_ = sp.Matrix([
-    Sig_.T.diff(eps) for eps in Eps
+    Sig_.T.diff(eps) for eps in Eps 
 ] ).T
 
 # **Executable Python code generation** $\displaystyle \frac{\partial }{\partial \boldsymbol{\mathcal{E}}}  \boldsymbol{\mathcal{S}}(s,\boldsymbol{\mathcal{E}})$
@@ -135,7 +135,7 @@ tau_eff_y = sp.Symbol(r'tau_eff_y')
 Q_x = sp.Function('Q_x')(tau_eff_x,X_x)
 Q_y = sp.Function('Q_y')(tau_eff_y,X_y)
 
-# The stress norm is defined using the stress offset $X$, i.e. the kinematic hardening stress representing the shift of the origin of the yield locus.
+# The stress norm is defined using the stress offset $X$, i.e. the kinematic hardening stress representing the shift of the origin of the yield locus.  
 
 norm_Q = sp.sqrt(Q_x*Q_x + Q_y*Q_y)
 
@@ -173,7 +173,7 @@ f_ = f_3.subs(fdc.symb.tau_bar, (bartau+Z))
 f_eff_ = f_2.subs(fdc.symb.tau_bar, (bartau+Z))
 
 # **Executable code generation** $f(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$
-#
+# 
 # Note that this is a function of both the forces and kinematic state variables
 
 # The derivative of $f$ required for time-stepping $\frac{\partial f}{\partial \boldsymbol{\mathcal{S}}}$ is obtained as
@@ -190,7 +190,7 @@ c_NT, S_NT = sp.symbols(r'c_NT, S_NT')
 # $\boldsymbol{\Upsilon} \, \partial_{\boldsymbol{\mathcal{S}}} \varphi$
 # This renders following flow direction vector
 # \begin{align}
-# \boldsymbol{\Phi} = - \Upsilon \frac{\partial \varphi}{\partial \boldsymbol{\mathcal{S}}}
+# \boldsymbol{\Phi} = - \Upsilon \frac{\partial \varphi}{\partial \boldsymbol{\mathcal{S}}} 
 # \end{align}
 
 class Slide34Expr(bu.SymbExpr):
