@@ -468,7 +468,6 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
         The procedure returns the stresses and state variables of
         $\boldsymbol{\mathcal{S}}_{n+1}$ and $\boldsymbol{\mathcal{E}}_{n+1}$
         '''
-        print(eps_Ema)
         eps_aEm = np.einsum('...a->a...',eps_Ema)
         dim = len(eps_aEm)
 
