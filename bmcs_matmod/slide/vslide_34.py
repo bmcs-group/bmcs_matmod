@@ -380,23 +380,23 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
     def _get_get_Phi_(self):
         return self.symb.get_Phi_final_
 
-    def get_f_df(self, w_n1, s_x_n1, s_y_n1, Sig_k, Eps_k):
+    def get_f_df(self, u_N_n1, u_Tx_n1, u_Ty_n1, Sig_k, Eps_k):
         if self.debug:
-            print('w_n1', w_n1.dtype,w_n1.shape)
-            print('s_x_n1', s_x_n1.dtype, s_x_n1.shape)
-            print('s_y_n1', s_y_n1.dtype, s_y_n1.shape)
+            print('w_n1', u_N_n1.dtype,u_N_n1.shape)
+            print('s_x_n1', u_Tx_n1.dtype, u_Tx_n1.shape)
+            print('s_y_n1', u_Ty_n1.dtype, u_Ty_n1.shape)
             print('Eps_k', Eps_k.dtype, Eps_k.shape)
             print('Sig_k', Sig_k.dtype, Sig_k.shape)
-        ONES = np.ones_like(s_x_n1, dtype=np.float_)
+        ONES = np.ones_like(u_Tx_n1, dtype=np.float_)
         if self.debug:
             print('ONES', ONES.dtype)
-        ZEROS = np.zeros_like(s_x_n1, dtype=np.float_)
+        ZEROS = np.zeros_like(u_Tx_n1, dtype=np.float_)
         if self.debug:
             print('ZEROS', ZEROS.dtype)
-        Sig_k = self.symb.get_Sig_(w_n1, s_x_n1, s_y_n1, Sig_k, Eps_k)[0]
+        Sig_k = self.symb.get_Sig_(u_N_n1, u_Tx_n1, u_Ty_n1, Sig_k, Eps_k)[0]
         if self.debug:
             print('Sig_k', Sig_k.dtype, Sig_k.shape)
-        dSig_dEps_k = self.symb.get_dSig_dEps_(w_n1, s_x_n1, s_y_n1, Sig_k, Eps_k, ZEROS, ONES)
+        dSig_dEps_k = self.symb.get_dSig_dEps_(u_N_n1, u_Tx_n1, u_Ty_n1, Sig_k, Eps_k, ZEROS, ONES)
         if self.debug:
             print('dSig_dEps_k', dSig_dEps_k.dtype)
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
@@ -420,14 +420,14 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
         df_k = df_dlambda
         return f_k, df_k, Sig_k
 
-    def get_Eps_k1(self, w_n1, s_x_n1, s_y_n1, Eps_n, lam_k, Sig_k, Eps_k):
+    def get_Eps_k1(self, u_N_n1, u_Tx_n1, u_Ty_n1, Eps_n, lam_k, Sig_k, Eps_k):
         '''Evolution equations:
         The update of state variables
         for an updated $\lambda_k$ is performed using this procedure.
         '''
-        ONES = np.ones_like(s_x_n1)
-        ZEROS = np.zeros_like(s_x_n1)
-        Sig_k = self.symb.get_Sig_(w_n1, s_x_n1, s_y_n1, Sig_k, Eps_k)[0]
+        ONES = np.ones_like(u_Tx_n1)
+        ZEROS = np.zeros_like(u_Tx_n1)
+        Sig_k = self.symb.get_Sig_(u_N_n1, u_Tx_n1, u_Ty_n1, Sig_k, Eps_k)[0]
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
         Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
         Eps_k1 = Eps_n + lam_k * Phi_k[:, 0]
@@ -473,16 +473,18 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
 
         if dim == 2: # hack - only one slip considered - 2D version
             select_idx = (0, 1)
-            w_n1, s_x_n1  = eps_aEm
-            s_y_n1 = np.zeros_like(s_x_n1)
+            u_N_n1, u_Tx_n1  = eps_aEm
+            u_Ty_n1 = np.zeros_like(u_Tx_n1)
         else:
             select_idx = (0, 1, 2)
-            w_n1, s_x_n1, s_y_n1 = eps_aEm
+            u_N_n1, u_Tx_n1, u_Ty_n1 = eps_aEm
 
-        ONES = np.ones_like(s_x_n1, dtype=np.float_)
+        print('u_N, u_T', u_N_n1, u_Tx_n1, u_Ty_n1)
+
+        ONES = np.ones_like(u_Tx_n1, dtype=np.float_)
         if self.debug:
             print('ONES', ONES.dtype)
-        ZEROS = np.zeros_like(s_x_n1, dtype=np.float_)
+        ZEROS = np.zeros_like(u_Tx_n1, dtype=np.float_)
         if self.debug:
             print('ZEROS', ZEROS.dtype)
 
@@ -491,7 +493,7 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
         Eps_k = np.copy(Eps_n)
         #Sig_k = np.array([state[sig_name] for sig_name in self.Sig_names], dtype=np.float_)
         Sig_k = np.zeros_like(Eps_k)
-        f_k, df_k, Sig_k = self.get_f_df(w_n1, s_x_n1, s_y_n1, Sig_k, Eps_k)
+        f_k, df_k, Sig_k = self.get_f_df(u_N_n1, u_Tx_n1, u_Ty_n1, Sig_k, Eps_k)
         f_k, df_k = f_k[0,...], df_k[0,0,...]
         f_k_trial = f_k
         # indexes of inelastic entries
@@ -510,7 +512,8 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
             if (len(I[0]) == 0):
                 # empty inelastic entries - accept state
                 #return Eps_k, Sig_k, k + 1
-                dSig_dEps_k = self.symb.get_dSig_dEps_(w_n1, s_x_n1, s_y_n1, Sig_k, Eps_k, ZEROS, ONES)
+                dSig_dEps_k = self.symb.get_dSig_dEps_(u_N_n1, u_Tx_n1, u_Ty_n1,
+                                                       Sig_k, Eps_k, ZEROS, ONES)
                 ix1, ix2 = np.ix_(select_idx, select_idx)
                 D_ = np.einsum('ab...->...ab',dSig_dEps_k[ix1, ix2, ...])
                 sig_ = np.einsum('a...->...a',Sig_k[select_idx,...])
@@ -544,11 +547,11 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
             if self.debug:
                 print('lam_k_L',lam_k,lam_k.dtype, lam_k[L].shape)
             L_slice = (slice(None),) + L
-            Eps_k_L = self.get_Eps_k1(w_n1[L], s_x_n1[L], s_y_n1[L],
+            Eps_k_L = self.get_Eps_k1(u_N_n1[L], u_Tx_n1[L], u_Ty_n1[L],
                                       Eps_n[L_slice],
                                       lam_k[L], Sig_k[L_slice], Eps_k[L_slice])
             Eps_k[L_slice] = Eps_k_L
-            f_k_L, df_k_L, Sig_k_L = self.get_f_df(w_n1[L], s_x_n1[L], s_y_n1[L],
+            f_k_L, df_k_L, Sig_k_L = self.get_f_df(u_N_n1[L], u_Tx_n1[L], u_Ty_n1[L],
                                                    Sig_k[L_slice], Eps_k_L)
             f_k[L], df_k[L] = f_k_L[0, ...], df_k_L[0, 0, ...]
             Sig_k[L_slice] = Sig_k_L
@@ -558,7 +561,7 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
             f_k_norm_I = np.fabs(f_k[L])
             k += 1
         else:
-            raise ConvergenceError('no convergence for entries', [L, w_n1[I], s_x_n1[I], s_y_n1[I]])
+            raise ConvergenceError('no convergence for entries', [L, u_N_n1[I], u_Tx_n1[I], u_Ty_n1[I]])
         # add the algorithmic stiffness
         # recalculate df_k and -f_k for a unit increment of epsilon and solve for lambda
         #
