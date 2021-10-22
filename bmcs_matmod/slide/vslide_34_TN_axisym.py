@@ -517,8 +517,8 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
                 # quick fix
                 _, _, _, _, _, _, omega_T, omega_N = Eps_k
                 D_ = np.zeros(sig_.shape + (sig_.shape[-1],))
-                D_[...,0,0] = self.E_N #* (1 - omega_N)
-                D_[...,1,1] = self.E_T #* (1 - omega_T)
+                D_[...,0,0] = self.E_N * (1 - omega_N)
+                D_[...,1,1] = self.E_T * (1 - omega_T)
                 if dim == 3:
                     D_[...,2,2] = self.E_T #* (1 - omega_T)
                 for eps_name, Eps_ in zip(self.Eps_names, Eps_k):
