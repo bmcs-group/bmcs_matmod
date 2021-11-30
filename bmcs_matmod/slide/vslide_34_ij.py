@@ -69,20 +69,23 @@ class MATS3DSlideStrain(MATS3DEval):
         eps_ij = eps_Emab_n1
         eps_N = np.einsum('...ij,...i,...j->...', eps_ij, n_i, n_i)
         eps_T = self.get_eps_T(eps_ij, n_i)
-
+        eps_T = np.sqrt(np.einsum('...i,...i->...',eps_T,eps_T))
+        eps_NT_Ema = np.concatenate([np.transpose(eps_N), np.transpose(eps_T)], axis=-1)
+        print('eps_NT_Ema', eps_NT_Ema.shape)
+        print(self.state_var_shapes)
         se = self.slide_displ
-        eps_NT_Ema = np.concatenate([eps_N, eps_T], axis=-1)
         sig_NT_Ema, D_Emab = se.get_corr_pred(eps_NT_Ema, tn1, **state)
 
         eps_N_p, eps_T_p_x, eps_T_p_y = state['w_pi'], state['s_pi_x'], state['s_pi_y']
         eps_T = self.get_eps_T(eps_ij, n_i)
         eps_T_p_i = self.get_eps_T_p(eps_T_p_x, eps_T)
         omega_N_Em, omega_T_Em = state['omega_N'], state['omega_T']
+        print(eps_ij.shape)
 
         phi_Emab = np.zeros_like(eps_ij)
-        phi_Emab[1, 1] = 0.
-        phi_Emab[2, 2] = np.sqrt(1 - omega_T_Em)
-        phi_Emab[0, 0] = np.sqrt(1 - omega_N_Em)
+        phi_Emab[:,1, 1] = 0.
+        phi_Emab[:,2, 2] = np.sqrt(1 - omega_T_Em)
+        phi_Emab[:,0, 0] = np.sqrt(1 - omega_N_Em)
 
         beta_Emijkl = np.einsum('...ik,...jl->...ijkl', phi_Emab,
                               np.transpose(phi_Emab, (1, 0)))
