@@ -28,7 +28,7 @@ class MATS3DSlideStrain(MATS3DEval):
 
     state_var_shapes = tr.Property
     @tr.cached_property
-    def _get_var_shapes(self):
+    def _get_state_var_shapes(self):
         return self.slide_displ.state_var_shapes
     r'''
     Shapes of the state variables
