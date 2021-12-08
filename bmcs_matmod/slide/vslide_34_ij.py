@@ -19,6 +19,13 @@ class MATS3DSlideStrain(MATS3DEval):
 
     slide_displ = bu.Instance(Slide34, ())
 
+    slide_displ_ = tr.Property(depends_on='+MAT')
+    '''Reconfigure slide with the derived stiffness parameters'''
+    @tr.cached_property
+    def _get_slide_displ_(self):
+        self.slide_displ.trait_set(E_N=self.E, E_T=self.E_T)
+        return self.slide_displ
+
     tree = ['slide_displ']
 
     ipw_view = bu.View(
@@ -29,7 +36,7 @@ class MATS3DSlideStrain(MATS3DEval):
     state_var_shapes = tr.Property
     @tr.cached_property
     def _get_state_var_shapes(self):
-        return self.slide_displ.state_var_shapes
+        return self.slide_displ_.state_var_shapes
     r'''
     Shapes of the state variables
     to be stored in the global array at the level 
@@ -52,7 +59,10 @@ class MATS3DSlideStrain(MATS3DEval):
         eps_T_p = np.einsum('...,...i->...i', eps_T_p, director_vector)
         return eps_T_p
 
-    def get_E_T(self, E, nu, n_i):
+    E_T = tr.Property(depends_on='MAT')
+    @tr.cached_property
+    def _get_E_T(self):
+        n_i = self.n_a
         delta_ij = np.identity(3)
         D_ijkl = self.D_abef
         operator = 0.5 * (np.einsum('i,jk,l->ijkl', n_i, delta_ij, n_i)
@@ -73,7 +83,7 @@ class MATS3DSlideStrain(MATS3DEval):
         eps_NT_Ema = np.concatenate([np.transpose(eps_N), np.transpose(eps_T)], axis=-1)
         print('eps_NT_Ema', eps_NT_Ema.shape)
         print(self.state_var_shapes)
-        se = self.slide_displ
+        se = self.slide_displ_
         sig_NT_Ema, D_Emab = se.get_corr_pred(eps_NT_Ema, tn1, **state)
 
         eps_N_p, eps_T_p_x, eps_T_p_y = state['w_pi'], state['s_pi_x'], state['s_pi_y']
@@ -101,5 +111,3 @@ class MATS3DSlideStrain(MATS3DEval):
         sigma_Emab = np.einsum('...ijkl,...kl->...ij', D_Emabcd, (eps_Emab_n1 - eps_ij_p))
 
         return sigma_Emab, D_Emabcd
-
-
