@@ -11,15 +11,15 @@ Microplane Fatigue model 2D
 Using Jirasek homogenization approach [1999]
 '''
 
-from ibvpy.tmodel.mats3D.mats3D_eval import \
-    MATS3DEval
+from ibvpy.tmodel.mats3D.mats3D_eval import MATS3DEval
+
 from bmcs_utils.api import InteractiveModel, Item, View
 import numpy as np
 import traits.api as tr
 
 
 class MS1(MATS3DEval, InteractiveModel):
-    gamma_T = tr.Float(100000.,
+    gamma_T = tr.Float(1000000.,
                        label="gamma_T",
                        desc=" Tangential Kinematic hardening modulus",
                        enter_set=True,
@@ -42,13 +42,13 @@ class MS1(MATS3DEval, InteractiveModel):
                    desc="Damage cumulation parameter",
                    enter_set=True,
                    auto_set=False)
-    p_T = tr.Float(12.,
+    p_T = tr.Float(2.,
                    label="p_T",
                    desc="Damage cumulation parameter",
                    enter_set=True,
                    auto_set=False)
 
-    c_T = tr.Float(4.6,
+    c_T = tr.Float(3,
                    label="c_T",
                    desc="Damage cumulation parameter",
                    enter_set=True,
@@ -60,7 +60,7 @@ class MS1(MATS3DEval, InteractiveModel):
                           enter_set=True,
                           auto_set=False)
 
-    m_T = tr.Float(0.003,
+    m_T = tr.Float(0.1,
                  label="m_T",
                  desc="Lateral pressure coefficient",
                  enter_set=True,
@@ -69,13 +69,13 @@ class MS1(MATS3DEval, InteractiveModel):
     # -------------------------------------------
     # Normal_Tension constitutive law parameters (without cumulative normal strain)
     # -------------------------------------------
-    Ad = tr.Float(100.0,
+    Ad = tr.Float(10.0,
                   label="A_d",
                   desc="brittleness coefficient",
                   enter_set=True,
                   auto_set=False)
 
-    eps_0 = tr.Float(0.00008,
+    eps_0 = tr.Float(.0001,
                      label="eps_N_0",
                      desc="threshold strain",
                      enter_set=True,
@@ -96,7 +96,7 @@ class MS1(MATS3DEval, InteractiveModel):
                        enter_set=True,
                        auto_set=False)
 
-    sigma_N_0 = tr.Float(30.,
+    sigma_N_0 = tr.Float(10.,
                        label="sigma_N_0",
                        desc="Yielding stress",
                        enter_set=True,
@@ -175,7 +175,7 @@ class MS1(MATS3DEval, InteractiveModel):
     # (without cumulative normal strain for fatigue under tension)
     # --------------------------------------------------------------
     def get_normal_law(self, eps_N_Emn, omega_N_Emn, z_N_Emn,
-                       alpha_N_Emn, r_N_Emn, eps_N_p_Emn):
+                       alpha_N_Emn, r_N_Emn, eps_N_p_Emn, eps_T_Emna):
 
         E_N = self.E / (1.0 - 2.0 * self.nu)
 
@@ -186,8 +186,8 @@ class MS1(MATS3DEval, InteractiveModel):
 
         sigma_trial = E_N * (eps_N_Emn - eps_N_p_Emn)
         # looking for microplanes violating strain boundary
-        pos1 = [(eps_N_Emn < -1e-6) & (sigma_trial > 1e-6)]
-        sigma_trial[pos1[0]] = 0
+        # pos1 = [(eps_N_Emn < -1e-6) & (sigma_trial > 1e-6)]
+        # sigma_trial[pos1[0]] = 0
         pos = eps_N_Emn > 1e-6  # microplanes under traction
         pos2 = eps_N_Emn < -1e-6  # microplanes under compression
         H = 1.0 * pos
@@ -195,7 +195,7 @@ class MS1(MATS3DEval, InteractiveModel):
 
         # thermo forces
         sigma_N_Emn_tilde = E_N * (eps_N_Emn - eps_N_p_Emn)
-        sigma_N_Emn_tilde[pos1[0]] = 0  # imposing strain boundary
+        # sigma_N_Emn_tilde[pos1[0]] = 0  # imposing strain boundary
 
         Z = self.K_N * z_N_Emn
         X = self.gamma_N * alpha_N_Emn * H2
@@ -232,12 +232,23 @@ class MS1(MATS3DEval, InteractiveModel):
         omega_N_Emn[...] = np.clip(omega_N_Emn,0,0.9999)
         r_N_Emn[f > 1e-6] = -omega_N_Emn[f > 1e-6]
 
+        # epsilon_0 = 59.0e-6
+        # epsilon_f = 250.0e-6
+        # I = np.where(eps_N_Emn >= epsilon_0)
+        # omega_N_Emn[I] = (
+        #         1.0 - (epsilon_0 / eps_N_Emn[I] *
+        #                np.exp(-1.0 * (eps_N_Emn[I] - epsilon_0) /
+        #                       (epsilon_f - epsilon_0))
+        #                ))
+        # r_N_Emn[I] = -omega_N_Emn[I]
         sigma_N_Emn = (1.0 - H * omega_N_Emn) * E_N * (eps_N_Emn - eps_N_p_Emn)
-        pos1 = [(eps_N_Emn < -1e-6) & (sigma_trial > 1e-6)]  # looking for microplanes violating strain boundary
-        sigma_N_Emn[pos1[0]] = 0
+        # pos1 = [(eps_N_Emn < -1e-6) & (sigma_trial > 1e-6)]  # looking for microplanes violating strain boundary
+        # sigma_N_Emn[pos1[0]] = 0
+
 
         Z = self.K_N * z_N_Emn
         X = self.gamma_N * alpha_N_Emn * H2
+
 
         return sigma_N_Emn, Z, X, Y_N
 
@@ -295,7 +306,7 @@ class MS1(MATS3DEval, InteractiveModel):
 
         omega_T_Emn += ((1 - omega_T_Emn) ** self.c_T) * \
                        (delta_lamda * (Y / self.S_T) ** self.r_T) * \
-                       (self.sigma_T_0 / (self.sigma_T_0 + self.m_T * sigma_N_Emn)) ** self.p_T
+                       (self.sigma_T_0 / (self.sigma_T_0 - self.m_T * sigma_N_Emn)) ** self.p_T
         omega_T_Emn[...] = np.clip(omega_T_Emn,0,0.9999)
 
         alpha_T_Emna[..., 0] += plas_1 * delta_lamda * \
@@ -357,6 +368,18 @@ class MS1(MATS3DEval, InteractiveModel):
         MPTT_ijr = self._get__MPTT()
         return np.einsum('nija,...ij->...na', MPTT_ijr, eps_Emab)
 
+    def _get_phi(self, eps_Emab, omega_N_Emn, z_N_Emn,
+                           alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
+                           alpha_T_Emna, eps_T_pi_Emna):
+        # Returns the 2nd order damage tensor 'phi_mtx'
+        # scalar integrity factor for each microplane
+        omega_Emn = np.maximum(omega_N_Emn, omega_T_Emn)
+        phi_n = np.sqrt(1.0 - omega_Emn)
+        # 'phi_Emn', phi_Emn[:, -1, :]
+        # integration terms for each microplanes
+        phi_ab = np.einsum('...n,n,nab->...ab', phi_n, self._MPW, self._MPNN)
+        return phi_ab
+
     # ---------------------------------------------------------------------
     # Extra homogenization of damage tensor in case of two damage parameters
     # Returns the 4th order damage tensor 'beta4' using (ref. [Baz99], Eq.(63))
@@ -372,7 +395,7 @@ class MS1(MATS3DEval, InteractiveModel):
         eps_T_Emna = self._get_e_T_Emnar_2(eps_Emab)
 
         sigma_N_Emn, Z_n, X_n, Y_n = self.get_normal_law(
-            eps_N_Emn, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn)
+            eps_N_Emn, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn,eps_T_Emna)
 
         sigma_T_Emna, Z_T, X_T, Y_T = self.get_tangential_law(
             eps_T_Emna, omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn)
@@ -406,7 +429,7 @@ class MS1(MATS3DEval, InteractiveModel):
 
         # plastic normal strains
         sigma_N_Emn, Z_n, X_n, Y_n = self.get_normal_law(
-            eps_N_Emn, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn)
+            eps_N_Emn, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, eps_T_Emna)
 
         # sliding tangential strains
         sigma_T_Emna, Z_T, X_T, Y_T = self.get_tangential_law(
@@ -441,9 +464,19 @@ class MS1(MATS3DEval, InteractiveModel):
         # ------------------------------------------------------------------
 
         D_Emabcd = np.einsum(
-            '...ijab, abef, ...cdef->...ijcd',
-            beta_Emabcd, self.D_abef, beta_Emabcd
+             '...ijab, abef, ...cdef->...ijcd',
+             beta_Emabcd, self.D_abef, beta_Emabcd
         )
+
+        #phi_ab = self._get_phi(eps_Emab, **Eps_k)
+#
+#
+        #D_Emabcd = 0.25 * (
+        #        np.einsum('mjnl, ...im, ...kn -> ...ijkl', self.D_abef, phi_ab, phi_ab) +
+        #        np.einsum('imnl, ...jm, ...kn -> ...ijkl', self.D_abef, phi_ab, phi_ab) +
+        #        np.einsum('mjkn, ...im, ...ln -> ...ijkl', self.D_abef, phi_ab, phi_ab) +
+        #        np.einsum('imkn, ...jm, ...ln -> ...ijkl', self.D_abef, phi_ab, phi_ab)
+        #)
 
         # ----------------------------------------------------------------------
         # Return stresses (corrector) and damaged secant stiffness matrix (predictor)
