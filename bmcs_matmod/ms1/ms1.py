@@ -385,9 +385,9 @@ class MS1(MATS3DEval, InteractiveModel):
     # Returns the 4th order damage tensor 'beta4' using (ref. [Baz99], Eq.(63))
     # ---------------------------------------------------------------------
 
-    def _get_beta_Emabcd_2(self, eps_Emab, omega_N_Emn, z_N_Emn,
-                           alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
-                           alpha_T_Emna, eps_T_pi_Emna):
+    def _get_beta_Emabcd(self, eps_Emab, omega_N_Emn, z_N_Emn,
+                         alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
+                         alpha_T_Emna, eps_T_pi_Emna):
         # Returns the 4th order damage tensor 'beta4' using
         # (cf. [Baz99], Eq.(63))
 
@@ -457,7 +457,7 @@ class MS1(MATS3DEval, InteractiveModel):
         # ------------------------------------------------------------------
         # Damage tensor (4th order) using product- or sum-type symmetrization:
         # ------------------------------------------------------------------
-        beta_Emabcd = self._get_beta_Emabcd_2(eps_Emab, **Eps_k)
+        beta_Emabcd = self._get_beta_Emabcd(eps_Emab, **Eps_k)
 
         # ------------------------------------------------------------------
         # Damaged stiffness tensor calculated based on the damage tensor beta4:
@@ -609,3 +609,34 @@ class MS13D(MS1):
                   np.einsum(',il,jk->ijkl', mu, delta, delta))
 
         return D_abef
+
+
+
+    # -------------------------------------------------------------------------
+    # Response variables for postprocessing
+    # -------------------------------------------------------------------------
+
+    def get_max_omega(self, eps_Emab, t_n1, **Eps_k):
+        max_omega_N = self.get_max_omega_N(eps_Emab, t_n1, **Eps_k)
+        max_omega_T = self.get_max_omega_T(eps_Emab, t_n1, **Eps_k)
+        max_omega_NT = np.array([max_omega_N, max_omega_T], np.float_)
+        return np.max(max_omega_NT, axis=0)
+
+    def get_max_omega_N(self, eps_Emab, t_n1, **Eps_k):
+        return np.max( Eps_k['omega_N_Emn'], axis=-1)
+
+    def get_max_omega_T(self, eps_Emab, t_n1, **Eps_k):
+        return np.max( Eps_k['omega_T_Emn'], axis=-1)
+
+    def get_eps_p_ab(self, eps_Emab, t_n1, **Eps_k):
+        return self._get_eps_p_Emab(eps_Emab, **Eps_k)
+
+    def _get_var_dict(self):
+        var_dict = super()._get_var_dict()
+        var_dict.update(
+            eps_p_ab=self.get_eps_p_ab,
+            max_omega=self.get_max_omega,
+            max_omega_N=self.get_max_omega_N,
+            max_omega_T=self.get_max_omega_T
+        )
+        return var_dict
