@@ -19,7 +19,7 @@ import numpy as np
 import traits.api as tr
 
 
-class MS1(MATS3DEval, InteractiveModel):
+class MS1_sigma_int(MATS3DEval, InteractiveModel):
     gamma_T = tr.Float(1000000.,
                        label="gamma_T",
                        desc=" Tangential Kinematic hardening modulus",
@@ -152,6 +152,10 @@ class MS1(MATS3DEval, InteractiveModel):
         z_T_Emn=(),
         alpha_T_Emna=(n_D,),
         eps_T_pi_Emna=(n_D,),
+        plastic_dissip_T_Emn=(),
+        damage_dissip_T_Emn =(),
+        plastic_dissip_N_Emn=(),
+        damage_dissip_N_Emn=(),
     )
     '''
     State variables
@@ -175,38 +179,30 @@ class MS1(MATS3DEval, InteractiveModel):
     # microplane constitutive law (normal behavior CP + TD)
     # (without cumulative normal strain for fatigue under tension)
     # --------------------------------------------------------------
-    def get_normal_law(self, sigma_N_Emn, eps_N_Emn, omega_N_Emn, z_N_Emn,
-                       alpha_N_Emn, r_N_Emn, eps_N_p_Emn, eps_T_Emna):
+    def get_normal_law(self, eps_N_Emn, omega_N_Emn, z_N_Emn,
+                           alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
+                           alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn):
 
         E_N = self.E / (1.0 - 2.0 * self.nu)
 
-        # When deciding if a microplane is in tensile or compression,
-        # we define a strain boundary such that
-        # sigmaN <= 0 if eps_N < 0, avoiding entering in the quadrant
-        # of compressive strains and traction
+        sigma_N_Emn_tilde = E_N * (eps_N_Emn - eps_N_p_Emn)
 
-        sigma_trial = E_N * (eps_N_Emn - eps_N_p_Emn)
-        # looking for microplanes violating strain boundary
-        # pos1 = [(eps_N_Emn < -1e-6) & (sigma_trial > 1e-6)]
-        # sigma_trial[pos1[0]] = 0
-        pos = sigma_trial > 1e-6  # microplanes under traction
-        pos2 = sigma_trial < -1e-6  # microplanes under compression
-        H = 1.0 * pos
-        H2 = 1.0 * pos2
+        pos = sigma_N_Emn_tilde > 1e-6  # microplanes under tension
+        pos2 = sigma_N_Emn_tilde < -1e-6  # microplanes under compression
+        tension = 1.0 * pos
+        compression = 1.0 * pos2
 
         # thermo forces
-        sigma_N_Emn_tilde = E_N * (eps_N_Emn - eps_N_p_Emn)
-        # sigma_N_Emn_tilde[pos1[0]] = 0  # imposing strain boundary
 
-        Z = self.K_N * z_N_Emn
-        X = self.gamma_N * alpha_N_Emn * H2
-        h = (self.sigma_N_0 + Z) * H2
+        Z = self.K_N * z_N_Emn * compression
+        X = self.gamma_N * alpha_N_Emn * compression
+        h = (self.sigma_N_0 + Z) * compression
 
-        f_trial = (abs(sigma_N_Emn_tilde - X) - h) * H2
+        f_trial = (abs(sigma_N_Emn_tilde - X) - h) * compression
 
         # threshold plasticity
 
-        thres_1 = f_trial > 1e-6
+        thres_1 = f_trial > 1e-10
 
         delta_lamda = f_trial / \
                       (E_N / (1 - omega_N_Emn) + abs(self.K_N) + self.gamma_N) * thres_1
@@ -218,10 +214,10 @@ class MS1(MATS3DEval, InteractiveModel):
 
         def R_N(r_N_Emn): return (1.0 / self.Ad) * (-r_N_Emn / (1.0 + r_N_Emn))
 
-        Y_N = 0.5 * H * E_N * (eps_N_Emn - eps_N_p_Emn) ** 2.0
+        Y_N = 0.5 * tension * E_N * (eps_N_Emn - eps_N_p_Emn) ** 2.0
         Y_0 = 0.5 * E_N * self.eps_0 ** 2.0
 
-        f = (Y_N - (Y_0 + R_N(r_N_Emn)))
+        f = (Y_N - (Y_0 + R_N(r_N_Emn)))*tension
 
         # threshold damage
 
@@ -230,26 +226,17 @@ class MS1(MATS3DEval, InteractiveModel):
         def f_w(Y): return 1.0 - 1.0 / (1.0 + self.Ad * (Y - Y_0))
 
         omega_N_Emn[f > 1e-6] = f_w(Y_N)[f > 1e-6]
-        omega_N_Emn[...] = np.clip(omega_N_Emn,0,0.9999)
+        omega_N_Emn[...] = np.clip(omega_N_Emn,0,1.0)
         r_N_Emn[f > 1e-6] = -omega_N_Emn[f > 1e-6]
 
-        # epsilon_0 = 59.0e-6
-        # epsilon_f = 250.0e-6
-        # I = np.where(eps_N_Emn >= epsilon_0)
-        # omega_N_Emn[I] = (
-        #         1.0 - (epsilon_0 / eps_N_Emn[I] *
-        #                np.exp(-1.0 * (eps_N_Emn[I] - epsilon_0) /
-        #                       (epsilon_f - epsilon_0))
-        #                ))
-        # r_N_Emn[I] = -omega_N_Emn[I]
-        sigma_N_Emn = (1.0 - H * omega_N_Emn) * E_N * (eps_N_Emn - eps_N_p_Emn)
+        sigma_N_Emn = (1.0 - tension * omega_N_Emn) * E_N * (eps_N_Emn - eps_N_p_Emn)
         # sigma_N_Emn = E_N * (eps_N_Emn - eps_N_p_Emn)
         # pos1 = [(eps_N_Emn < -1e-6) & (sigma_trial > 1e-6)]  # looking for microplanes violating strain boundary
         # sigma_N_Emn[pos1[0]] = 0
 
 
-        Z = self.K_N * z_N_Emn
-        X = self.gamma_N * alpha_N_Emn * H2
+        Z = self.K_N * z_N_Emn * compression
+        X = self.gamma_N * alpha_N_Emn * compression
 
 
         return sigma_N_Emn, Z, X, Y_N
@@ -257,8 +244,9 @@ class MS1(MATS3DEval, InteractiveModel):
     # -------------------------------------------------------------------------
     # microplane constitutive law (Tangential CSD)-(Pressure sensitive cumulative damage)
     # -------------------------------------------------------------------------
-    def get_tangential_law(self,eps_Emab,omega_N_Emn, eps_N_p_Emn, eps_T_Emna, omega_T_Emn, z_T_Emn,
-                           alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn):
+    def get_tangential_law(self, eps_T_Emna, eps_Emab, omega_N_Emn, z_N_Emn,
+                           alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
+                           alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn):
 
 
         E_T = self.E * (1.0 - 4 * self.nu) / \
@@ -281,82 +269,16 @@ class MS1(MATS3DEval, InteractiveModel):
                 (eps_T_Emna - eps_T_pi_Emna),
                 (eps_T_Emna - eps_T_pi_Emna))
 
-        # # threshold
-        # beta_N = 1. - omega_N_Emn
-        # beta_T = 1. - omega_T_Emn
-        # delta = self.DELTA
-        #
-        # beta_Emabcd = np.einsum('n, ...n,ni, nj, nk, nl -> ...ijkl', self._MPW, beta_N, self._MPN,
-        #                         self._MPN, self._MPN,
-        #                         self._MPN) + \
-        #               0.25 * (np.einsum('n, ...n,ni, nk, jl -> ...ijkl', self._MPW, beta_T, self._MPN,
-        #                                 self._MPN, delta) +
-        #                       np.einsum('n, ...n,ni, nl, jk -> ...ijkl', self._MPW, beta_T, self._MPN,
-        #                                 self._MPN, delta) +
-        #                       np.einsum('n, ...n,nj, nk, il -> ...ijkl', self._MPW, beta_T, self._MPN,
-        #                                 self._MPN, delta) +
-        #                       np.einsum('n, ...n,nj, nl, ik -> ...ijkl', self._MPW, beta_T, self._MPN,
-        #                                 self._MPN, delta) -
-        #                       4.0 * np.einsum('n, ...n, ni, nj, nk, nl -> ...ijkl', self._MPW, beta_T,
-        #                                       self._MPN,
-        #                                       self._MPN, self._MPN, self._MPN))
-        #
-        # D_Emabcd = np.einsum(
-        #     '...ijab, abef, ...cdef->...ijcd',
-        #     beta_Emabcd, self.D_abef, beta_Emabcd
-        # )
-        #
-        # eps_p_Emab = (
-        #         np.einsum('n,...n,na,nb->...ab',
-        #                   self._MPW, eps_N_p_Emn, self._MPN, self._MPN) +
-        #         0.5 * (
-        #                 np.einsum('n,...nf,na,fb->...ab',
-        #                           self._MPW, eps_T_pi_Emna, self._MPN, self.DELTA) +
-        #                 np.einsum('n,...nf,nb,fa->...ab',
-        #                           self._MPW, eps_T_pi_Emna, self._MPN, self.DELTA)
-        #         )
-        # )
-        # # elastic strain tensor
-        # eps_e_Emab = eps_Emab - eps_p_Emab
-        #
-        # # calculation of the stress tensor
-        # sig_Emab = np.einsum(
-        #     '...abcd,...cd,...ab->...ab',
-        #     D_Emabcd, eps_e_Emab, self.DELTA)
-        #
-        # # ------------------------------------------------------------------
-        # # Damaged stiffness tensor calculated based on the damage tensor beta4:
-        # # ------------------------------------------------------------------
-        #
-        # sigma_N_Emn = self._get_e_N_Emn_2(sig_Emab)
-        #
-        #
-        # sigma_N_Emn = sigma_N_Emn * (1 + 1.75**sigma_N_Emn)
-
-        # vol = (eps_Emab[..., 0, 0] + eps_Emab[..., 1, 1] + eps_Emab[..., 2, 2]) / 3
-        # eps_vol = np.zeros_like(eps_Emab)
-        # eps_vol[..., 0, 0] = eps_vol[..., 1, 1] = eps_vol[..., 2, 2] = vol
-        # eps_N_vol = self._get_e_N_Emn_2(eps_Emab)
-        # sigma_T_Emn = np.sqrt(
-        #     np.einsum(
-        #         '...na,...na->...n',
-        #         (sig_pi_trial), (sig_pi_trial))
-        # )
-        # sigma_T_Emn[0][sigma_T_Emn[0] < 1e-10] = 1.0
-        # inverse = 1/np.max(sigma_T_Emn[0],axis=1)
-        #
-        # sigma_N_Emn = eps_N_vol * np.einsum('...ik,...i->...ik', sigma_T_Emn ,inverse ) * self.E / (1.0 - 2.0 * self.nu)
-
 
         E_N = self.E / (1.0 - 2.0 * self.nu)
 
-        eps_N_Emn = self._get_e_N_Emn_2(eps_Emab)
+        eps_N_Emn = self._get_e_N_Emn(eps_Emab)
         sigma_N_Emn = (1.0 - omega_N_Emn) * E_N * (eps_N_Emn - eps_N_p_Emn)
 
         f = norm_1 - self.sigma_T_0 - Z + self.m_T * sigma_N_Emn
 
-        plas_1 = f > 1e-6
-        elas_1 = f < 1e-6
+        plas_1 = f > 1e-15
+        elas_1 = f < 1e-15
 
         delta_lamda = f / \
                       (E_T / (1.0 - omega_T_Emn) + self.gamma_T + self.K_T) * plas_1
@@ -376,19 +298,10 @@ class MS1(MATS3DEval, InteractiveModel):
         eps_T_pi_Emna[..., 2] +=  plas_1 * delta_lamda * \
                                 ((sig_pi_trial[..., 2] - X[..., 2]) /
                                  (1.0 - omega_T_Emn)) / norm_2
-        # omega_T = copy.deepcopy(omega_T_Emn)
-        omega_T_Emn += ((1 - omega_T_Emn) ** self.c_T) * \
+        omega_T_Emn += plas_1 * ((1 - omega_T_Emn) ** self.c_T) * \
                        (delta_lamda * (Y / self.S_T) ** self.r_T) * \
                        (self.sigma_T_0 / (self.sigma_T_0 - self.m_T * sigma_N_Emn)) ** self.p_T
-        # omega_T_Emn += omega_N_Emn
-        omega_T_Emn[...] = np.clip(omega_T_Emn,0,0.9999)
-        # omega_T_Emn[...] = (1. - self.m_T) * copy.deepcopy(omega_T_Emn[...]) +self.m_T * copy.deepcopy(omega_N_Emn[...])
-        # print(omega_N_Emn)
-        # print(omega_T)
-        # omega_T_Emn = 0.5 * (omega_N_Emn + omega_T)
-        # print(omega_T_Emn)
-        # print(omega_N_Emn)
-        # omega_T_Emn = np.maximum(omega_TN_Emn, omega_T_Emn)
+        omega_T_Emn[...] = np.clip(omega_T_Emn,0,1.0)
 
         alpha_T_Emna[..., 0] += plas_1 * delta_lamda * \
                                (sig_pi_trial[..., 0] - X[..., 0]) / norm_2
@@ -398,7 +311,9 @@ class MS1(MATS3DEval, InteractiveModel):
         alpha_T_Emna[..., 2] += plas_1 * delta_lamda * \
                                (sig_pi_trial[..., 2] - X[..., 2]) / norm_2
 
-        z_T_Emn += delta_lamda
+
+
+        z_T_Emn += plas_1 * delta_lamda
 
         sigma_T_Emna = np.einsum(
             '...n,...na->...na', (1 - omega_T_Emn), E_T * (eps_T_Emna - eps_T_pi_Emna))
@@ -411,7 +326,45 @@ class MS1(MATS3DEval, InteractiveModel):
                 (eps_T_Emna - eps_T_pi_Emna),
                 (eps_T_Emna - eps_T_pi_Emna))
 
-        return sigma_T_Emna, Z, X, Y
+        # Energy dissipation evaluation
+
+        delta_eps_T_pi_Emna = np.zeros_like(eps_T_pi_Emna)
+        delta_alpha_T_Emna = np.zeros_like(alpha_T_Emna)
+        delta_z_T_Emn = np.zeros_like(z_T_Emn)
+        delta_omega_T_Emn = np.zeros_like(omega_T_Emn)
+
+        delta_eps_T_pi_Emna[..., 0] = plas_1 * delta_lamda * \
+                                ((sig_pi_trial[..., 0] - X[..., 0]) /
+                                 (1.0 - omega_T_Emn)) / norm_2
+        delta_eps_T_pi_Emna[..., 1] = plas_1 * delta_lamda * \
+                                      ((sig_pi_trial[..., 1] - X[..., 1]) /
+                                       (1.0 - omega_T_Emn)) / norm_2
+        delta_eps_T_pi_Emna[..., 2] = plas_1 * delta_lamda * \
+                                      ((sig_pi_trial[..., 2] - X[..., 2]) /
+                                       (1.0 - omega_T_Emn)) / norm_2
+
+        delta_alpha_T_Emna[..., 0] = plas_1 * delta_lamda * \
+                                (sig_pi_trial[..., 0] - X[..., 0]) / norm_2
+        delta_alpha_T_Emna[..., 1] = plas_1 * delta_lamda * \
+                                (sig_pi_trial[..., 1] - X[..., 1]) / norm_2
+
+        delta_alpha_T_Emna[..., 2] = plas_1 * delta_lamda * \
+                                (sig_pi_trial[..., 2] - X[..., 2]) / norm_2
+
+        delta_z_T_Emn = plas_1 * delta_lamda
+
+        delta_omega_T_Emn = plas_1 * ((1 - omega_T_Emn) ** self.c_T) * \
+                       (delta_lamda * (Y / self.S_T) ** self.r_T) * \
+                       (self.sigma_T_0 / (self.sigma_T_0 - self.m_T * sigma_N_Emn)) ** self.p_T
+
+        plastic_dissip_T_Emn = np.einsum('...na,...na->...n', sigma_T_Emna, delta_eps_T_pi_Emna) - \
+        np.einsum('...na,...na->...n', X, delta_alpha_T_Emna) - np.einsum('...n,...n->...n', Z, delta_z_T_Emn)
+
+        damage_dissip_T_Emn = np.einsum('...n,...n->...n', Y, delta_omega_T_Emn)
+
+        # if plastic_dissip_T_Emn.any() < -1e-15:
+        #     print(sigma_T_Emna, delta_eps_T_pi_Emna)
+        return sigma_T_Emna, Z, X, Y, plastic_dissip_T_Emn
 
     #     #-------------------------------------------------------------------------
     #     # MICROPLANE-Kinematic constraints
@@ -440,36 +393,15 @@ class MS1(MATS3DEval, InteractiveModel):
         )
         return MPTT_nijr
 
-    def _get_e_N_Emn_2(self, eps_Emab):
+    def _get_e_N_Emn(self, eps_Emab):
         # get the normal strain array for each microplane
         return np.einsum('nij,...ij->...n', self._MPNN, eps_Emab)
 
-    def _get_e_T_Emnar_2(self, eps_Emab):
+    def _get_e_T_Emna(self, eps_Emab):
         # get the tangential strain vector array for each microplane
         MPTT_ijr = self._get__MPTT()
         return np.einsum('nija,...ij->...na', MPTT_ijr, eps_Emab)
 
-    def _get_phi(self, eps_Emab, omega_N_Emn, z_N_Emn,
-                           alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
-                           alpha_T_Emna, eps_T_pi_Emna):
-        # Returns the 2nd order damage tensor 'phi_mtx'
-        eps_N_Emn = self._get_e_N_Emn_2(eps_Emab)
-        eps_T_Emna = self._get_e_T_Emnar_2(eps_Emab)
-
-        sigma_N_Emn, Z, X, Y_N = self.get_normal_law(
-            sigma_N_Emn,eps_N_Emn, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, eps_T_Emna)
-
-        sigma_T_Emna, Z_T, X_T, Y_T = self.get_tangential_law(
-            eps_Emab,omega_N_Emn, eps_N_p_Emn, eps_T_Emna, omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn)
-        # scalar integrity factor for each microplane
-        # omega_Emn = np.maximum(omega_N_Emn, omega_T_Emn)
-        # omega_Emn = omega_N_Emn + omega_T_Emn
-        # omega_Emn[...] = np.clip(omega_N_Emn, 0, 0.9999)
-        phi_n = np.sqrt(1.0 - omega_N_Emn)*np.sqrt(1.0 - copy.deepcopy(omega_T_Emn))
-        # 'phi_Emn', phi_Emn[:, -1, :]
-        # integration terms for each microplanes
-        phi_ab = np.einsum('...n,n,nab->...ab', phi_n, self._MPW, self._MPNN)
-        return phi_ab
 
     # ---------------------------------------------------------------------
     # Extra homogenization of damage tensor in case of two damage parameters
@@ -478,26 +410,13 @@ class MS1(MATS3DEval, InteractiveModel):
 
     def _get_beta_Emabcd(self, eps_Emab, omega_N_Emn, z_N_Emn,
                          alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
-                         alpha_T_Emna, eps_T_pi_Emna):
+                         alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn):
         # Returns the 4th order damage tensor 'beta4' using
         # (cf. [Baz99], Eq.(63))
 
-        eps_N_Emn = self._get_e_N_Emn_2(eps_Emab)
-        eps_T_Emna = self._get_e_T_Emnar_2(eps_Emab)
-
-        sigma_N_Emn, Z, X, Y_N = self.get_normal_law(
-            sigma_N_Emn, eps_N_Emn, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn,eps_T_Emna)
-
-        sigma_T_Emna, Z_T, X_T, Y_T = self.get_tangential_law(
-            eps_Emab,omega_N_Emn, eps_N_p_Emn, eps_T_Emna, omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn)
-
         delta = self.DELTA
         beta_N = np.sqrt(1. - omega_N_Emn)
-        # omega_T = 0.1*copy.deepcopy(omega_T_Emn) + 0.9*copy.deepcopy(omega_N_Emn)
         beta_T = np.sqrt(1. -  omega_T_Emn)
-        # beta_T = 0.5*copy.deepcopy(beta_T) +0.5*copy.deepcopy(beta_T)*copy.deepcopy(beta_N)
-        # beta_N = 1. - omega_N_Emn
-        # beta_T = 1. - omega_T_Emn
 
         beta_ijkl = np.einsum('n, ...n,ni, nj, nk, nl -> ...ijkl', self._MPW, beta_N, self._MPN, self._MPN, self._MPN,
                               self._MPN) + \
@@ -510,6 +429,14 @@ class MS1(MATS3DEval, InteractiveModel):
 
         return beta_ijkl
 
+    def _get_phi(self, eps_Emab, omega_N_Emn, z_N_Emn,
+                         alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
+                         alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn):
+
+        phi_n = np.sqrt(1.0 - omega_N_Emn)*np.sqrt(1.0 - omega_T_Emn)
+        phi_ab = np.einsum('...n,n,nab->...ab', phi_n, self._MPW, self._MPNN)
+        return phi_ab
+
     DELTA = np.identity(n_D)
 
     # -----------------------------------------------------------
@@ -517,18 +444,8 @@ class MS1(MATS3DEval, InteractiveModel):
     # -----------------------------------------------------------
 
     def _get_eps_p_Emab(self, eps_Emab, omega_N_Emn, z_N_Emn,
-                        alpha_N_Emn, r_N_Emn, eps_N_p_Emn,
-                        omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn):
-        eps_N_Emn = self._get_e_N_Emn_2(eps_Emab)
-        eps_T_Emna = self._get_e_T_Emnar_2(eps_Emab)
-
-        # plastic normal strains
-        sigma_N_Emn, Z, X, Y_N = self.get_normal_law(
-            sigma_N_Emn, eps_N_Emn, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, eps_T_Emna)
-
-        # sliding tangential strains
-        sigma_T_Emna, Z_T, X_T, Y_T = self.get_tangential_law(
-            eps_Emab,omega_N_Emn, eps_N_p_Emn, eps_T_Emna, omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn)
+                         alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
+                         alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn):
 
         # 2-nd order plastic (inelastic) tensor
         eps_p_Emab = (
@@ -549,6 +466,28 @@ class MS1(MATS3DEval, InteractiveModel):
         """
         # Corrector predictor computation.
 
+        eps_N_Emn = self._get_e_N_Emn(eps_Emab)
+        eps_T_Emna = self._get_e_T_Emna(eps_Emab)
+
+        sigma_N_Emn, Z, X, Y_N = self.get_normal_law(eps_N_Emn,
+            **Eps_k)
+
+        # sliding tangential strains
+        sigma_T_Emna, Z_T, X_T, Y_T, plastic_dissip_T_Emn = self.get_tangential_law(eps_T_Emna,
+            eps_Emab,**Eps_k)
+
+        delta = np.identity(3)
+
+        sig_Emab = (
+                np.einsum('n,...n,na,nb->...ab',
+                          self._MPW, sigma_N_Emn, self._MPN, self._MPN) +
+                0.5 * (
+                        np.einsum('n,...nf,na,fb->...ab',
+                                  self._MPW, sigma_T_Emna, self._MPN, delta) +
+                        np.einsum('n,...nf,nb,fa->...ab', self._MPW,
+                                  sigma_T_Emna, self._MPN, delta)
+                )
+        )
         # ------------------------------------------------------------------
         # Damage tensor (4th order) using product- or sum-type symmetrization:
         # ------------------------------------------------------------------
@@ -559,10 +498,9 @@ class MS1(MATS3DEval, InteractiveModel):
         # ------------------------------------------------------------------
 
         D_Emabcd = np.einsum(
-             '...ijab, abef, ...cdef->...ijcd',
-             beta_Emabcd, self.D_abef, beta_Emabcd
+            '...ijab, abef, ...cdef->...ijcd',
+            beta_Emabcd, self.D_abef, beta_Emabcd
         )
-
 
         # phi_ab = self._get_phi(eps_Emab, **Eps_k)
         #
@@ -574,25 +512,11 @@ class MS1(MATS3DEval, InteractiveModel):
         #        np.einsum('imkn, ...jm, ...ln -> ...ijkl', self.D_abef, phi_ab, phi_ab)
         # )
 
-        # ----------------------------------------------------------------------
-        # Return stresses (corrector) and damaged secant stiffness matrix (predictor)
-        # ----------------------------------------------------------------------
-        # plastic strain tensor
-        eps_p_Emab = self._get_eps_p_Emab(eps_Emab, **Eps_k)
-
-        # elastic strain tensor
-        eps_e_Emab = eps_Emab - eps_p_Emab
-
-        # calculation of the stress tensor
-        sig_Emab = np.einsum(
-            '...abcd,...cd->...ab',
-            D_Emabcd, eps_e_Emab
-        )
 
         return sig_Emab, D_Emabcd
 
 
-class MS12D(MS1):
+class MS12D_sigma_int(MS1_sigma_int):
     """Two dimensional version of the MS1 model
     """
 
@@ -627,7 +551,7 @@ class MS12D(MS1):
         return MPW
 
 
-class MS13D(MS1):
+class MS13D_sigma_int(MS1_sigma_int):
     # -----------------------------------------------
     # number of microplanes - currently fixed for 3D
     # -----------------------------------------------
