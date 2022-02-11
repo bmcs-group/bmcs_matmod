@@ -181,7 +181,8 @@ class MS1_sigma_int(MATS3DEval, InteractiveModel):
     # --------------------------------------------------------------
     def get_normal_law(self, eps_N_Emn, omega_N_Emn, z_N_Emn,
                            alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
-                           alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn):
+                           alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn, damage_dissip_T_Emn,
+                           plastic_dissip_N_Emn, damage_dissip_N_Emn):
 
         E_N = self.E / (1.0 - 2.0 * self.nu)
 
@@ -246,7 +247,8 @@ class MS1_sigma_int(MATS3DEval, InteractiveModel):
     # -------------------------------------------------------------------------
     def get_tangential_law(self, eps_T_Emna, eps_Emab, omega_N_Emn, z_N_Emn,
                            alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
-                           alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn):
+                           alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn, damage_dissip_T_Emn,
+                           plastic_dissip_N_Emn, damage_dissip_N_Emn):
 
 
         E_T = self.E * (1.0 - 4 * self.nu) / \
@@ -409,8 +411,9 @@ class MS1_sigma_int(MATS3DEval, InteractiveModel):
     # ---------------------------------------------------------------------
 
     def _get_beta_Emabcd(self, eps_Emab, omega_N_Emn, z_N_Emn,
-                         alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
-                         alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn):
+                           alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
+                           alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn, damage_dissip_T_Emn,
+                           plastic_dissip_N_Emn, damage_dissip_N_Emn):
         # Returns the 4th order damage tensor 'beta4' using
         # (cf. [Baz99], Eq.(63))
 
@@ -444,8 +447,9 @@ class MS1_sigma_int(MATS3DEval, InteractiveModel):
     # -----------------------------------------------------------
 
     def _get_eps_p_Emab(self, eps_Emab, omega_N_Emn, z_N_Emn,
-                         alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
-                         alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn):
+                           alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
+                           alpha_T_Emna, eps_T_pi_Emna,plastic_dissip_T_Emn, damage_dissip_T_Emn,
+                           plastic_dissip_N_Emn, damage_dissip_N_Emn):
 
         # 2-nd order plastic (inelastic) tensor
         eps_p_Emab = (
@@ -516,7 +520,7 @@ class MS1_sigma_int(MATS3DEval, InteractiveModel):
         return sig_Emab, D_Emabcd
 
 
-class MS12D_sigma_int(MS1_sigma_int):
+class MS12DPVW(MS1_sigma_int):
     """Two dimensional version of the MS1 model
     """
 
@@ -551,7 +555,7 @@ class MS12D_sigma_int(MS1_sigma_int):
         return MPW
 
 
-class MS13D_sigma_int(MS1_sigma_int):
+class MS13DPVW(MS1_sigma_int):
     # -----------------------------------------------
     # number of microplanes - currently fixed for 3D
     # -----------------------------------------------

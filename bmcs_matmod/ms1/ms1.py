@@ -350,7 +350,7 @@ class MS1(MATS3DEval, InteractiveModel):
 
         E_N = self.E / (1.0 - 2.0 * self.nu)
 
-        eps_N_Emn = self._get_e_N_Emn_2(eps_Emab)
+        eps_N_Emn = self._get_e_N_Emn(eps_Emab)
         sigma_N_Emn = (1.0 - omega_N_Emn) * E_N * (eps_N_Emn - eps_N_p_Emn)
 
         f = norm_1 - self.sigma_T_0 - Z + self.m_T * sigma_N_Emn
@@ -440,11 +440,11 @@ class MS1(MATS3DEval, InteractiveModel):
         )
         return MPTT_nijr
 
-    def _get_e_N_Emn_2(self, eps_Emab):
+    def _get_e_N_Emn(self, eps_Emab):
         # get the normal strain array for each microplane
         return np.einsum('nij,...ij->...n', self._MPNN, eps_Emab)
 
-    def _get_e_T_Emnar_2(self, eps_Emab):
+    def _get_e_T_Emna(self, eps_Emab):
         # get the tangential strain vector array for each microplane
         MPTT_ijr = self._get__MPTT()
         return np.einsum('nija,...ij->...na', MPTT_ijr, eps_Emab)
@@ -453,8 +453,8 @@ class MS1(MATS3DEval, InteractiveModel):
                            alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
                            alpha_T_Emna, eps_T_pi_Emna):
         # Returns the 2nd order damage tensor 'phi_mtx'
-        eps_N_Emn = self._get_e_N_Emn_2(eps_Emab)
-        eps_T_Emna = self._get_e_T_Emnar_2(eps_Emab)
+        eps_N_Emn = self._get_e_N_Emn(eps_Emab)
+        eps_T_Emna = self._get_e_T_Emna(eps_Emab)
 
         sigma_N_Emn, Z, X, Y_N = self.get_normal_law(
             sigma_N_Emn,eps_N_Emn, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn, eps_T_Emna)
@@ -482,8 +482,8 @@ class MS1(MATS3DEval, InteractiveModel):
         # Returns the 4th order damage tensor 'beta4' using
         # (cf. [Baz99], Eq.(63))
 
-        eps_N_Emn = self._get_e_N_Emn_2(eps_Emab)
-        eps_T_Emna = self._get_e_T_Emnar_2(eps_Emab)
+        eps_N_Emn = self._get_e_N_Emn(eps_Emab)
+        eps_T_Emna = self._get_e_T_Emna(eps_Emab)
 
         sigma_N_Emn, Z, X, Y_N = self.get_normal_law(
             sigma_N_Emn, eps_N_Emn, omega_N_Emn, z_N_Emn, alpha_N_Emn, r_N_Emn, eps_N_p_Emn,eps_T_Emna)
@@ -519,8 +519,8 @@ class MS1(MATS3DEval, InteractiveModel):
     def _get_eps_p_Emab(self, eps_Emab, omega_N_Emn, z_N_Emn,
                         alpha_N_Emn, r_N_Emn, eps_N_p_Emn,
                         omega_T_Emn, z_T_Emn, alpha_T_Emna, eps_T_pi_Emna, sigma_N_Emn):
-        eps_N_Emn = self._get_e_N_Emn_2(eps_Emab)
-        eps_T_Emna = self._get_e_T_Emnar_2(eps_Emab)
+        eps_N_Emn = self._get_e_N_Emn(eps_Emab)
+        eps_T_Emna = self._get_e_T_Emna(eps_Emab)
 
         # plastic normal strains
         sigma_N_Emn, Z, X, Y_N = self.get_normal_law(
