@@ -17,51 +17,51 @@ from ibvpy.tmodel.mats3D.mats3D_eval import MATS3DEval
 from bmcs_utils.api import InteractiveModel, Item, View
 import numpy as np
 import traits.api as tr
+import bmcs_utils as bu
 
-
-class MS1_sigma_int(MATS3DEval, InteractiveModel):
-    gamma_T = tr.Float(1000000.,
+class MS1PVW(MATS3DEval, InteractiveModel):
+    gamma_T = bu.Float(1000000.,
                        label="gamma_T",
                        desc=" Tangential Kinematic hardening modulus",
                        enter_set=True,
                        auto_set=False)
 
-    K_T = tr.Float(10000.,
+    K_T = bu.Float(10000.,
                    label="K_T",
                    desc="Tangential Isotropic harening",
                    enter_set=True,
                    auto_set=False)
 
-    S_T = tr.Float(0.005,
+    S_T = bu.Float(0.005,
                    label="S_T",
                    desc="Damage strength",
                    enter_set=True,
                    auto_set=False)
 
-    r_T = tr.Float(9.,
+    r_T = bu.Float(9.,
                    label="r",
                    desc="Damage cumulation parameter",
                    enter_set=True,
                    auto_set=False)
-    p_T = tr.Float(2.,
+    p_T = bu.Float(2.,
                    label="p_T",
                    desc="Damage cumulation parameter",
                    enter_set=True,
                    auto_set=False)
 
-    c_T = tr.Float(3,
+    c_T = bu.Float(3,
                    label="c_T",
                    desc="Damage cumulation parameter",
                    enter_set=True,
                    auto_set=False)
 
-    sigma_T_0 = tr.Float(1.7,
+    sigma_T_0 = bu.Float(1.7,
                           label="sigma_T_0",
                           desc="Reversibility limit",
                           enter_set=True,
                           auto_set=False)
 
-    m_T = tr.Float(0.1,
+    m_T = bu.Float(0.1,
                  label="m_T",
                  desc="Lateral pressure coefficient",
                  enter_set=True,
@@ -70,13 +70,13 @@ class MS1_sigma_int(MATS3DEval, InteractiveModel):
     # -------------------------------------------
     # Normal_Tension constitutive law parameters (without cumulative normal strain)
     # -------------------------------------------
-    Ad = tr.Float(10.0,
+    Ad = bu.Float(10.0,
                   label="A_d",
                   desc="brittleness coefficient",
                   enter_set=True,
                   auto_set=False)
 
-    eps_0 = tr.Float(.0001,
+    eps_0 = bu.Float(.0001,
                      label="eps_N_0",
                      desc="threshold strain",
                      enter_set=True,
@@ -85,19 +85,19 @@ class MS1_sigma_int(MATS3DEval, InteractiveModel):
     # -----------------------------------------------
     # Normal_Compression constitutive law parameters
     # -----------------------------------------------
-    K_N = tr.Float(10000.,
+    K_N = bu.Float(10000.,
                    label="K_N",
                    desc=" Normal isotropic harening",
                    enter_set=True,
                    auto_set=False)
 
-    gamma_N = tr.Float(5000.,
+    gamma_N = bu.Float(5000.,
                        label="gamma_N",
                        desc="Normal kinematic hardening",
                        enter_set=True,
                        auto_set=False)
 
-    sigma_N_0 = tr.Float(10.,
+    sigma_N_0 = bu.Float(10.,
                        label="sigma_N_0",
                        desc="Yielding stress",
                        enter_set=True,
@@ -107,13 +107,13 @@ class MS1_sigma_int(MATS3DEval, InteractiveModel):
     # Cached elasticity tensors
     # -------------------------------------------------------------------------
 
-    E = tr.Float(35e+3,
+    E = bu.Float(35e+3,
                  label="E",
                  desc="Young's Modulus",
                  auto_set=False,
                  input=True)
 
-    nu = tr.Float(0.2,
+    nu = bu.Float(0.2,
                   label='nu',
                   desc="Poison ratio",
                   auto_set=False,
@@ -359,7 +359,7 @@ class MS1_sigma_int(MATS3DEval, InteractiveModel):
                        (delta_lamda * (Y / self.S_T) ** self.r_T) * \
                        (self.sigma_T_0 / (self.sigma_T_0 - self.m_T * sigma_N_Emn)) ** self.p_T
 
-        plastic_dissip_T_Emn = np.einsum('...na,...na->...n', sigma_T_Emna, delta_eps_T_pi_Emna) - \
+        plastic_dissip_T_Emn[...] = np.einsum('...na,...na->...n', sigma_T_Emna, delta_eps_T_pi_Emna) - \
         np.einsum('...na,...na->...n', X, delta_alpha_T_Emna) - np.einsum('...n,...n->...n', Z, delta_z_T_Emn)
 
         damage_dissip_T_Emn = np.einsum('...n,...n->...n', Y, delta_omega_T_Emn)
@@ -520,7 +520,7 @@ class MS1_sigma_int(MATS3DEval, InteractiveModel):
         return sig_Emab, D_Emabcd
 
 
-class MS12DPVW(MS1_sigma_int):
+class MS12DPVW(MS1PVW):
     """Two dimensional version of the MS1 model
     """
 
@@ -555,7 +555,7 @@ class MS12DPVW(MS1_sigma_int):
         return MPW
 
 
-class MS13DPVW(MS1_sigma_int):
+class MS13DPVW(MS1PVW):
     # -----------------------------------------------
     # number of microplanes - currently fixed for 3D
     # -----------------------------------------------
