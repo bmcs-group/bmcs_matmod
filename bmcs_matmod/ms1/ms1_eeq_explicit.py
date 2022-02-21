@@ -19,7 +19,7 @@ import numpy as np
 import traits.api as tr
 
 
-class MS1(MATS3DEval, InteractiveModel):
+class MS1EEQ(MATS3DEval, InteractiveModel):
     gamma_T = tr.Float(1000000.,
                        label="gamma_T",
                        desc=" Tangential Kinematic hardening modulus",
@@ -558,15 +558,82 @@ class MS1(MATS3DEval, InteractiveModel):
 
         return total_work_microplane, total_work_macro
 
-    def get_corr_pred(self, eps_Emab, t_n1, **Eps_k):
+    def get_corr_pred(self, eps_Emab, t_n1, omega_N_Emn, z_N_Emn,
+                           alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
+                           alpha_T_Emna, eps_T_pi_Emna,sigma_T_Emna,plastic_dissip_T_Emn, damage_dissip_T_Emn,
+                           plastic_dissip_N_Emn, damage_dissip_N_Emn,total_work_microplane, total_work_macro,eps_aux):
         """Evaluation - get the corrector and predictor
+
         """
         # Corrector predictor computation.
+
+        eps_N_Emn = self._get_e_N_Emn(eps_Emab)
+        eps_T_Emna = self._get_e_T_Emna(eps_Emab)
+
+        sigma_N_Emn, Z, X, Y_N = self.get_normal_law(eps_N_Emn,
+                                                     omega_N_Emn, z_N_Emn,
+                                                     alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn,
+                                                     z_T_Emn,
+                                                     alpha_T_Emna, eps_T_pi_Emna, sigma_T_Emna, plastic_dissip_T_Emn,
+                                                     damage_dissip_T_Emn,
+                                                     plastic_dissip_N_Emn, damage_dissip_N_Emn, total_work_microplane,
+                                                     total_work_macro, eps_aux)
+
+        # sliding tangential strains
+        sigma_T_Emna, Z_T, X_T, Y_T, plastic_dissip_T_Emn = self.get_tangential_law(eps_T_Emna,
+                                                                                    eps_Emab, omega_N_Emn, z_N_Emn,
+                           alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn, z_T_Emn,
+                           alpha_T_Emna, eps_T_pi_Emna,sigma_T_Emna,plastic_dissip_T_Emn, damage_dissip_T_Emn,
+                           plastic_dissip_N_Emn, damage_dissip_N_Emn,total_work_microplane, total_work_macro,eps_aux)
+
+        eps_N_Emn_effective = np.einsum('...n,...n->...n', eps_N_Emn, (1-omega_N_Emn))
+        eps_T_Emna_effective = np.einsum('...na,...n->...na', eps_T_Emna, (1- omega_T_Emn))
+        delta = np.identity(3)
+        eps_Emab_effective = (
+                np.einsum('n,...n,na,nb->...ab',
+                          self._MPW, eps_N_Emn_effective, self._MPN, self._MPN) +
+                0.5 * (
+                        np.einsum('n,...nf,na,fb->...ab',
+                                  self._MPW, eps_T_Emna_effective, self._MPN, delta) +
+                        np.einsum('n,...nf,nb,fa->...ab', self._MPW,
+                                  eps_T_Emna_effective, self._MPN, delta)
+                )
+        )
+
+        sigma_Emab_effective = np.einsum(
+            '...abcd,...cd->...ab',
+            self.D_abef, eps_Emab_effective
+        )
+
+        sigma_N_Emn_effective = self._get_e_N_Emn(sigma_Emab_effective)
+        sigma_T_Emna_effective = self._get_e_T_Emna(sigma_Emab_effective)
+
+        sigma_N_Emn[...] = np.einsum('...n,...n->...n', sigma_N_Emn_effective, (1-omega_N_Emn))
+        sigma_T_Emna[...] = np.einsum('...na,...n->...na', sigma_T_Emna_effective, (1 - omega_T_Emn))
+
+        sig_Emab = (
+                np.einsum('n,...n,na,nb->...ab',
+                          self._MPW, sigma_N_Emn, self._MPN, self._MPN) +
+                0.5 * (
+                        np.einsum('n,...nf,na,fb->...ab',
+                                  self._MPW, sigma_T_Emna, self._MPN, delta) +
+                        np.einsum('n,...nf,nb,fa->...ab', self._MPW,
+                                  sigma_T_Emna, self._MPN, delta)
+                )
+        )
+
 
         # ------------------------------------------------------------------
         # Damage tensor (4th order) using product- or sum-type symmetrization:
         # ------------------------------------------------------------------
-        beta_Emabcd = self._get_beta_Emabcd(eps_Emab, **Eps_k)
+        beta_Emabcd = self._get_beta_Emabcd(eps_Emab,
+                                                     omega_N_Emn, z_N_Emn,
+                                                     alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn,
+                                                     z_T_Emn,
+                                                     alpha_T_Emna, eps_T_pi_Emna, sigma_T_Emna, plastic_dissip_T_Emn,
+                                                     damage_dissip_T_Emn,
+                                                     plastic_dissip_N_Emn, damage_dissip_N_Emn, total_work_microplane,
+                                                     total_work_macro, eps_aux)
 
         # ------------------------------------------------------------------
         # Damaged stiffness tensor calculated based on the damage tensor beta4:
@@ -577,37 +644,19 @@ class MS1(MATS3DEval, InteractiveModel):
              beta_Emabcd, self.D_abef, beta_Emabcd
         )
 
-
-        # phi_ab = self._get_phi(eps_Emab, **Eps_k)
-        #
-        #
-        # D_Emabcd = 0.25 * (
-        #        np.einsum('mjnl, ...im, ...kn -> ...ijkl', self.D_abef, phi_ab, phi_ab) +
-        #        np.einsum('imnl, ...jm, ...kn -> ...ijkl', self.D_abef, phi_ab, phi_ab) +
-        #        np.einsum('mjkn, ...im, ...ln -> ...ijkl', self.D_abef, phi_ab, phi_ab) +
-        #        np.einsum('imkn, ...jm, ...ln -> ...ijkl', self.D_abef, phi_ab, phi_ab)
-        # )
-
-        # ----------------------------------------------------------------------
-        # Return stresses (corrector) and damaged secant stiffness matrix (predictor)
-        # ----------------------------------------------------------------------
-        # plastic strain tensor
-        eps_p_Emab = self._get_eps_p_Emab(eps_Emab, **Eps_k)
-
-        # elastic strain tensor
-        eps_e_Emab = eps_Emab - eps_p_Emab
-
-        # calculation of the stress tensor
-        sig_Emab = np.einsum(
-            '...abcd,...cd->...ab',
-            D_Emabcd, eps_e_Emab
-        )
-        total_work_micro, total_work_macro = self.get_total_work(eps_Emab, sig_Emab, **Eps_k)
+        total_work_micro, total_work_macro = self.get_total_work(eps_Emab, sig_Emab,
+                                                     omega_N_Emn, z_N_Emn,
+                                                     alpha_N_Emn, r_N_Emn, eps_N_p_Emn, sigma_N_Emn, omega_T_Emn,
+                                                     z_T_Emn,
+                                                     alpha_T_Emna, eps_T_pi_Emna, sigma_T_Emna, plastic_dissip_T_Emn,
+                                                     damage_dissip_T_Emn,
+                                                     plastic_dissip_N_Emn, damage_dissip_N_Emn, total_work_microplane,
+                                                     total_work_macro, eps_aux)
 
         return sig_Emab, D_Emabcd
 
 
-class MS12D(MS1):
+class MS12DEEQ(MS1EEQ):
     """Two dimensional version of the MS1 model
     """
 
@@ -642,7 +691,7 @@ class MS12D(MS1):
         return MPW
 
 
-class MS13D(MS1):
+class MS13DEEQ(MS1EEQ):
     # -----------------------------------------------
     # number of microplanes - currently fixed for 3D
     # -----------------------------------------------

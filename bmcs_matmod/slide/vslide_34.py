@@ -479,8 +479,6 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
             select_idx = (0, 1, 2)
             u_N_n1, u_Tx_n1, u_Ty_n1 = eps_aEm
 
-        print('u_N, u_T', u_N_n1, u_Tx_n1, u_Ty_n1)
-
         ONES = np.ones_like(u_Tx_n1, dtype=np.float_)
         if self.debug:
             print('ONES', ONES.dtype)
