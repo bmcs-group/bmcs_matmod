@@ -124,7 +124,10 @@ class SlideExplorer(bu.Model):
         si_x_t = self.s_x_0 + tf_s_x * (self.s_x_1 - self.s_x_0) + 1e-9
         si_y_t = self.s_y_0 + tf_s_y * (self.s_y_1 - self.s_y_0) + 1e-9
         wi_t = self.w_0 + tf_w * (self.w_1 - self.w_0) + 1e-9
-        for t, s_x_n1, s_y_n1, w_n1 in zip(t_i, si_x_t, si_y_t, wi_t):
+        for i, (t, s_x_n1, s_y_n1, w_n1) in enumerate(zip(t_i, si_x_t, si_y_t, wi_t)):
+            if self.slide_model.debug_level == 1:
+                print('============= INCREMENT', i)
+
             try: self.Eps_n1, self.Sig_n1, k = self.slide_model.get_sig_n1(
                     s_x_n1, s_y_n1, w_n1, self.Sig_n1, self.Eps_n1, self.k_max
                 )

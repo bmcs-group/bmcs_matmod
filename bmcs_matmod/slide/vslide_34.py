@@ -312,7 +312,7 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
     def _get_S_NT(self):
         return np.sqrt(self.S_N * self.S_T)
 
-    debug = bu.Bool(False)
+    debug_level = bu.Int(0)
 
     def C_codegen(self):
 
@@ -381,35 +381,39 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
         return self.symb.get_Phi_final_
 
     def get_f_df(self, u_N_n1, u_Tx_n1, u_Ty_n1, Sig_k, Eps_k):
-        if self.debug:
-            print('w_n1', u_N_n1.dtype,u_N_n1.shape)
-            print('s_x_n1', u_Tx_n1.dtype, u_Tx_n1.shape)
-            print('s_y_n1', u_Ty_n1.dtype, u_Ty_n1.shape)
-            print('Eps_k', Eps_k.dtype, Eps_k.shape)
-            print('Sig_k', Sig_k.dtype, Sig_k.shape)
+
+        if self.debug_level == 1:
+            print('>>>>>>>>>>>>> get_f_df(): INPUT')
+            print('u_N_n1', u_N_n1)
+            print('u_Tx_n1', u_Tx_n1)
+            print('u_Ty_n1', u_Ty_n1)
+            print('Eps_k', Eps_k)
+            print('Sig_k', Sig_k)
+            print('<<<<<<<<<<<<< get_f_df(): INPUT')
+
         ONES = np.ones_like(u_Tx_n1, dtype=np.float_)
-        if self.debug:
+        if self.debug_level == 3:
             print('ONES', ONES.dtype)
         ZEROS = np.zeros_like(u_Tx_n1, dtype=np.float_)
-        if self.debug:
+        if self.debug_level == 3:
             print('ZEROS', ZEROS.dtype)
         Sig_k = self.symb.get_Sig_(u_N_n1, u_Tx_n1, u_Ty_n1, Sig_k, Eps_k)[0]
-        if self.debug:
+        if self.debug_level == 3:
             print('Sig_k', Sig_k.dtype, Sig_k.shape)
         dSig_dEps_k = self.symb.get_dSig_dEps_(u_N_n1, u_Tx_n1, u_Ty_n1, Sig_k, Eps_k, ZEROS, ONES)
-        if self.debug:
+        if self.debug_level == 3:
             print('dSig_dEps_k', dSig_dEps_k.dtype)
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
-        if self.debug:
-            print('H_sig_pi', H_sig_pi.dtype)
+        if self.debug_level == 3:
+                print('H_sig_pi', H_sig_pi.dtype)
         f_k = np.array([self.symb.get_f_(Eps_k, Sig_k, H_sig_pi)])
-        if self.debug:
+        if self.debug_level == 2:
             print('f_k', f_k.dtype)
         df_dSig_k = self.symb.get_df_dSig_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
-        if self.debug:
+        if self.debug_level == 2:
             print('df_dSig_k',df_dSig_k.dtype)
         ddf_dEps_k = self.symb.get_ddf_dEps_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
-        if self.debug:
+        if self.debug_level == 2:
             print('ddf_dEps_k',ddf_dEps_k.dtype)
         df_dEps_k = np.einsum(
             'ik...,ji...->jk...', df_dSig_k, dSig_dEps_k) + ddf_dEps_k
@@ -418,6 +422,14 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
         df_dlambda = np.einsum(
             'ki...,kj...->ij...', df_dEps_k, dEps_dlambda_k)
         df_k = df_dlambda
+
+        if self.debug_level == 1:
+            print('>>>>>>>>>>>>> get_f_df(): OUTPUT')
+            print('Sig_k', Sig_k)
+            print('f_k', f_k)
+            print('df_k', df_k)
+            print('<<<<<<<<<<<<< get_f_df(): OUTPUT')
+
         return f_k, df_k, Sig_k
 
     def get_Eps_k1(self, u_N_n1, u_Tx_n1, u_Ty_n1, Eps_n, lam_k, Sig_k, Eps_k):
@@ -431,6 +443,9 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
         Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
         Eps_k1 = Eps_n + lam_k * Phi_k[:, 0]
+        Eps_k1_view = Eps_k1[-2:,...]
+        ix_omega_1 = np.where(Eps_k1_view >= 0.99)
+        Eps_k1_view[ix_omega_1] = 0.99
         return Eps_k1
 
     rtol = bu.Float(1e-3, ALG=True)
@@ -480,17 +495,17 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
             u_N_n1, u_Tx_n1, u_Ty_n1 = eps_aEm
 
         ONES = np.ones_like(u_Tx_n1, dtype=np.float_)
-        if self.debug:
+        if self.debug_level == 3:
             print('ONES', ONES.dtype)
         ZEROS = np.zeros_like(u_Tx_n1, dtype=np.float_)
-        if self.debug:
+        if self.debug_level == 3:
             print('ZEROS', ZEROS.dtype)
 
         # Transform state to Eps_k and Sig_k
         Eps_n = np.array([ state[eps_name] for eps_name in self.Eps_names], dtype=np.float_)
         Eps_k = np.copy(Eps_n)
-        #Sig_k = np.array([state[sig_name] for sig_name in self.Sig_names], dtype=np.float_)
-        Sig_k = np.zeros_like(Eps_k)
+        Sig_k = np.array([state[sig_name] for sig_name in self.Sig_names], dtype=np.float_)
+        #Sig_k = np.zeros_like(Eps_k)
         f_k, df_k, Sig_k = self.get_f_df(u_N_n1, u_Tx_n1, u_Ty_n1, Sig_k, Eps_k)
         f_k, df_k = f_k[0,...], df_k[0,0,...]
         f_k_trial = f_k
@@ -501,11 +516,12 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
         lam_k = np.zeros_like(f_k_trial)
         k = 0
         while k < self.k_max:
-            if self.debug:
-                print('k', k)
+            if self.debug_level == 1:
+                print('============= RETURN STEP:', k)
+
             # which entries are above the tolerance
             I = np.where(f_k_norm_I > (self.f_t * self.rtol))
-            if self.debug:
+            if self.debug_level == 2:
                 print('f_k_norm_I', f_k_norm_I, self.f_t * self.rtol, len(I[0]))
             if (len(I[0]) == 0):
                 # empty inelastic entries - accept state
@@ -526,24 +542,26 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
                     state[eps_name][...] = Eps_[...]
                 for sig_name, Sig_ in zip(self.Sig_names, Sig_k):
                     state[sig_name][...] = Sig_[...]
+                if self.debug_level == 1:
+                    print('============= SUCCESS')
                 return sig_, D_
 
-            if self.debug:
+            if self.debug_level == 2:
                 print('I', I)
                 print('L', L)
             LL = tuple(Li[I] for Li in L)
             L = LL
-            if self.debug:
+            if self.debug_level == 3:
                 print('new L', L)
                 print('f_k', f_k[L].shape,f_k[L].dtype)
                 print('df_k', df_k[L].shape,df_k[L].dtype)
             # return mapping on inelastic entries
             dlam_L = -f_k[L] / df_k[L] # np.linalg.solve(df_k[I], -f_k[I])
-            if self.debug:
-                print('dlam_I',dlam_L,dlam_L.dtype)
+            if self.debug_level == 1:
+                print('dlam_I',dlam_L)
             lam_k[L] += dlam_L
-            if self.debug:
-                print('lam_k_L',lam_k,lam_k.dtype, lam_k[L].shape)
+            if self.debug_level == 3:
+                print('lam_k_L',lam_k[L])
             L_slice = (slice(None),) + L
             Eps_k_L = self.get_Eps_k1(u_N_n1[L], u_Tx_n1[L], u_Ty_n1[L],
                                       Eps_n[L_slice],
@@ -553,7 +571,7 @@ class Slide34(MATSEval,bu.InjectSymbExpr):
                                                    Sig_k[L_slice], Eps_k_L)
             f_k[L], df_k[L] = f_k_L[0, ...], df_k_L[0, 0, ...]
             Sig_k[L_slice] = Sig_k_L
-            if self.debug:
+            if self.debug_level == 3:
                 print('Sig_k',Sig_k)
                 print('f_k', f_k)
             f_k_norm_I = np.fabs(f_k[L])

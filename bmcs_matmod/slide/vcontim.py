@@ -18,15 +18,27 @@ import traits.api as tr
 import numpy as np
 from bmcs_matmod.slide.f_double_cap import FDoubleCap
 import bmcs_utils.api as bu
-import k3d
+from ibvpy.tmodel import MATSEval
 
 H_switch = Cymbol(r'H(\sigma^\pi)', real=True)
 H = lambda x: sp.Piecewise( (0, x <=0 ), (1, True) )
 
+# **Code generation** The derivation is adopted for the purpose of code generation both in Python and C utilizing the `codegen` package provided in `sympy`. The expressions that are part of the time stepping algorithm are transformed to an executable code directly at the place where they are derived. At the end of the notebook the C code can be exported to external files and applied in external tools. 
+
+# This code is needed to lambdify expressions named with latex symbols
+# it removes the backslashes and curly braces upon before code generation.
+# from sympy.utilities.codegen import codegen
+# import re
+# def _print_Symbol(self, expr):
+#     CodePrinter = sp.printing.codeprinter.CodePrinter
+#     name = super(CodePrinter, self)._print_Symbol(expr)
+#     return re.sub(r'[\{^}]','_',re.sub(r'[\\\{\}]', '', name))
+# sp.printing.codeprinter.CodePrinter._print_Symbol = _print_Symbol
+
 # ## Material parameters
 
 E_T = Cymbol('E_T', real=True, nonnegative=True)
-gamma_T = sp.Symbol('gamma_T', real=True, nonnegative=True)
+gamma_T = Cymbol('gamma_T', real=True, nonnegative=True)
 K_T = Cymbol('K_T', real=True)
 S_T = Cymbol('S_T', real=True)
 c_T = Cymbol('c_T', real=True)
@@ -42,25 +54,31 @@ eta = Cymbol('eta', real=True, nonnegative=True)
 
 s_x = Cymbol('s_x', real=True)
 s_y = Cymbol('s_y', real=True)
+s_z = Cymbol('s_z', real=True)
 omega_T = Cymbol('omega_T', real=True, nonnegative=True)
 s_pi_x = Cymbol(r's^{\pi}_x', codename='s_pi_x', real=True)
 s_pi_y = Cymbol(r's^{\pi}_y', codename='s_pi_y', real=True)
+s_pi_z = Cymbol(r's^{\pi}_z', codename='s_pi_z', real=True)
 alpha_x = Cymbol('alpha_x', real=True)
 alpha_y = Cymbol('alpha_y', real=True)
+alpha_z = Cymbol('alpha_z', real=True)
 z = Cymbol('z', real=True)
 
 w = Cymbol('w', real=True)
 omega_N = Cymbol('omega_N', real=True, nonnegative=True)
 w_pi = Cymbol(r'w^{\pi}', codename='w_pi', real=True)
 
-Eps = sp.Matrix([s_pi_x, s_pi_y, w_pi, z, alpha_x, alpha_y, omega_T, omega_N])
+Eps = sp.Matrix([w_pi, s_pi_x, s_pi_y, s_pi_z, z, alpha_x, alpha_y, alpha_z, omega_T, omega_N])
 
 tau_x = Cymbol('tau_x', real=True)
 tau_y = Cymbol('tau_y', real=True)
+tau_z = Cymbol('tau_z', real=True)
 tau_pi_x = Cymbol(r'\tau^\pi_x', codename='tau_pi_x', real=True)
 tau_pi_y = Cymbol(r'\tau^\pi_y', codename='tau_pi_y', real=True)
+tau_pi_z = Cymbol(r'\tau^\pi_z', codename='tau_pi_z', real=True)
 X_x = Cymbol('X_x', real=True)
 X_y = Cymbol('X_y', real=True)
+X_z = Cymbol('X_z', real=True)
 Z = Cymbol('Z', real=True, nonnegative=True)
 Y_T = Cymbol('Y_T', real=True)
 
@@ -68,16 +86,18 @@ sig = Cymbol(r'\sigma', real=True)
 sig_pi = Cymbol(r'\sigma^\pi', codename='sig_pi', real=True)
 Y_N = Cymbol('Y_N', real=True)
 
-Sig = sp.Matrix([tau_pi_x, tau_pi_y, sig_pi, Z, X_x, X_y, Y_T, Y_N])
+Sig = sp.Matrix([sig_pi, tau_pi_x, tau_pi_y, tau_pi_z, Z, X_x, X_y, X_z, Y_T, Y_N])
 
 # ## Helmholtz free energy
 
 rho_psi_T_ = sp.Rational(1,2)* (
     (1-omega_T)*E_T*(s_x-s_pi_x)**2 +
     (1-omega_T)*E_T*(s_y-s_pi_y)**2 +
+    (1-omega_T)*E_T*(s_z-s_pi_z)**2 +
     K_T * z**2 +
     gamma_T * alpha_x**2 +
-    gamma_T * alpha_y**2
+    gamma_T * alpha_y**2 +
+    gamma_T * alpha_z**2
 )
 
 rho_psi_N_ = sp.Rational(1,2) * (1 - H(sig_pi) * omega_N) * E_N * (w - w_pi)**2
@@ -92,13 +112,13 @@ rho_psi_ = rho_psi_T_ + rho_psi_N_
 
 d_rho_psi_ = sp.Matrix([rho_psi_.diff(eps) for eps in Eps])
 
-# To obtain consistent signs of the Helmholtz derivatives we define a sign switch operator so that all generalized forces are defined as positive for the respective conjugate state variable $\boldsymbol{\Upsilon}$. 
+# To obtain consistent signs of the Helmholtz derivatives we define a sign switch operator so that all generalized forces are defined as positive for the respective conjugate state variable $\boldsymbol{\Upsilon}$.
 
-Sig_signs = sp.diag(-1,-1,-1,1,1,1,-1,-1)
+Sig_signs = sp.diag(-1,-1,-1,-1, 1, 1, 1, 1, -1,-1)
 
 # The constitutive laws between generalized force and kinematic variables then read
 # \begin{align}
-# \boldsymbol{\mathcal{S}} = \boldsymbol{\Upsilon}\frac{\rho \psi}{\partial\boldsymbol{\mathcal{E}}} 
+# \boldsymbol{\mathcal{S}} = \boldsymbol{\Upsilon}\frac{\rho \psi}{\partial\boldsymbol{\mathcal{E}}}
 # \end{align}
 
 Sig_ = Sig_signs * d_rho_psi_
@@ -110,34 +130,39 @@ Sig_ = Sig_signs * d_rho_psi_
 # \end{align}
 
 dSig_dEps_ = sp.Matrix([
-    Sig_.T.diff(eps) for eps in Eps 
+    Sig_.T.diff(eps) for eps in Eps
 ] ).T
 
 # **Executable Python code generation** $\displaystyle \frac{\partial }{\partial \boldsymbol{\mathcal{E}}}  \boldsymbol{\mathcal{S}}(s,\boldsymbol{\mathcal{E}})$
 # ## Threshold function
 # To keep the framework general for different stress norms and hardening definitions let us first introduce a general function for effective stress. Note that the observable stress $\tau$ is identical with the plastic stress $\tau_\pi$ due to the performed sign switch in the definition of the thermodynamic forces.
 
+sig_eff = sp.Symbol(r'sigma_eff')
 tau_eff_x = sp.Symbol(r'tau_eff_x')
 tau_eff_y = sp.Symbol(r'tau_eff_y')
-sig_eff = sp.Symbol(r'sigma_eff')
+tau_eff_z = sp.Symbol(r'tau_eff_z')
 Q_x = sp.Function('Q_x')(tau_eff_x,X_x)
 Q_y = sp.Function('Q_y')(tau_eff_y,X_y)
+Q_z = sp.Function('Q_z')(tau_eff_z,X_z)
 
-# The stress norm is defined using the stress offset $X$, i.e. the kinematic hardening stress representing the shift of the origin of the yield locus.  
+# The stress norm is defined using the stress offset $X$, i.e. the kinematic hardening stress representing the shift of the origin of the yield locus.
 
-norm_Q = sp.sqrt(Q_x*Q_x + Q_y*Q_y)
+norm_Q = sp.sqrt(Q_x*Q_x + Q_y*Q_y + Q_z*Q_z)
 
 # Let us now introduce the back stress $X$ by defining the substitution for $Q = \tau^\mathrm{eff} - X$
 
-subs_Q = {Q_x: tau_eff_x - X_x, Q_y: tau_eff_y - X_y}
+subs_Q = {Q_x: tau_eff_x - X_x, Q_y: tau_eff_y - X_y, Q_z: tau_eff_z - X_z}
 
 tau_eff_x_ = tau_pi_x / (1-omega_T)
 tau_eff_y_ = tau_pi_y / (1-omega_T)
+tau_eff_z_ = tau_pi_z / (1-omega_T)
 sig_eff_ = sig_pi / (1- H(sig_pi) * omega_N)
 
-subs_tau_eff = {tau_eff_x: tau_pi_x / (1-omega_T),
-                tau_eff_y: tau_pi_y / (1-omega_T),
-                sig_eff: sig_pi / (1- H_switch * omega_N)}
+subs_tau_eff = {sig_eff: sig_pi / (1 - H_switch * omega_N),
+                tau_eff_x: tau_pi_x / (1 - omega_T),
+                tau_eff_y: tau_pi_y / (1 - omega_T),
+                tau_eff_z: tau_pi_z / (1 - omega_T)
+                }
 
 # After substitutions the yield function reads
 
@@ -160,7 +185,7 @@ f_ = f_3.subs(fdc.symb.tau_bar, (bartau+Z))
 f_eff_ = f_2.subs(fdc.symb.tau_bar, (bartau+Z))
 
 # **Executable code generation** $f(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$
-# 
+#
 # Note that this is a function of both the forces and kinematic state variables
 
 # The derivative of $f$ required for time-stepping $\frac{\partial f}{\partial \boldsymbol{\mathcal{S}}}$ is obtained as
@@ -177,13 +202,13 @@ c_NT, S_NT = sp.symbols(r'c_NT, S_NT')
 # $\boldsymbol{\Upsilon} \, \partial_{\boldsymbol{\mathcal{S}}} \varphi$
 # This renders following flow direction vector
 # \begin{align}
-# \boldsymbol{\Phi} = - \Upsilon \frac{\partial \varphi}{\partial \boldsymbol{\mathcal{S}}} 
+# \boldsymbol{\Phi} = - \Upsilon \frac{\partial \varphi}{\partial \boldsymbol{\mathcal{S}}}
 # \end{align}
 
-class Slide23Expr(bu.SymbExpr):
+class VConTIMExpr(bu.SymbExpr):
 
     # control and state variables
-    s_x, s_y, w, Eps, Sig = s_x, s_y, w, Eps, Sig
+    w, s_x, s_y, s_z, Eps, Sig = w, s_x, s_y, s_z, Eps, Sig
 
     # model parameters
     E_T = E_T
@@ -206,24 +231,22 @@ class Slide23Expr(bu.SymbExpr):
     c_NT = c_NT
     S_NT = S_NT
 
+    ONE = Cymbol(r'I')
+    ZERO = Cymbol(r'O')
+
     # expressions
     Sig_ = Sig_.T
-    dSig_dEps_ = dSig_dEps_
+    dSig_dEps_ = dSig_dEps_.subs(0,ZERO) * ONE
     f_ = f_
-    df_dSig_ = df_dSig_
-    ddf_dEps_ = ddf_dEps_
+    df_dSig_ = df_dSig_.subs(0,ZERO) * ONE
+    ddf_dEps_ = ddf_dEps_.subs(0,ZERO) * ONE
 
     phi_final_ = tr.Property()
     @tr.cached_property
     def _get_phi_final_(self):
-        def geo(var1, var2):
-            return (1-sp.sqrt((1-var1)*(1-var2)))
-        def ari(var1, var2):
-            return (var1 + var2) / 2
         def g_ari_integrity(var1, var2):
             return 1-sp.sqrt( (1-var1)*(1-var2))
         omega_NT = g_ari_integrity(omega_N, omega_T)
-        #omega_NT = ari(omega_N, omega_T)
         phi_N = (1 - omega_N)**(c_N) * S_N/(r+1) * (Y_N/S_N)**(r+1) * H_switch
         phi_T = (1 - omega_T)**(c_T) * S_T/(r+1) * (Y_T/S_T)**(r+1)
         phi_NT  = (1 - omega_NT)**(c_NT) * S_NT/(r+1) * ((Y_N+Y_T)/S_NT)**(r+1)
@@ -237,9 +260,10 @@ class Slide23Expr(bu.SymbExpr):
 
     H_sig_pi_ = H(sig_pi)
 
+    sig_eff_ = sig_pi / (1 - H(sig_pi) * omega_N)
     tau_eff_x_ = tau_pi_x / (1 - omega_T)
     tau_eff_y_ = tau_pi_y / (1 - omega_T)
-    sig_eff_ = sig_pi / (1 - H(sig_pi) * omega_N)
+    tau_eff_z_ = tau_pi_z / (1 - omega_T)
 
     symb_model_params = [
         'E_T', 'gamma_T', 'K_T', 'S_T', 'c_T', 'bartau',
@@ -249,13 +273,13 @@ class Slide23Expr(bu.SymbExpr):
 
     # List of expressions for which the methods `get_`
     symb_expressions = [
-        ('Sig_', ('s_x', 's_y', 'w', 'Sig', 'Eps')),
-        ('dSig_dEps_', ('s_x', 's_y', 'w', 'Sig', 'Eps')),
+        ('Sig_', ('w', 's_x', 's_y', 's_z', 'Sig', 'Eps')),
+        ('dSig_dEps_', ('w', 's_x', 's_y', 's_z', 'Sig', 'Eps', 'ZERO', 'ONE')),
         ('f_', ('Eps', 'Sig', 'H_switch')),
-        ('df_dSig_', ('Eps', 'Sig', 'H_switch')),
-        ('ddf_dEps_', ('Eps', 'Sig', 'H_switch')),
+        ('df_dSig_', ('Eps', 'Sig', 'H_switch', 'ZERO', 'ONE')),
+        ('ddf_dEps_', ('Eps', 'Sig', 'H_switch', 'ZERO', 'ONE')),
         ('phi_final_', ('Eps', 'Sig', 'H_switch')),
-        ('Phi_final_', ('Eps', 'Sig', 'H_switch')),
+        ('Phi_final_', ('Eps', 'Sig', 'H_switch', 'ZERO', 'ONE')),
         ('H_sig_pi_', ('Sig',))
     ]
 
@@ -270,10 +294,10 @@ class ConvergenceError(Exception):
     def __str__(self):
         return f'{self.message} for state {self.state}'
 
-class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
+class VConTIM(MATSEval,bu.InjectSymbExpr):
 
     name = 'Slide 3.4'
-    symb_class = Slide23Expr
+    symb_class = VConTIMExpr
 
     E_T = bu.Float(28000, MAT=True)
     gamma_T = bu.Float(10, MAT=True)
@@ -300,6 +324,8 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
     @tr.cached_property
     def _get_S_NT(self):
         return np.sqrt(self.S_N * self.S_T)
+
+    debug = bu.Bool(False)
 
     def C_codegen(self):
 
@@ -341,7 +367,7 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         bu.Item('E_T', latex='E_T'),
         bu.Item('S_T'),
         bu.Item('c_T'),
-        bu.Item('gamma_T', latex=r'\gamma_\mathrm{T}'),
+        bu.Item('gamma_T'),
         bu.Item('K_T'),
         bu.Item('bartau', latex=r'\bar{\tau}'),
         bu.Item('E_N'),
@@ -351,8 +377,10 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         bu.Item('f_t'),
         bu.Item('f_c', latex=r'f_\mathrm{c}'),
         bu.Item('f_c0', latex=r'f_\mathrm{c0}'),
-        bu.Item('eta', minmax=(0, 1)),
-        bu.Item('r')
+        bu.Item('eta'),
+        bu.Item('r'),
+        bu.Item('c_NT', readonly=True),
+        bu.Item('S_NT', readonly=True),
     )
 
     damage_interaction = tr.Enum('final', 'geometric','arithmetic')
@@ -365,119 +393,86 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
     def _get_get_Phi_(self):
         return self.symb.get_Phi_final_
 
-    def get_f_df(self, s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k):
+    def get_f_df(self, u_N_n1, u_Tx_n1, u_Ty_n1, u_Tz_n1, Sig_k, Eps_k):
+    #def get_f_df(self, u_N_n1, u_T_n1, Sig_k, Eps_k):
 
-        if self.debug_level == 1:
-            print('>>>>>>>>>>>>> get_f_df(): INPUT')
-            print('u_N', w_n1)
-            print('u_T_x', s_x_n1)
-            print('u_T_y', s_y_n1)
+        if self.debug:
+            print('w_n1', u_N_n1.dtype,u_N_n1.shape)
+            # print('s_x_n1', u_Tx_n1.dtype, u_Tx_n1.shape)
+            # print('s_y_n1', u_Ty_n1.dtype, u_Ty_n1.shape)
+            # print('s_z_n1', u_Tz_n1.dtype, u_Tz_n1.shape)
+            print('Eps_k', Eps_k.dtype, Eps_k.shape)
+            print('Sig_k', Sig_k.dtype, Sig_k.shape)
+        ONES = np.ones_like(u_N_n1, dtype=np.float_)
+        if self.debug:
+            print('ONES', ONES.dtype)
+        ZEROS = np.zeros_like(u_N_n1, dtype=np.float_)
+        if self.debug:
+            print('ZEROS', ZEROS.dtype)
+        # args = (u_N_n1,) + tuple(u_T for u_T in u_T_n1) + (Sig_k, Eps_k)
+        # Sig_k = self.symb.get_Sig_(*args)[0]
+        Sig_k = self.symb.get_Sig_(u_N_n1, u_Tx_n1, u_Ty_n1, u_Tz_n1, Sig_k, Eps_k)[0]
+        if self.debug:
+            print('Sig_k', Sig_k.dtype, Sig_k.shape)
+        # dSig_dEps_k = self.symb.get_dSig_dEps_(*(args + (ZEROS, ONES)))
+        dSig_dEps_k = self.symb.get_dSig_dEps_(u_N_n1, u_Tx_n1, u_Ty_n1, u_Tz_n1, Sig_k, Eps_k, ZEROS, ONES)
+        if self.debug:
+            print('dSig_dEps_k', dSig_dEps_k.dtype)
+        H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
+        if self.debug:
+            print('H_sig_pi', H_sig_pi)
+        f_k = np.array([self.symb.get_f_(Eps_k, Sig_k, H_sig_pi)])
+        if self.debug:
+            print('====================')
+            print('f_k', f_k)
             print('Eps_k', Eps_k)
             print('Sig_k', Sig_k)
-            print('<<<<<<<<<<<<< get_f_df(): INPUT')
-
-        Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)[0]
-        dSig_dEps_k = self.symb.get_dSig_dEps_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
-        H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
-        f_k = np.array([self.symb.get_f_(Eps_k, Sig_k, H_sig_pi)])
-        df_dSig_k = self.symb.get_df_dSig_(Eps_k, Sig_k, H_sig_pi)
-        ddf_dEps_k = self.symb.get_ddf_dEps_(Eps_k, Sig_k, H_sig_pi)
+            print('H_sig_pi', H_sig_pi)
+            print('ZEROS', ZEROS, ONES)
+        df_dSig_k = self.symb.get_df_dSig_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
+        if self.debug:
+            print('df_dSig_k',df_dSig_k.dtype)
+        ddf_dEps_k = self.symb.get_ddf_dEps_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
+        if self.debug:
+            print('ddf_dEps_k',ddf_dEps_k.dtype)
         df_dEps_k = np.einsum(
-            'ik,ji->jk', df_dSig_k, dSig_dEps_k) + ddf_dEps_k
-        Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi)
+            'ik...,ji...->jk...', df_dSig_k, dSig_dEps_k) + ddf_dEps_k
+        Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
         dEps_dlambda_k = Phi_k
         df_dlambda = np.einsum(
-            'ki,kj->ij', df_dEps_k, dEps_dlambda_k)
+            'ki...,kj...->ij...', df_dEps_k, dEps_dlambda_k)
         df_k = df_dlambda
-
-        if self.debug_level == 1:
-            print('>>>>>>>>>>>>> get_f_df(): OUTPUT')
-            print('Sig_k', Sig_k)
-            print('f_k', f_k)
-            print('df_k', df_k)
-            print('<<<<<<<<<<<<< get_f_df(): OUTPUT')
-
         return f_k, df_k, Sig_k
 
-    def get_Eps_k1(self, s_x_n1, s_y_n1, w_n1, Eps_n, lam_k, Sig_k, Eps_k):
+    def get_Eps_k1(self, u_N_n1, u_Tx_n1, u_Ty_n1, u_Tz_n1, Eps_n, lam_k, Sig_k, Eps_k):
+    # def get_Eps_k1(self, u_N_n1, u_T_n1, Eps_n, lam_k, Sig_k, Eps_k):
         '''Evolution equations:
         The update of state variables
         for an updated $\lambda_k$ is performed using this procedure.
         '''
-        Sig_k = self.symb.get_Sig_(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)[0]
+        ONES = np.ones_like(u_N_n1)
+        ZEROS = np.zeros_like(u_N_n1)
+        # args = (u_N_n1,) + tuple(u_T for u_T in u_T_n1) + (Sig_k, Eps_k)
+        #Sig_k = self.symb.get_Sig_(*args)[0]
+        Sig_k = self.symb.get_Sig_(u_N_n1, u_Tx_n1, u_Ty_n1, u_Tz_n1, Sig_k, Eps_k)[0]
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_k)
-        Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi)
+        Phi_k = self.get_Phi_(Eps_k, Sig_k, H_sig_pi, ZEROS, ONES)
         Eps_k1 = Eps_n + lam_k * Phi_k[:, 0]
-        Eps_k1[-2] = min(0.99, Eps_k1[-2])
-        Eps_k1[-1] = min(0.99, Eps_k1[-1])
+
+        # Cutoff damage on update, if it exceeds the value 1.0
+        # Handle the case that a microplane is fully damaged and that
+        # there is no elastic domain to return to
+        #
+        Eps_k1_view = Eps_k1[-2:, ...]
+        ix_omega_1 = np.where(Eps_k1_view >= 0.99)
+        Eps_k1_view[ix_omega_1] = 0.99
+
         return Eps_k1
 
     rtol = bu.Float(1e-3, ALG=True)
     '''Relative tolerance of the return mapping algorithm related 
     to the tensile strength
     '''
-
-    f_lambda_recording = bu.Bool(False)
-
-    f_list = tr.List
-    lam_list = tr.List
-
-    lam_max = bu.Float(1)
-
-    def reset_flam_profile(self):
-        self.f_list = []
-        self.lam_list = []
-
-    def record_flam_profile(self, lam_k, s_x_n1, s_y_n1, w_n1, Sig_n, Eps_n):
-        Eps_k = np.copy(Eps_n)
-        Sig_k = np.copy(Sig_n)
-        lam_range = np.linspace(0, self.lam_max, 30)
-        f_range = np.zeros_like(lam_range)
-        for i, lam in enumerate(lam_range):
-            Eps_k = self.get_Eps_k1(s_x_n1, s_y_n1, w_n1, Eps_n, lam-lam_k, Sig_k, Eps_k)
-            f_k, df_k, Sig_k = self.get_f_df(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
-            f_range[i] = f_k
-        self.lam_list.append(lam_range)
-        self.f_list.append(np.array(f_range))
-
-    debug_level = bu.Int(0)
-
-    def get_sig_n1(self, s_x_n1, s_y_n1, w_n1, Sig_n, Eps_n, k_max):
-        '''Return mapping iteration:
-        This function represents a user subroutine in a finite element
-        code or in a lattice model. The input is $s_{n+1}$ and the state variables
-        representing the state in the previous solved step $\boldsymbol{\mathcal{E}}_n$.
-        The procedure returns the stresses and state variables of
-        $\boldsymbol{\mathcal{S}}_{n+1}$ and $\boldsymbol{\mathcal{E}}_{n+1}$
-        '''
-        if self.f_lambda_recording:
-            self.reset_flam_profile()
-        Eps_k = np.copy(Eps_n)
-        Sig_k = np.copy(Sig_n)
-        lam_k = 0
-        f_k, df_k, Sig_k = self.get_f_df(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
-        f_k_norm = np.linalg.norm(f_k)
-        f_k_trial = f_k[0]
-        k = 0
-        while k < k_max:
-            if self.debug_level == 1:
-                print('============= RETURN STEP:', k)
-            if self.f_lambda_recording:
-                self.record_flam_profile(lam_k, s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
-            if f_k_trial < 0 or f_k_norm < self.f_t * self.rtol:
-                if self.debug_level == 1:
-                    print('============= SUCCESS')
-                return Eps_k, Sig_k, k + 1
-            dlam = np.linalg.solve(df_k, -f_k)
-            lam_k += dlam
-            if self.debug_level == 1:
-                print('lam_k', lam_k, dlam)
-            Eps_k = self.get_Eps_k1(s_x_n1, s_y_n1, w_n1, Eps_n, lam_k, Sig_k, Eps_k)
-            f_k, df_k, Sig_k = self.get_f_df(s_x_n1, s_y_n1, w_n1, Sig_k, Eps_k)
-            f_k_norm = np.linalg.norm(f_k)
-            k += 1
-        else:
-            raise ConvergenceError('no convergence for step', [s_x_n1, s_y_n1, w_n1])
 
     Eps_names = tr.Property
     @tr.cached_property
@@ -498,29 +493,138 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         method defined in Cymbol as well'''
         return {eps_name: () for eps_name in self.Eps_names + self.Sig_names}
 
+    k_max = bu.Int(100, ALG=True)
+    '''Maximum number of iterations'''
 
-    def plot_f_state(self, ax, Eps, Sig, color='red'):
+    def get_corr_pred(self, eps_Ema, t_n1, **state):
+        '''Return mapping iteration:
+        This function represents a user subroutine in a finite element
+        code or in a lattice model. The input is $s_{n+1}$ and the state variables
+        representing the state in the previous solved step $\boldsymbol{\mathcal{E}}_n$.
+        The procedure returns the stresses and state variables of
+        $\boldsymbol{\mathcal{S}}_{n+1}$ and $\boldsymbol{\mathcal{E}}_{n+1}$
+        '''
+        eps_aEm = np.einsum('...a->a...',eps_Ema)
+        u_N_n1 = eps_aEm[0,...]
+        u_To_n1 = eps_aEm[1:,...]
+
+        dim_T = len(u_To_n1)
+        if dim_T == 1: # hack - only one slip considered - 2D version
+            select_idx = (0, 1)
+            u_Tx_n1, = u_To_n1
+            u_Ty_n1, u_Tz_n1 = np.zeros_like(u_Tx_n1), np.zeros_like(u_Tx_n1)
+        elif dim_T == 2:
+            select_idx = (0, 1, 2)
+            u_Tx_n1, u_Ty_n1 = u_To_n1
+            u_Tz_n1 = np.zeros_like(u_Tx_n1)
+        else:
+            select_idx = (0, 1, 2, 3)
+            u_Tx_n1, u_Ty_n1, u_Tz_n1 = u_To_n1
+
+        u_T_n1 = np.r_[u_Tx_n1, u_Ty_n1, u_Tz_n1]
+
+        ONES = np.ones_like(u_Tx_n1, dtype=np.float_)
+        if self.debug:
+            print('ONES', ONES.dtype)
+        ZEROS = np.zeros_like(u_Tx_n1, dtype=np.float_)
+        if self.debug:
+            print('ZEROS', ZEROS.dtype)
+
+        # Transform state to Eps_k and Sig_k
+        Eps_n = np.array([ state[eps_name] for eps_name in self.Eps_names], dtype=np.float_)
+        Eps_k = np.copy(Eps_n)
+        Sig_k = np.array([state[sig_name] for sig_name in self.Sig_names], dtype=np.float_)
+        f_k, df_k, Sig_k = self.get_f_df(u_N_n1, u_Tx_n1, u_Ty_n1, u_Tz_n1, Sig_k, Eps_k)
+        f_k, df_k = f_k[0,...], df_k[0,0,...]
+        f_k_trial = f_k
+        # indexes of inelastic entries
+        L = np.where(f_k_trial > 0)
+        # f norm in inelastic entries - to allow also positive values less the rtol
+        f_k_norm_I = np.fabs(f_k_trial[L])
+        lam_k = np.zeros_like(f_k_trial)
+        k = 0
+        while k < self.k_max:
+            if self.debug:
+                print('k', k)
+            # which entries are above the tolerance
+            I = np.where(f_k_norm_I > (self.f_t * self.rtol))
+            if self.debug:
+                print('f_k_norm_I', f_k_norm_I, self.f_t * self.rtol, len(I[0]))
+            if (len(I[0]) == 0):
+                # empty inelastic entries - accept state
+                #return Eps_k, Sig_k, k + 1
+                dSig_dEps_k = self.symb.get_dSig_dEps_(u_N_n1, u_Tx_n1, u_Ty_n1, u_Tz_n1,
+                                                       Sig_k, Eps_k, ZEROS, ONES)
+                ix1, ix2 = np.ix_(select_idx, select_idx)
+                D_ = np.einsum('ab...->...ab',dSig_dEps_k[ix1, ix2, ...])
+                sig_ = np.einsum('a...->...a',Sig_k[select_idx,...])
+                # quick fix
+                _, _, _, _, _, _, _, _, omega_T, omega_N = Eps_k
+                D_ = np.zeros(sig_.shape + (sig_.shape[-1],))
+                D_[...,0,0] = self.E_N * (1 - omega_N)
+                D_[...,1,1] = self.E_T * (1 - omega_T)
+                if dim_T == 2:
+                    D_[...,2,2] = self.E_T * (1 - omega_T)
+                if dim_T == 3:
+                    D_[...,3,3] = self.E_T * (1 - omega_T)
+                for eps_name, Eps_ in zip(self.Eps_names, Eps_k):
+                    state[eps_name][...] = Eps_[...]
+                for sig_name, Sig_ in zip(self.Sig_names, Sig_k):
+                    state[sig_name][...] = Sig_[...]
+                return sig_, D_
+
+            if self.debug:
+                print('I', I)
+                print('L', L)
+            LL = tuple(Li[I] for Li in L)
+            L = LL
+            if self.debug:
+                print('new L', L)
+                print('f_k', f_k[L].shape,f_k[L].dtype)
+                print('df_k', df_k[L].shape,df_k[L].dtype)
+            # return mapping on inelastic entries
+            dlam_L = -f_k[L] / df_k[L] # np.linalg.solve(df_k[I], -f_k[I])
+            if self.debug:
+                print('dlam_I',dlam_L,dlam_L.dtype)
+            lam_k[L] += dlam_L
+            if self.debug:
+                print('lam_k_L',lam_k,lam_k.dtype, lam_k[L].shape)
+            L_slice = (slice(None),) + L
+            Eps_k_L = self.get_Eps_k1(u_N_n1[L], u_Tx_n1[L], u_Ty_n1[L], u_Tz_n1[L],
+                                      Eps_n[L_slice],
+                                      lam_k[L], Sig_k[L_slice], Eps_k[L_slice])
+            Eps_k[L_slice] = Eps_k_L
+            f_k_L, df_k_L, Sig_k_L = self.get_f_df(u_N_n1[L], u_Tx_n1[L], u_Ty_n1[L], u_Tz_n1[L],
+                                                   Sig_k[L_slice], Eps_k_L)
+            f_k[L], df_k[L] = f_k_L[0, ...], df_k_L[0, 0, ...]
+            Sig_k[L_slice] = Sig_k_L
+            if self.debug:
+                print('Sig_k',Sig_k)
+                print('f_k', f_k)
+            f_k_norm_I = np.fabs(f_k[L])
+            k += 1
+        else:
+            raise ConvergenceError('no convergence for entries', [L, u_N_n1[L], u_T_n1[L]])
+        # add the algorithmic stiffness
+        # recalculate df_k and -f_k for a unit increment of epsilon and solve for lambda
+        #
+
+    def plot_f_state(self, ax, Eps, Sig):
         lower = -self.f_c * 1.05
         upper = self.f_t + 0.05 * self.f_c
         lower_tau = -self.bartau * 2
         upper_tau = self.bartau * 2
-        lower_tau = -10
+        lower_tau = 0
         upper_tau = 10
-        tau_x, tau_y, sig = Sig[:3]
+        sig, tau_x, tau_y = Sig[:3]
         tau = np.sqrt(tau_x**2 + tau_y**2)
         sig_ts, tau_x_ts  = np.mgrid[lower:upper:201j,lower_tau:upper_tau:201j]
         Sig_ts = np.zeros((len(self.symb.Eps),) + tau_x_ts.shape)
         Eps_ts = np.zeros_like(Sig_ts)
-        Sig_ts[0,...] = tau_x_ts
-        Sig_ts[2,...] = sig_ts
+        Sig_ts[0,...] = sig_ts
+        Sig_ts[1,...] = tau_x_ts
         Sig_ts[3:,...] = Sig[3:,np.newaxis,np.newaxis]
-        Sig_ts[4,...] = np.sqrt(Sig_ts[4,...]**2+Sig_ts[5,...]**2)
-        Sig_ts[5,...] = 0
         Eps_ts[...] = Eps[:,np.newaxis,np.newaxis]
-        Eps_ts[0,...] = np.sqrt(Eps_ts[0,...]**2+Eps_ts[1,...]**2)
-        Eps_ts[1,...] = 0
-        Eps_ts[4,...] = np.sqrt(Eps_ts[4,...]**2+Eps_ts[5,...]**2)
-        Eps_ts[5,...] = 0
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
         f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts, H_sig_pi)])
 
@@ -531,13 +635,14 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         omega_T = Eps_ts[-2,:]
         sig_ts_eff = sig_ts / (1 - H_sig_pi*omega_N)
         tau_x_ts_eff = tau_x_ts / (1 - omega_T)
-        #ax.contour(sig_ts_eff, tau_x_ts_eff, f_ts[0,...], [0], colors=('green',))
-        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], [0], colors=(color,))
+        ax.contour(sig_ts_eff, tau_x_ts_eff, f_ts[0,...], levels=0, colors=('green',))
+
+        ax.contour(sig_ts, tau_x_ts, f_ts[0,...], levels=0, colors=('red',))
         #ax.contour(sig_ts, tau_x_ts, phi_ts[0, ...])
         ax.plot(sig, tau, marker='H', color='red')
         ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
         ax.plot([0, 0], [lower_tau, upper_tau], color='black', lw=0.4)
-        ax.set_ylim(ymin=0, ymax=upper_tau)
+        ax.set_ylim(ymin=0, ymax=10)
 
     def plot_f(self, ax):
         lower = -self.f_c * 1.05
@@ -546,8 +651,8 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         upper_tau = self.bartau * 2
         sig_ts, tau_x_ts  = np.mgrid[lower:upper:201j,lower_tau:upper_tau:201j]
         Sig_ts = np.zeros((len(self.symb.Eps),) + tau_x_ts.shape)
-        Sig_ts[0,:] = tau_x_ts
-        Sig_ts[2,:] = sig_ts
+        Sig_ts[0,:] = sig_ts
+        Sig_ts[1,:] = tau_x_ts
         Eps_ts = np.zeros_like(Sig_ts)
         H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
         f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts, H_sig_pi)])
@@ -558,47 +663,17 @@ class Slide32(bu.InteractiveModel,bu.InjectSymbExpr):
         ax.plot([lower, upper], [0, 0], color='black', lw=0.4)
         ax.plot([0, 0], [lower_tau, upper_tau], color='black', lw=0.4)
 
-    def plot_phi_Y(self, ax):
-        lower_N = 0
-        upper_N = 1
-        lower_T = 0
-        upper_T = 1
-        Y_N, Y_T  = np.mgrid[lower_N:upper_N:201j,lower_T:upper_T:201j]
-        Sig_ts = np.zeros((len(self.symb.Eps),) + Y_T.shape)
-        Sig_ts[0,:] = Y_N
-        Sig_ts[2,:] = Y_T
-        Eps_ts = np.zeros_like(Sig_ts)
-        H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
-        phi_ts = np.array([self.get_phi_(Eps_ts, Sig_ts, H_sig_pi)])
-        ax.set_title('potential function');
-        ax.contour(Y_N, Y_T, phi_ts[0,...]) #, levels=0)
+    def plot_sig_w(self, ax):
+        pass
 
-    def update_plot(self, ax):
-        self.plot_f(ax)
+    def plot_tau_s(self, ax):
+        pass
 
-    def plot3d(self, pb):
-        delta_f = self.f_t * 0.05
-        lower = -self.f_c - delta_f
-        upper = self.f_t + delta_f
-        lower_tau = -self.bartau * 2
-        upper_tau = self.bartau * 2
-        sig_ts, tau_x_ts  = np.mgrid[lower:upper:201j,lower_tau:upper_tau:201j]
-        Sig_ts = np.zeros((len(self.symb.Eps),) + tau_x_ts.shape)
-        Sig_ts[0,:] = tau_x_ts
-        Sig_ts[2,:] = sig_ts
-        Eps_ts = np.zeros_like(Sig_ts)
-        H_sig_pi = self.symb.get_H_sig_pi_(Sig_ts)
-        f_ts = np.array([self.symb.get_f_(Eps_ts, Sig_ts, H_sig_pi)])
+    def subplots(self, fig):
+        return fig.subplots(2,2)
 
-        # max_f_c = self.f_c
-        # max_f_t = self.f_t
-        # max_tau_bar = self.bartau
-        # X_a, Y_a = np.mgrid[-1.1*max_f_c:1.1*max_f_t:210j, -max_tau_bar:max_tau_bar:210j]
-        # Z_a = self.symb.get_f_solved(X_a, Y_a) * self.z_scale
-        # #ax.contour(X_a, Y_a, Z_a, levels=8)
-        Z_0 = np.zeros_like(f_ts)
-        self.surface = k3d.surface(f_ts.astype(np.float32))
-        pb.plot_fig += self.surface
-        self.surface0 = k3d.surface(Z_0.astype(np.float32),color=0xbbbbbe)
-        pb.plot_fig += self.surface0
-
+    def update_plot(self, axes):
+        (ax_sig_w, ax_tau_s), (ax_f, _) = axes
+        self.plot_sig_w(ax_sig_w)
+        self.plot_tau_s(ax_tau_s)
+        self.plot_f(ax_f)
