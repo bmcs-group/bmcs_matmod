@@ -19,6 +19,8 @@ import numpy as np
 from bmcs_matmod.slide.f_double_cap import FDoubleCap
 import bmcs_utils.api as bu
 from ibvpy.tmodel import MATSEval
+from .i_ntim import INTIM
+from .exceptions import ReturnMappingError
 
 H_switch = Cymbol(r'H(\sigma^\pi)', real=True)
 H = lambda x: sp.Piecewise( (0, x <=0 ), (1, True) )
@@ -283,18 +285,8 @@ class VConTIMExpr(bu.SymbExpr):
         ('H_sig_pi_', ('Sig',))
     ]
 
-class ConvergenceError(Exception):
-    """ Inappropriate argument value (of correct type). """
-
-    def __init__(self, message, state):  # real signature unknown
-        self.message = message
-        self.state = state
-        super().__init__(self.message)
-
-    def __str__(self):
-        return f'{self.message} for state {self.state}'
-
-class VConTIM(MATSEval,bu.InjectSymbExpr):
+@tr.provides(INTIM)
+class VCoNTIM(MATSEval,bu.InjectSymbExpr):
 
     name = 'Slide 3.4'
     symb_class = VConTIMExpr
@@ -604,10 +596,18 @@ class VConTIM(MATSEval,bu.InjectSymbExpr):
             f_k_norm_I = np.fabs(f_k[L])
             k += 1
         else:
-            raise ConvergenceError('no convergence for entries', [L, u_N_n1[L], u_T_n1[L]])
+            raise ReturnMappingError('no convergence for entries', [L, u_N_n1[L], u_T_n1[L]])
         # add the algorithmic stiffness
         # recalculate df_k and -f_k for a unit increment of epsilon and solve for lambda
         #
+
+    def get_eps_NT_p(self, **Eps):
+        # plastic strain tensor
+        eps_N_p = Eps['w_pi']
+        eps_T_p_a = np.einsum('a...->...a',
+                              np.array([Eps['s_pi_x'], Eps['s_pi_y'], Eps['s_pi_z']])
+                              )
+        return eps_N_p, eps_T_p_a
 
     def plot_f_state(self, ax, Eps, Sig):
         lower = -self.f_c * 1.05
