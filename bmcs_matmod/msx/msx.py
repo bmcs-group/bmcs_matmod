@@ -16,7 +16,7 @@ import numpy as np
 import traits.api as tr
 from bmcs_utils.api import \
     Float, Instance, EitherType, View, Item, Model, Bool
-from bmcs_matmod.ntim import INTIM, VCoNTIM, VUNTIM, ReturnMappingError
+from bmcs_matmod.ntim import INTIM, VCoNTIM, VUNTIM, VDNTIM, ReturnMappingError
 from ibvpy.tmodel.mats3D.mats3D_eval import MATS3DEval
 from .ms_integ_schemes import MSIntegScheme, MSIS3DM28
 
@@ -36,10 +36,9 @@ class MSX(MATS3DEval):
     )
 
     mic = EitherType(options=[('contim', VCoNTIM),
-                              ('untim', VUNTIM)],
+                              ('untim', VUNTIM),
+                              ('dntim', VDNTIM)],
                      on_option_change='reset_mic')
-
-    #mic = Instance(INTIM)
 
     integ_scheme = EitherType(options=[('3DM28', MSIS3DM28)])
 
@@ -107,7 +106,6 @@ class MSX(MATS3DEval):
         )
         return beta_ijkl
 
-    # def _get_eps_p_ab(self, **Eps):
     def NT_to_ab(self, v_N, v_T_a):
         """
         Integration of the (inelastic) strains for each microplane
@@ -149,9 +147,13 @@ class MSX(MATS3DEval):
             # ----------------------------------------------------------------------
             # Return stresses (corrector) and damaged secant stiffness matrix (predictor)
             # ----------------------------------------------------------------------
-            eps_N_p, eps_T_p_a = self.mic_.get_eps_NT_p(**Eps)
-            eps_p_ab = self.NT_to_ab(eps_N_p, eps_T_p_a)
-            eps_e_ab = eps_ab - eps_p_ab
+            eps_p_a = self.mic_.get_eps_NT_p(**Eps)
+            if eps_p_a:
+                eps_N_p, eps_T_p_a = eps_p_a
+                eps_p_ab = self.NT_to_ab(eps_N_p, eps_T_p_a)
+                eps_e_ab = eps_ab - eps_p_ab
+            else:
+                eps_e_ab = eps_ab
             sig_ab = np.einsum('...abcd,...cd->...ab', D_abcd, eps_e_ab)
         else:
             sig_N, sig_T_a = sig_a[...,0], sig_a[...,1:]
