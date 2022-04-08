@@ -13,7 +13,7 @@ Using Jirasek homogenization approach [1999]
 import bmcs_utils.view
 import numpy as np
 import traits.api as tr
-from bmcs_utils.api import Float, Instance, EitherType, View, Item
+from bmcs_utils.api import Float, View, Item
 from .i_ntim import INTIM
 from ibvpy.tmodel.mats3D.mats3D_eval import MATS3DEval
 
