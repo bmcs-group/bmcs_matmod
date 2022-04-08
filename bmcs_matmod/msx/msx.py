@@ -19,7 +19,7 @@ from bmcs_utils.api import \
 from bmcs_matmod.ntim import INTIM, VCoNTIM, VUNTIM, VDNTIM, ReturnMappingError
 from ibvpy.tmodel.mats3D.mats3D_eval import MATS3DEval
 from .ms_integ_schemes import MSIntegScheme, MSIS3DM28
-
+from ibvpy.api import XDomainSinglePoint, TStepBC, BCDof
 
 class MSX(MATS3DEval):
 
@@ -165,6 +165,25 @@ class MSX(MATS3DEval):
         ax_sig, ax_d_sig = axes
         eps_max = self.eps_max
         n_eps = self.n_eps
+        xmodel = XDomainSinglePoint()
+        m = TStepBC(
+            domains=[(xmodel, self), ],
+            bc=[BCDof(
+                var='u', dof=0, value=eps_max,
+            )]
+        )
+        m.sim.tline.trait_set(step=float(1.0/n_eps))
+        m.sim.run()
+        eps_t = m.hist.U_t[:, 0]
+        sig_t = m.hist.F_t[:, 0]
+        ax_sig.plot(eps_t, sig_t, linestyle='solid', color='blue')
+        ax_sig.set_xlabel(r'$\varepsilon_{11}$ [-]')
+        ax_sig.set_ylabel(r'$\sigma_{11}$ [MPa]')
+
+    def xupdate_plot(self, axes):
+        ax_sig, ax_d_sig = axes
+        eps_max = self.eps_max
+        n_eps = self.n_eps
         eps11_range = np.linspace(1e-9, eps_max, n_eps)
         eps_range = np.zeros((n_eps, 3, 3))
         eps_range[:, 0, 0] = eps11_range
@@ -175,11 +194,11 @@ class MSX(MATS3DEval):
         sig11_range, d_sig1111_range = [], []
         for eps_ab in eps_range:
             try:
-                sig_ab, D_range = self.get_corr_pred(eps_ab[np.newaxis, ...], 1, **state_vars)
+                sig_ab, D_abcd = self.get_corr_pred(eps_ab[np.newaxis, ...], 1, **state_vars)
             except ReturnMappingError:
                 break
             sig11_range.append(sig_ab[0, 0, 0])
-            d_sig1111_range.append(D_range[0, 0, 0, 0, 0])
+            d_sig1111_range.append(D_abcd[0, 0, 0, 0, 0])
         sig11_range = np.array(sig11_range, dtype=np.float_)
         eps11_range = eps11_range[:len(sig11_range)]
         ax_sig.plot(eps11_range, sig11_range, color='blue')
