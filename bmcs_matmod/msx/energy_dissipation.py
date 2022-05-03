@@ -253,170 +253,164 @@ class EnergyDissipation(bu.InteractiveModel):
 
         return W_arr_micro, W_arr_macro
 
-    def plot_energy_dissp(self, m, mic):
+    def plot_energy_dissp(self, m, MSX):
 
-        eps_Emab_hist = self.get_eps_ab(m.hist.U_t).squeeze()
-        delta_eps_Emab = np.concatenate((np.zeros((3, 3))[np.newaxis, ...], np.diff(eps_Emab_hist, axis=0)), axis=0)
+        sigma_ab, eps_ab = [], []
+        for i in range(len(m.hist.F_t)):
+            sigma_ab.append(m.fe_domain[0].xmodel.map_U_to_field(m.hist.F_t[i]) * 2)
+            eps_ab.append(m.fe_domain[0].xmodel.map_U_to_field(m.hist.U_t[i]))
+        sigma_ab = np.array(sigma_ab)
+        eps_ab = np.array(eps_ab)
 
-        sig_Emab_hist = self.get_eps_ab(m.hist.F_t).squeeze()
+        fig_list = []
 
-        eps_a = self._get_e_a(eps_Emab_hist)
-        eps_a_ = np.einsum('...a->a...', eps_a)
-        eps_N = eps_a_[0, ...]
-        eps_T_a = np.einsum('a...->...a', eps_a_[1:, ...])
-        delta_eps_N = np.concatenate((np.zeros(28,)[np.newaxis,...],np.diff(eps_N,axis=0)),axis=0)
-        delta_eps_T_a = np.concatenate((np.zeros((28,3))[np.newaxis, ...], np.diff(eps_T_a, axis=0)), axis=0)
+        for i in range(8):
 
-        omega_N, z_N, alpha_N, r_N, eps_N_p, sig_N, omega_T, z_T, alpha_T_a, eps_T_p_a, sig_T_a = \
-            [], [], [], [], [], [], [], [], [], [], []
-        for i in range(len(m.hist.state_vars)):
-            omega_N.append(m.hist.state_vars[i][0]['omega_N'])
-            z_N.append(m.hist.state_vars[i][0]['z_N'])
-            alpha_N.append(m.hist.state_vars[i][0]['alpha_N'])
-            r_N.append(m.hist.state_vars[i][0]['r_N'])
-            eps_N_p.append(m.hist.state_vars[i][0]['eps_N_p'])
-            sig_N.append(m.hist.state_vars[i][0]['sig_N'])
-            omega_T.append(m.hist.state_vars[i][0]['omega_T'])
-            z_T.append(m.hist.state_vars[i][0]['z_T'])
-            alpha_T_a.append(m.hist.state_vars[i][0]['alpha_T_a'])
-            eps_T_p_a.append(m.hist.state_vars[i][0]['eps_T_p_a'])
-            sig_T_a.append(m.hist.state_vars[i][0]['sig_T_a'])
+            eps_Emab_hist = eps_ab[:, :, i, :, :].squeeze()
+            delta_eps_Emab = np.concatenate((np.zeros((3, 3))[np.newaxis, ...], np.diff(eps_Emab_hist, axis=0)), axis=0)
+            eps_a = self._get_e_a(eps_Emab_hist)
+            eps_a_ = np.einsum('...a->a...', eps_a)
+            eps_N = eps_a_[0, ...]
+            eps_T_a = np.einsum('a...->...a', eps_a_[1:, ...])
+            delta_eps_N = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(eps_N, axis=0)), axis=0)
+            delta_eps_T_a = np.concatenate((np.zeros((28, 3))[np.newaxis, ...], np.diff(eps_T_a, axis=0)), axis=0)
 
-        omega_N = np.array(omega_N).squeeze()
-        z_N = np.array(z_N).squeeze()
-        alpha_N = np.array(alpha_N).squeeze()
-        r_N = np.array(r_N).squeeze()
-        eps_N_p = np.array(eps_N_p).squeeze()
-        sig_N = np.array(sig_N).squeeze()
-        omega_T = np.array(omega_T).squeeze()
-        z_T = np.array(z_T).squeeze()
-        alpha_T_a = np.array(alpha_T_a).squeeze()
-        eps_T_p_a = np.array(eps_T_p_a).squeeze()
-        sig_T_a = np.array(sig_T_a).squeeze()
-        eps_N_e = eps_N - eps_N_p
-        eps_T_e_a = eps_T_a - eps_T_p_a
+            omega_N, z_N, alpha_N, r_N, eps_N_p, sig_N, omega_T, z_T, alpha_T_a, eps_T_p_a, sig_T_a = \
+                [], [], [], [], [], [], [], [], [], [], []
+            for j in range(len(m.hist.state_vars)):
+                omega_N.append(m.hist.state_vars[j][0]['omega_N'][0][i])
+                z_N.append(m.hist.state_vars[j][0]['z_N'][0][i])
+                alpha_N.append(m.hist.state_vars[i][0]['alpha_N'][0][i])
+                r_N.append(m.hist.state_vars[j][0]['r_N'][0][i])
+                eps_N_p.append(m.hist.state_vars[j][0]['eps_N_p'][0][i])
+                sig_N.append(m.hist.state_vars[j][0]['sig_N'][0][i])
+                omega_T.append(m.hist.state_vars[j][0]['omega_T'][0][i])
+                z_T.append(m.hist.state_vars[j][0]['z_T'][0][i])
+                alpha_T_a.append(m.hist.state_vars[j][0]['alpha_T_a'][0][i])
+                eps_T_p_a.append(m.hist.state_vars[j][0]['eps_T_p_a'][0][i])
+                sig_T_a.append(m.hist.state_vars[j][0]['sig_T_a'][0][i])
 
+            omega_N = np.array(omega_N).squeeze()
+            z_N = np.array(z_N).squeeze()
+            alpha_N = np.array(alpha_N).squeeze()
+            eps_N_p = np.array(eps_N_p).squeeze()
+            sig_N = np.array(sig_N).squeeze()
+            omega_T = np.array(omega_T).squeeze()
+            z_T = np.array(z_T).squeeze()
+            alpha_T_a = np.array(alpha_T_a).squeeze()
+            eps_T_p_a = np.array(eps_T_p_a).squeeze()
+            sig_T_a = np.array(sig_T_a).squeeze()
+            eps_N_e = eps_N - eps_N_p
+            eps_T_e_a = eps_T_a - eps_T_p_a
+            sig_Emab_hist = MSX.NT_to_ab(sig_N, sig_T_a)
 
-        work_microplane = np.einsum('...n,...n->...n', sig_N, delta_eps_N) + np.einsum('...na,...na->...n',
-                                                                                                 sig_T_a,
-                                                                                                 delta_eps_T_a)
-        W_arr_micro = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), work_microplane), initial=0)
-        W_arr_macro = cumtrapz(np.einsum('...ij,...ij->...', sig_Emab_hist, delta_eps_Emab), initial=0)
+            work_microplane = np.einsum('...n,...n->...n', sig_N, delta_eps_N) + np.einsum('...na,...na->...n',
+                                                                                           sig_T_a,
+                                                                                           delta_eps_T_a)
+            W_arr_micro = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), work_microplane), initial=0)
+            W_arr_macro = cumtrapz(np.einsum('...ij,...ij->...', sig_Emab_hist, delta_eps_Emab), initial=0)
 
-        delta_eps_N_p = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(eps_N_p, axis=0)), axis=0)
-        delta_eps_N_e = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(eps_N_e, axis=0)), axis=0)
-        delta_alpha_N = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(alpha_N, axis=0)), axis=0)
-        delta_z_N = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(z_N, axis=0)), axis=0)
-        delta_omega_N = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(omega_N, axis=0)), axis=0)
-        delta_r_N = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(r_N, axis=0)), axis=0)
+            delta_eps_N_p = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(eps_N_p, axis=0)), axis=0)
+            delta_eps_N_e = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(eps_N_e, axis=0)), axis=0)
+            delta_alpha_N = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(alpha_N, axis=0)), axis=0)
+            delta_z_N = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(z_N, axis=0)), axis=0)
+            delta_omega_N = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(omega_N, axis=0)), axis=0)
 
-        Z_N = mic.K_N * z_N
-        X_N = mic.gamma_N * alpha_N
-        Y_N = 0.5  * mic.E_N * (eps_N - eps_N_p) ** 2.0
-        R_N = (1.0 / mic.Ad) * (-r_N / (1.0 + r_N))
+            Z_N = MSX.mic_.K_N * z_N
+            X_N = MSX.mic_.gamma_N * alpha_N
+            Y_N = 0.5 * MSX.mic_.E_N * (eps_N - eps_N_p) ** 2.0
 
-        plastic_work_N = np.einsum('...n,...n->...n', sig_N, delta_eps_N_p)
-        elastic_work_N = np.einsum('...n,...n->...n', sig_N, delta_eps_N_e)
-        kin_free_energy_N = np.einsum('...n,...n->...n', X_N, delta_alpha_N)
-        iso_free_energy_N = np.einsum('...n,...n->...n',Z_N, delta_z_N)
-        damage_dissip_N = np.einsum('...n,...n->...n', Y_N, delta_omega_N) #+ \
-                                   #np.einsum('...n,...n->...n', R_N, delta_r_N)
+            plastic_work_N = np.einsum('...n,...n->...n', sig_N, delta_eps_N_p)
+            elastic_work_N = np.einsum('...n,...n->...n', sig_N, delta_eps_N_e)
+            kin_free_energy_N = np.einsum('...n,...n->...n', X_N, delta_alpha_N)
+            iso_free_energy_N = np.einsum('...n,...n->...n', Z_N, delta_z_N)
+            damage_dissip_N = np.einsum('...n,...n->...n', Y_N, delta_omega_N)
 
-        E_plastic_work_N = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), plastic_work_N), initial=0)
-        E_elastic_work_N = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), elastic_work_N), initial=0)
-        E_iso_free_energy_N = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), iso_free_energy_N), initial=0)
-        E_kin_free_energy_N = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), kin_free_energy_N), initial=0)
-        E_plastic_diss_N = E_plastic_work_N - E_iso_free_energy_N - E_kin_free_energy_N
-        E_damage_N = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), damage_dissip_N), initial=0)
+            E_plastic_work_N = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), plastic_work_N), initial=0)
+            E_elastic_work_N = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), elastic_work_N), initial=0)
+            E_iso_free_energy_N = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), iso_free_energy_N), initial=0)
+            E_kin_free_energy_N = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), kin_free_energy_N), initial=0)
+            E_plastic_diss_N = E_plastic_work_N - E_iso_free_energy_N - E_kin_free_energy_N
+            E_damage_N = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), damage_dissip_N), initial=0)
 
-        delta_eps_T_p_a = np.concatenate((np.zeros((28, 3))[np.newaxis, ...], np.diff(eps_T_p_a, axis=0)), axis=0)
-        delta_eps_T_e_a = np.concatenate((np.zeros((28, 3))[np.newaxis, ...], np.diff(eps_T_e_a, axis=0)), axis=0)
-        delta_alpha_T_a = np.concatenate((np.zeros((28, 3))[np.newaxis, ...], np.diff(alpha_T_a, axis=0)), axis=0)
-        delta_z_T = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(z_T, axis=0)), axis=0)
-        delta_omega_T = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(omega_T, axis=0)), axis=0)
+            delta_eps_T_p_a = np.concatenate((np.zeros((28, 3))[np.newaxis, ...], np.diff(eps_T_p_a, axis=0)), axis=0)
+            delta_eps_T_e_a = np.concatenate((np.zeros((28, 3))[np.newaxis, ...], np.diff(eps_T_e_a, axis=0)), axis=0)
+            delta_alpha_T_a = np.concatenate((np.zeros((28, 3))[np.newaxis, ...], np.diff(alpha_T_a, axis=0)), axis=0)
+            delta_z_T = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(z_T, axis=0)), axis=0)
+            delta_omega_T = np.concatenate((np.zeros(28, )[np.newaxis, ...], np.diff(omega_T, axis=0)), axis=0)
 
-        Z_T = mic.K_T * z_T
-        X_T = mic.gamma_T * alpha_T_a
-        Y_T = 0.5 * mic.E_T * np.einsum('...na,...na->...n', (eps_T_a - eps_T_p_a), (eps_T_a - eps_T_p_a))
+            Z_T = MSX.mic_.K_T * z_T
+            X_T = MSX.mic_.gamma_T * alpha_T_a
+            Y_T = 0.5 * MSX.mic_.E_T * np.einsum('...na,...na->...n', (eps_T_a - eps_T_p_a), (eps_T_a - eps_T_p_a))
 
-        plastic_work_T = np.einsum('...na,...na->...n', sig_T_a, delta_eps_T_p_a)
-        elastic_work_T = np.einsum('...na,...na->...n', sig_T_a, delta_eps_T_e_a)
-        kin_free_energy_T = np.einsum('...na,...na->...n', X_T, delta_alpha_T_a)
-        iso_free_energy_T = np.einsum('...n,...n->...n', Z_T, delta_z_T)
-        damage_dissip_T = np.einsum('...n,...n->...n', Y_T, delta_omega_T)
+            plastic_work_T = np.einsum('...na,...na->...n', sig_T_a, delta_eps_T_p_a)
+            elastic_work_T = np.einsum('...na,...na->...n', sig_T_a, delta_eps_T_e_a)
+            kin_free_energy_T = np.einsum('...na,...na->...n', X_T, delta_alpha_T_a)
+            iso_free_energy_T = np.einsum('...n,...n->...n', Z_T, delta_z_T)
+            damage_dissip_T = np.einsum('...n,...n->...n', Y_T, delta_omega_T)
 
-        E_plastic_work_T = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), plastic_work_T), initial=0)
-        E_elastic_work_T = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), elastic_work_T), initial=0)
-        E_iso_free_energy_T = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), iso_free_energy_T), initial=0)
-        E_kin_free_energy_T = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), kin_free_energy_T), initial=0)
-        E_plastic_diss_T = E_plastic_work_T - E_iso_free_energy_T - E_kin_free_energy_T
-        E_damage_T = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), damage_dissip_T), initial=0)
+            E_plastic_work_T = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), plastic_work_T), initial=0)
+            E_elastic_work_T = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), elastic_work_T), initial=0)
+            E_iso_free_energy_T = cumtrapz(np.einsum('...n,...n->...',self._get_MPW(), iso_free_energy_T), initial=0)
+            E_kin_free_energy_T = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), kin_free_energy_T), initial=0)
+            E_plastic_diss_T = E_plastic_work_T - E_iso_free_energy_T - E_kin_free_energy_T
+            E_damage_T = cumtrapz(np.einsum('...n,...n->...', self._get_MPW(), damage_dissip_T), initial=0)
 
-        E_kin_free_energy = E_kin_free_energy_T + E_kin_free_energy_N
-        E_iso_free_energy = E_iso_free_energy_T + E_iso_free_energy_N
-        E_plastic_diss = E_plastic_diss_T + E_plastic_diss_N
-        E_damage_diss = E_damage_T + E_damage_N
-        E_plastic_work = E_plastic_work_T + E_plastic_work_N
-        E_elastic_work = E_elastic_work_T + E_elastic_work_N
+            E_kin_free_energy = E_kin_free_energy_T + E_kin_free_energy_N
+            E_iso_free_energy = E_iso_free_energy_T + E_iso_free_energy_N
+            E_plastic_diss = E_plastic_diss_T + E_plastic_diss_N
+            E_damage_diss = E_damage_T + E_damage_N
+            E_plastic_work = E_plastic_work_T + E_plastic_work_N
+            E_elastic_work = E_elastic_work_T + E_elastic_work_N
 
-        t_arr = np.linspace(0,1,len(E_plastic_work))
+            t_arr = np.linspace(0, 1, len(E_plastic_work))
 
-        fig = plt.figure()
-        ax = fig.subplots(1, 1)
-        E_level = 0
+            fig = plt.figure()
+            ax = fig.subplots(1, 1)
+            E_level = 0
 
+            #ax2.plot(eps_Emab_hist[:, 0, 0], sig_Emab_hist[:, 0, 0])
+            #ax2.plot(eps_Emab_hist[:, 0, 1], sig_Emab_hist[:, 0, 1])
+            #ax2.plot(eps_Emab_hist[:, 0, 2], sig_Emab_hist[:, 0, 2])
 
-        # ax_i = ax.twinx()
+            ax.plot(t_arr, E_damage_diss + E_level, color='black', lw=2)
+            ax.fill_between(t_arr, E_damage_N + E_level, E_level, color='black',
+                            hatch='|', label=r'$W$ - damage N diss');
+            E_d_level = E_level + abs(E_damage_N)
+            ax.fill_between(t_arr, abs(E_damage_T) + E_d_level, E_d_level, color='gray',
+                            alpha=0.3, label=r'$W$ - damage T diss');
 
-        ax.plot(t_arr, E_damage_diss + E_level, color='black', lw=1)
-        # ax_i.plot(t_arr, E_damage_diss, color='gray', lw=2,
-        #           label=r'damage diss.: $Y\dot{\omega}$')
-        ax.fill_between(t_arr, E_damage_N + E_level, E_level, color='black',
-                        hatch='|', label=r'$W$ - damage N diss');
-        E_d_level = E_level + E_damage_N
-        ax.fill_between(t_arr, E_damage_T + E_d_level, E_d_level, color='gray',
-                        alpha=0.3, label=r'$W$ - damage T diss');
+            E_level = abs(E_damage_diss)
 
-        E_level = E_damage_diss
-        # ax.plot(t_arr, E_plastic_work + E_level, lw=0.5, color='black')
-        # # ax.fill_between(t_arr, E_plastic_work + E_level, E_level, color='red', alpha=0.3)
-        # label = r'plastic work: $\sigma \dot{\varepsilon}^\pi$'
-        # ax_i.plot(t_arr, E_plastic_work, color='red', lw=2,label=label)
-        # ax.fill_between(t_arr, E_plastic_work_N + E_level, E_level, color='orange',
-        #                 alpha=0.3);
-        # E_p_level = E_level + E_plastic_work_N
-        # ax.fill_between(t_arr, E_plastic_work_T + E_p_level, E_p_level, color='red',
-        #                 alpha=0.3);
-        ax.plot(t_arr, E_plastic_diss + E_level, lw=.4, color='black')
-        label = r'apparent pl. diss.: $\sigma \dot{\varepsilon}^\pi - X\dot{\alpha} - Z\dot{z}$'
-        # ax_i.plot(t_arr, E_plastic_diss, color='red', lw=2, label=label)
-        ax.fill_between(t_arr, E_plastic_diss_N + E_level, E_level, color='red',
-                        hatch='-', label=r'$W$ - plastic N diss')
-        E_d_level = E_level + E_plastic_diss_N
-        ax.fill_between(t_arr, E_plastic_diss_T + E_d_level, E_d_level, color='red',
-                        alpha=0.3, label=r'$W$ - plastic T diss')
-        E_level += E_plastic_diss
-        ax.plot(t_arr, E_iso_free_energy + E_level, '-.', lw=0.5, color='black')
-        ax.fill_between(t_arr, E_iso_free_energy + E_level, E_level, color='royalblue',
-                        hatch='|', label=r'$W$ - iso free energy')
-        # ax_i.plot(t_arr, -E_iso_free_energy, '-.', color='royalblue', lw=2,
-        #           label=r'iso. diss.: $Z\dot{z}$')
-        E_level += E_iso_free_energy
-        ax.plot(t_arr, E_kin_free_energy + E_level, '-.', color='black', lw=0.5)
-        ax.fill_between(t_arr, E_kin_free_energy + E_level, E_level, color='royalblue', alpha=0.2,
-                        label=r'$W$ - kin free energyy')
-        # ax_i.plot(t_arr, -E_kin_free_energy, '-.', color='blue', lw=2,
-        #           label=r'free energy: $X\dot{\alpha}$')
-        E_level += E_kin_free_energy
+            ax.plot(t_arr, E_plastic_diss + E_level, lw=1., color='red')
+            ax.fill_between(t_arr, E_plastic_diss_N + E_level, E_level, color='red',
+                            hatch='-', label=r'$W$ - plastic N diss')
+            E_d_level = E_level + E_plastic_diss_N
+            ax.fill_between(t_arr, E_plastic_diss_T + E_d_level, E_d_level, color='red',
+                            alpha=0.3, label=r'$W$ - plastic T diss')
+            E_level += E_plastic_diss
 
-        ax.plot(t_arr, W_arr_macro, lw=2.5, color='black', label=r'$W$ - Input work')
-        # ax.plot(t_arr, G_arr, '--', color='black', lw = 0.5, label=r'$W^\mathrm{inel}$ - Inelastic work')
-        ax.fill_between(t_arr, W_arr_micro, E_level, color='green', alpha=0.2, label=r'$W$ - stored energy')
-        ax.set_xlabel('$t$ [-]');
-        ax.set_ylabel(r'$E$ [Nmm]')
-        ax.legend()
+            ax.plot(t_arr, abs(E_iso_free_energy) + E_level, '-.', lw=0.5, color='black')
+            ax.fill_between(t_arr, abs(E_iso_free_energy) + E_level, E_level, color='royalblue',
+                            hatch='|', label=r'$W$ - iso free energy')
 
-        return fig
+            E_level += abs(E_iso_free_energy)
+            ax.plot(t_arr, abs(E_kin_free_energy) + E_level, '-.', color='black', lw=0.5)
+            ax.fill_between(t_arr, abs(E_kin_free_energy) + E_level, E_level, color='royalblue', alpha=0.2,
+                            label=r'$W$ - kin free energyy')
+
+            E_level += abs(E_kin_free_energy)
+
+            ax.plot(t_arr, W_arr_macro, lw=2.5, color='black', label=r'$W$ - Input work')
+            ax.plot(t_arr, W_arr_micro, lw=2.5, color='red', label=r'$W$ - Input work - micro')
+            # ax.plot(t_arr, G_arr, '--', color='black', lw = 0.5, label=r'$W^\mathrm{inel}$ - Inelastic work')
+            ax.fill_between(t_arr, W_arr_micro, E_level, color='green', alpha=0.2, label=r'$W$ - stored energy')
+            ax.set_xlabel('$t$ [-]');
+            ax.set_ylabel(r'$E$ [Nmm]')
+            ax.legend()
+            fig_list.append(fig)
+
+        return fig_list
 
 
     def plot_energy(self, ax, ax_i):

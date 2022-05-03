@@ -160,13 +160,14 @@ class VUNTIM(MATS3DEval):
     # -------------------------------------------------------------------------
     # microplane constitutive law (Tangential CSD)-(Pressure sensitive cumulative damage)
     # -------------------------------------------------------------------------
-    def get_tangential_law(self, eps_T_a, **Eps):
+    def get_tangential_law(self, eps_T_a, eps_N, **Eps):
 
-        omega_T, z_T, alpha_T_a, eps_T_p_a, sig_N, sig_T_a= [
-            Eps[key] for key in ['omega_T', 'z_T', 'alpha_T_a', 'eps_T_p_a', 'sig_N','sig_T_a']
+        omega_T, omega_N, z_T, alpha_T_a, eps_T_p_a, eps_N_p, sig_T_a= [
+            Eps[key] for key in ['omega_T', 'omega_N', 'z_T', 'alpha_T_a', 'eps_T_p_a', 'eps_N_p','sig_T_a']
         ]
 
         E_T = self.E_T
+        E_N = self.E_N
 
         # thermodynamic forces
         sig_pi_trial = E_T * (eps_T_a - eps_T_p_a)
@@ -183,13 +184,14 @@ class VUNTIM(MATS3DEval):
                 '...na,...na->...n',
                 (eps_T_a - eps_T_p_a),
                 (eps_T_a - eps_T_p_a))
+        sig_N = (1.0 - omega_N) * E_N * (eps_N - eps_N_p)
 
-        f = norm_1 - self.sigma_T_0 - Z + self.a * sig_N
+        f = norm_1 - self.sigma_T_0 - Z - self.a * sig_N
 
         plas_1 = f > 1e-15
         elas_1 = f < 1e-15
 
-        delta_lamda = f / \
+        delta_lamda = (f + self.a * sig_N) / \
                       (E_T / (1.0 - omega_T) + self.gamma_T + self.K_T) * plas_1
         norm_2 = 1.0 * elas_1 + np.sqrt(
             np.einsum(
@@ -241,7 +243,7 @@ class VUNTIM(MATS3DEval):
         eps_T_a_n1 = np.einsum('a...->...a', eps_a_[1:,...])
 
         sig_N = self.get_normal_law(eps_N_n1, **Eps)
-        sig_T_a = self.get_tangential_law(eps_T_a_n1, **Eps)
+        sig_T_a = self.get_tangential_law(eps_T_a_n1,eps_N_n1, **Eps)
 
         D_ = np.zeros(eps_a.shape + (eps_a.shape[-1],))
         D_[..., 0, 0] = self.E_N # * (1 - omega_N)
@@ -321,3 +323,12 @@ class VUNTIM(MATS3DEval):
         G_arr = W_arr - U_arr
         return W_arr, U_arr, G_arr
 
+# if __name__ == "__main__":
+#     plane = VUNTIM()
+#     fig = plt.figure()
+#     ax_sig_N, ax_ener_N, ax_sig_T, ax_ener_T = fig.subplots(1, 4)
+#     ax_d_sig_N = ax_sig_N.twinx()
+#     ax_d_sig_T = ax_sig_T.twinx()
+#     axes = ax_sig_N, ax_d_sig_N, ax_ener_N, ax_sig_T, ax_d_sig_T, ax_ener_T
+#     plane.plot_idx(ax_sig_N, ax_d_sig_N, ax_ener_N, 0)
+#     plane.plot_idx(ax_sig_T, ax_d_sig_T,ax_ener_T, 1)

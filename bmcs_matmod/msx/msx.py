@@ -183,12 +183,13 @@ class MSX(MATS3DEval):
 
         eps_t = m.hist.U_t[:, 0]
         sig_t = m.hist.F_t[:, 0]
-        ax_sig.plot(eps_t, sig_t, linestyle='solid', color='blue')
-        ax_work.plot(eps_t, W_arr_micro, linestyle='dashed', color='red')
-        ax_work.plot(eps_t, W_arr_macro, linestyle='solid', color='red')
+        ax_sig.plot(eps_t, sig_t, linestyle='solid', color='blue',label=r'$\sigma - \varepsilon$')
+        ax_work.plot(eps_t, W_arr_micro, linestyle='dashed', color='red', label='microplane work')
+        ax_work.plot(eps_t, W_arr_macro, linestyle='solid', color='red', label='macroscopic work')
         ax_sig.set_xlabel(r'$\varepsilon_{11}$ [-]')
         ax_sig.set_ylabel(r'$\sigma_{11}$ [MPa]')
-        return m
+        ax_sig.legend()
+        ax_work.legend()
 
     def xupdate_plot(self, axes):
         ax_sig, ax_d_sig = axes
@@ -221,3 +222,14 @@ class MSX(MATS3DEval):
                     (sig11_range[:-1]-sig11_range[1:])/(eps11_range[:-1]-eps11_range[1:]),
                     color='orange', linestyle='dashed')
 
+# if __name__ == "__main__":
+#     import matplotlib.pyplot as plt
+#     mic = MSX(E=28000, nu=0.2,
+#           mic='untim', eps_max=0.01, n_eps=100, double_pvw=False)
+#     fig = plt.figure()
+#     ax_sig = fig.subplots(1, 1)
+#     ax_d_sig = ax_sig.twinx()
+#     axes = ax_sig, ax_d_sig
+#     m = mic.update_plot(axes)
+#     energydissipation = EnergyDissipation()
+#     fig = energydissipation.plot_energy_dissp(m,mic.mic_)
