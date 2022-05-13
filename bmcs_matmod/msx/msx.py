@@ -18,8 +18,10 @@ from bmcs_utils.api import \
     Float, Instance, EitherType, View, Item, Model, Bool
 from bmcs_matmod.ntim import INTIM, VCoNTIM, VUNTIM, VDNTIM, ReturnMappingError
 from ibvpy.tmodel.mats3D.mats3D_eval import MATS3DEval
-from .ms_integ_schemes import MSIntegScheme, MSIS3DM28
+from bmcs_matmod.msx.ms_integ_schemes import MSIntegScheme, MSIS3DM28
+from bmcs_matmod.msx.energy_dissipation import EnergyDissipation
 from ibvpy.api import XDomainSinglePoint, TStepBC, BCDof
+
 
 class MSX(MATS3DEval):
 
@@ -163,8 +165,10 @@ class MSX(MATS3DEval):
 
     def update_plot(self, axes):
         ax_sig, ax_d_sig = axes
+        ax_work = ax_sig.twinx()
         eps_max = self.eps_max
         n_eps = self.n_eps
+        n_eps = 100
         xmodel = XDomainSinglePoint()
         m = TStepBC(
             domains=[(xmodel, self), ],
@@ -174,11 +178,18 @@ class MSX(MATS3DEval):
         )
         m.sim.tline.trait_set(step=float(1.0/n_eps))
         m.sim.run()
+        energydissipation = EnergyDissipation()
+        W_arr_micro, W_arr_macro = energydissipation.plot_work(m)
+
         eps_t = m.hist.U_t[:, 0]
         sig_t = m.hist.F_t[:, 0]
-        ax_sig.plot(eps_t, sig_t, linestyle='solid', color='blue')
+        ax_sig.plot(eps_t, sig_t, linestyle='solid', color='blue',label=r'$\sigma - \varepsilon$')
+        ax_work.plot(eps_t, W_arr_micro, linestyle='dashed', color='red', label='microplane work')
+        ax_work.plot(eps_t, W_arr_macro, linestyle='solid', color='red', label='macroscopic work')
         ax_sig.set_xlabel(r'$\varepsilon_{11}$ [-]')
         ax_sig.set_ylabel(r'$\sigma_{11}$ [MPa]')
+        ax_sig.legend()
+        ax_work.legend()
 
     def xupdate_plot(self, axes):
         ax_sig, ax_d_sig = axes
@@ -191,7 +202,7 @@ class MSX(MATS3DEval):
             var: np.zeros((1,) + shape)
             for var, shape in self.state_var_shapes.items()
         }
-        sig11_range, d_sig1111_range = [], []
+        sig11_range, d_sig1111_range, state_vars_record = [], [], []
         for eps_ab in eps_range:
             try:
                 sig_ab, D_abcd = self.get_corr_pred(eps_ab[np.newaxis, ...], 1, **state_vars)
@@ -210,3 +221,15 @@ class MSX(MATS3DEval):
         ax_d_sig.plot(eps11_range[:-1],
                     (sig11_range[:-1]-sig11_range[1:])/(eps11_range[:-1]-eps11_range[1:]),
                     color='orange', linestyle='dashed')
+
+# if __name__ == "__main__":
+#     import matplotlib.pyplot as plt
+#     mic = MSX(E=28000, nu=0.2,
+#           mic='untim', eps_max=0.01, n_eps=100, double_pvw=False)
+#     fig = plt.figure()
+#     ax_sig = fig.subplots(1, 1)
+#     ax_d_sig = ax_sig.twinx()
+#     axes = ax_sig, ax_d_sig
+#     m = mic.update_plot(axes)
+#     energydissipation = EnergyDissipation()
+#     fig = energydissipation.plot_energy_dissp(m,mic.mic_)

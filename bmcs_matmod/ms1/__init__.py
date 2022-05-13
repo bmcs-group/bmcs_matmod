@@ -2,5 +2,15 @@ from .ms1 import MS1
 from .ms1 import MS13D
 from .ms1_sigma_pvw import MS1PVW
 from .ms1_sigma_pvw import MS13DPVW
+from .ms1_sigma_pvw_regularized import MS1PVWEQ
+from .ms1_sigma_pvw_regularized import MS13DPVWEQ
 from .ms1_eeq_explicit import MS1EEQ
 from .ms1_eeq_explicit import MS13DEEQ
+from .ms1_sigma_pvw_damage import MS1PVW_damage
+from .ms1_sigma_pvw_damage import MS13DPVW_damage
+from .ms1_sigma_eeq_damage import MS13DEEQ_damage
+from .ms1_sigma_eeq_damage import MS13DEEQ_damage
+from .ms1_sigma_pvw_plastic import MS1PVW_plastic
+from .ms1_sigma_pvw_plastic import MS13DPVW_plastic
+from .ms1_sigma_eeq_plastic import MS13DEEQ_plastic
+from .ms1_sigma_eeq_plastic import MS13DEEQ_plastic
