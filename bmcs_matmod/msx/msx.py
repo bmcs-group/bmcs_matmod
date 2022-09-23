@@ -16,7 +16,7 @@ import numpy as np
 import traits.api as tr
 from bmcs_utils.api import \
     Float, Instance, EitherType, View, Item, Model, Bool
-from bmcs_matmod.ntim import INTIM, VCoNTIM, VUNTIM, VDNTIM, ReturnMappingError
+from bmcs_matmod.ntim import INTIM, VCoNTIM, VUNTIM, VUNTIM_M, VDNTIM, ReturnMappingError
 from ibvpy.tmodel.mats3D.mats3D_eval import MATS3DEval
 from bmcs_matmod.msx.ms_integ_schemes import MSIntegScheme, MSIS3DM28
 from bmcs_matmod.msx.energy_dissipation import EnergyDissipation
@@ -39,6 +39,7 @@ class MSX(MATS3DEval):
 
     mic = EitherType(options=[('contim', VCoNTIM),
                               ('untim', VUNTIM),
+                              ('untim_m', VUNTIM_M),
                               ('dntim', VDNTIM)],
                      on_option_change='reset_mic')
 

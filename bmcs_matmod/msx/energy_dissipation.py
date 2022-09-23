@@ -281,7 +281,7 @@ class EnergyDissipation(bu.InteractiveModel):
                 omega_N.append(m.hist.state_vars[j][0]['omega_N'][0][i])
                 z_N.append(m.hist.state_vars[j][0]['z_N'][0][i])
                 alpha_N.append(m.hist.state_vars[i][0]['alpha_N'][0][i])
-                r_N.append(m.hist.state_vars[j][0]['r_N'][0][i])
+                # r_N.append(m.hist.state_vars[j][0]['r_N'][0][i])
                 eps_N_p.append(m.hist.state_vars[j][0]['eps_N_p'][0][i])
                 sig_N.append(m.hist.state_vars[j][0]['sig_N'][0][i])
                 omega_T.append(m.hist.state_vars[j][0]['omega_T'][0][i])
