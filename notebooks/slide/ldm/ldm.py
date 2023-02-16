@@ -356,7 +356,7 @@ def test04_mgrid(dimensions=(1, 1, 5), shape=(10, 5, 5)):
     # print('control_top', control_dofs)
     w_max = 0.1
 
-    # np.savez('myfile.npz', X_Ia=X_Ia, I_Li=I_Li, fixed_dofs=fixed_dofs,
+    # np. ez('myfile.npz', X_Ia=X_Ia, I_Li=I_Li, fixed_dofs=fixed_dofs,
     #          control_dofs=control_dofs)
     # npzfile = np.load('myfile.npz')
     # X_Ia = npzfile['X_Ia']
