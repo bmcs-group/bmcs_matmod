@@ -203,7 +203,7 @@ class TEVPDIfcPlot(object):
         ax.fill_between(t_t, E_kin_free_energy + E_level, E_level, color='royalblue', alpha=0.2);
 
         E_level += E_kin_free_energy
-        # E_kin_free_energy:
+        # E_thermal - calorimethric energy:
         ax.plot(t_t, E_S_E_ + E_level, '-.', color='black', lw=0.5)
         ax.fill_between(t_t, E_S_E_ + E_level, E_level, color='yellow', alpha=0.2);
 
