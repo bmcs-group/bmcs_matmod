@@ -1,5 +1,6 @@
 import matplotlib.pylab as plt
 from scipy.integrate import cumtrapz
+import numpy as np
 
 colors = dict( # color associations
      stored_energy = 'darkgreen', # recoverable
@@ -34,7 +35,7 @@ class TEVPDIfcPlot(object):
         ax1_twin = ax1.twinx()
 
         for (param, rv), color in zip(response_values.items(), ['black', 'red', 'green']):
-            t_t, u_ta, T_t, Eps_t, Sig_t, iter_t = rv
+            t_t, u_ta, T_t, Eps_t, Sig_t, iter_t, _ = rv
             u_p_Tx_t, u_p_Ty_t, u_p_N_t, z_T_t, alpha_Tx_t, alpha_Ty_t, omega_T_t, omega_N_t = Eps_t.T
             sig_Tx_t, sig_Ty_t, sig_N_t, Z_T_t, X_Tx_t, X_Ty_t, Y_T_t, Y_N_t = Sig_t.T
             ax1.plot(t_t, u_ta[:, 0], color=color, linewidth=1, label="{} = {}".format(param_name, param))  # Loading scenario
@@ -74,7 +75,7 @@ class TEVPDIfcPlot(object):
     @staticmethod
     def plot_Sig_Eps(rv, ax1, ax11, ax2, ax22, ax3, ax33, ax4, ax44):
         colors = ['blue','red', 'green', 'black', 'magenta' ]
-        t_t, u_ta, T_t, Eps_t, Sig_t, iter_t = rv
+        t_t, u_ta, T_t, Eps_t, Sig_t, iter_t, _ = rv
         s_x_t = u_ta[:,0]
         u_Tx_pi_, u_Ty_pi_, u_N_pi_, z_, alpha_Tx_, alpha_Ty_, omega_T_, omega_N_ = Eps_t.T
         tau_x_pi_, tau_y_pi_, sig_pi_, Z_, X_x_, X_y_, Y_T_, Y_N_ = Sig_t.T
@@ -106,7 +107,7 @@ class TEVPDIfcPlot(object):
     def plot_work(ax, rv):
         """Plot input work and stored energy on top of the dissipated energy.
         """
-        t_t, u_ta, T_t, Eps_t, Sig_t, iter_t = rv
+        t_t, u_ta, T_t, Eps_t, Sig_t, iter_t, _ = rv
         u_Tx_, u_Ty_, u_N_, = u_ta.T
         u_Tx_p_, u_Ty_p_, u_N_p_, z_, alpha_Tx_, alpha_Ty_, omega_T_, omega_N_ = Eps_t.T
         sig_Tx_p_, sig_Ty_p_, sig_N_p_, Z_, X_x_, X_y_, Y_T_, Y_N_ = Sig_t.T
@@ -138,7 +139,7 @@ class TEVPDIfcPlot(object):
     def plot_dissipation(ax, rv, ax_i=None):
         """Stapled and absolute plots of energy dissipation.
         """
-        t_t, u_ta, T_t, Eps_t, Sig_t, iter_t = rv
+        t_t, u_ta, T_t, Eps_t, Sig_t, iter_t, drho_psi_dEps_t = rv
 
         E_i = cumtrapz(Sig_t, Eps_t, initial=0, axis=0)
         E_T_x_pi_, E_T_y_pi_, E_N_pi_, E_z_, E_alpha_x_, E_alpha_y_, E_omega_T_, E_omega_N_ = E_i.T
@@ -151,7 +152,7 @@ class TEVPDIfcPlot(object):
         E_plastic_diss_N = E_plastic_work_N
         E_plastic_diss = E_plastic_diss_T + E_plastic_diss_N
         E_damage_diss = E_omega_T_ + E_omega_N_
-        
+
         if not ax_i is None:
                 ax_i.plot(t_t, E_damage_diss, color='gray', lw=2,
                         label=r'damage diss.: $Y\dot{\omega}$')
@@ -201,6 +202,10 @@ class TEVPDIfcPlot(object):
         # E_kin_free_energy:
         ax.plot(t_t, E_kin_free_energy + E_level, '-.', color='black', lw=0.5)
         ax.fill_between(t_t, E_kin_free_energy + E_level, E_level, color='royalblue', alpha=0.2);
+
+        D_ti = cumtrapz(drho_psi_dEps_t, Eps_t, initial=0, axis=0)
+        D_t = np.sum(D_ti, axis=1)
+        ax.plot(t_t, D_t, linestyle='dashed', color='red', lw=2)
 
     @classmethod
     def plot_energy_breakdown(ax, ax_i, t_arr, s_x_t, s_y_t, w_t, Eps_arr, Sig_arr):
