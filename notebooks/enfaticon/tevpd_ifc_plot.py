@@ -18,7 +18,7 @@ class TEVPDIfcPlot(object):
     """
         
     @staticmethod
-    def param_study_plot(param_name, response_values):
+    def param_study_plot(param_name, response_values, get_Gamma=None, **mp):
         """
         The function is used for visualizing the simulation results. This function accepts four arguments: `param_name`, `s_arr` (array of slip), `t_arr` (array of companion timestamps), and `response_values` (dictionary containing responses).
 
@@ -30,19 +30,58 @@ class TEVPDIfcPlot(object):
 
         Each subplot includes a legend depicting the parameter name and its corresponding value, and zero lines for easy reference.
         """
-        fig, ((ax1,  ax2), (ax3,  ax4)) = plt.subplots(2,2, tight_layout=True, figsize=(7,7))
+        fig, ((ax1,  ax2, ax5), (ax3,  ax4, ax6)) = plt.subplots(2,3, tight_layout=True, figsize=(10.5, 7))
         fig.canvas.header_visible = False
         ax1_twin = ax1.twinx()
+        ax5_twin = ax5.twinx()
 
         for (param, rv), color in zip(response_values.items(), ['black', 'red', 'green']):
             t_t, u_ta, T_t, Eps_t, Sig_t, iter_t, _ = rv
             u_p_Tx_t, u_p_Ty_t, u_p_N_t, z_T_t, alpha_Tx_t, alpha_Ty_t, omega_T_t, omega_N_t = Eps_t.T
             sig_Tx_t, sig_Ty_t, sig_N_t, Z_T_t, X_Tx_t, X_Ty_t, Y_T_t, Y_N_t = Sig_t.T
-            ax1.plot(t_t, u_ta[:, 0], color=color, linewidth=1, label="{} = {}".format(param_name, param))  # Loading scenario
+            ax1.plot(
+                t_t,
+                u_ta[:, 0],
+                color=color,
+                linewidth=1,
+                label=f"{param_name} = {param}",
+            )
             ax1_twin.plot(t_t, sig_Tx_t, linestyle='dashed', color=color, linewidth=1)
-            ax2.plot(u_ta[:,0], sig_Tx_t, color=color, linewidth=1, label="{} = {}".format(param_name, param))    # Stress-slip relation
-            ax3.plot(t_t, T_t, color=color, linewidth=1, label="{} = {}".format(param_name, param))      # Evolution of temp
-            ax4.plot(u_ta[:, 0], omega_T_t, color=color, linewidth=1, label="{} = {}".format(param_name, param))         # Damage evolution
+            ax2.plot(
+                u_ta[:, 0],
+                sig_Tx_t,
+                color=color,
+                linewidth=1,
+                label=f"{param_name} = {param}",
+            )
+            ax3.plot(t_t, T_t, color=color, linewidth=1, label=f"{param_name} = {param}")
+            ax4.plot(
+                u_ta[:, 0],
+                omega_T_t,
+                color=color,
+                linewidth=1,
+                label=f"{param_name} = {param}",
+            )
+            ax5.plot(
+                t_t,
+                z_T_t,
+                color=color,
+                linewidth=1,
+                label=f"{param_name} = {param}",
+            )
+            if get_Gamma is not None:
+                ax5_twin.plot(
+                        t_t, (mp['f_s_'] + Z_T_t) * get_Gamma(T_t,**mp),
+                        color=color,
+                        linewidth=1,
+                        linestyle='dashed'
+                )
+                ax5_twin.plot(
+                        t_t, Z_T_t,
+                        color=color,
+                        linewidth=1,
+                        linestyle='dotted'
+                )
 
         ax1.axhline(y=0, color='k', linewidth=1, alpha=0.5)
         ax1.axvline(x=0, color='k', linewidth=1, alpha=0.5)
@@ -71,6 +110,13 @@ class TEVPDIfcPlot(object):
         ax4.set_xlabel('slip [mm]')
         ax4.set_ylabel('damage [-]')
         ax4.legend()
+
+        ax5.axhline(y=0, color='k', linewidth=1, alpha=0.5)
+        ax5.axvline(x=0, color='k', linewidth=1, alpha=0.5)
+        ax5.set_title('isotropic hardening')
+        ax5.set_xlabel('time [-]')
+        ax5.set_ylabel('z [mm]')
+        ax5.legend()
 
     @staticmethod
     def plot_Sig_Eps(rv, ax1, ax11, ax2, ax22, ax3, ax33, ax4, ax44):
@@ -153,21 +199,21 @@ class TEVPDIfcPlot(object):
         E_plastic_diss = E_plastic_diss_T + E_plastic_diss_N
         E_damage_diss = E_omega_T_ + E_omega_N_
 
-        if not ax_i is None:
-                ax_i.plot(t_t, E_damage_diss, color='gray', lw=2,
-                        label=r'damage diss.: $Y\dot{\omega}$')
-                ax_i.plot(t_t, E_plastic_work, color='red', lw=2,
-                        label=r'plastic work: $\sigma \dot{\varepsilon}^\pi$')
-                ax_i.plot(t_t, E_plastic_diss, color='red', lw=2, 
-                        label=r'apparent pl. diss.: $\sigma \dot{\varepsilon}^\pi - X\dot{\alpha} - Z\dot{z}$')
-                ax_i.plot(t_t, -E_iso_free_energy, '-.', color='royalblue', lw=2,
-                        label=r'iso. diss.: $Z\dot{z}$')
-                ax_i.plot(t_t, -E_kin_free_energy, '-.', color='blue', lw=2,
-                        label=r'free energy: $X\dot{\alpha}$')
-                ax_i.legend()
-                ax_i.set_xlabel('$t$ [-]');
-                ax_i.set_ylabel(r'$E$ [Nmm]')
-                
+        if ax_i is not None:
+            ax_i.plot(t_t, E_damage_diss, color='gray', lw=2,
+                    label=r'damage diss.: $Y\dot{\omega}$')
+            ax_i.plot(t_t, E_plastic_work, color='red', lw=2,
+                    label=r'plastic work: $\sigma \dot{\varepsilon}^\pi$')
+            ax_i.plot(t_t, E_plastic_diss, color='red', lw=2, 
+                    label=r'apparent pl. diss.: $\sigma \dot{\varepsilon}^\pi - X\dot{\alpha} - Z\dot{z}$')
+            ax_i.plot(t_t, -E_iso_free_energy, '-.', color='royalblue', lw=2,
+                    label=r'iso. diss.: $Z\dot{z}$')
+            ax_i.plot(t_t, -E_kin_free_energy, '-.', color='blue', lw=2,
+                    label=r'free energy: $X\dot{\alpha}$')
+            ax_i.legend()
+            ax_i.set_xlabel('$t$ [-]');
+            ax_i.set_ylabel(r'$E$ [Nmm]')
+
         # stapled plot
         E_level = 0
         # E_damage_diss
@@ -208,8 +254,8 @@ class TEVPDIfcPlot(object):
         ax.plot(t_t, D_t, linestyle='dashed', color='red', lw=2)
 
     @classmethod
-    def plot_energy_breakdown(ax, ax_i, t_arr, s_x_t, s_y_t, w_t, Eps_arr, Sig_arr):
+    def plot_energy_breakdown(cls, ax_i, t_arr, s_x_t, s_y_t, w_t, Eps_arr, Sig_arr):
         """Plot the stapled and absolute breakdown of energies
         """
-        TEVPDIfcPlot.plot_work(ax, t_arr, s_x_t, s_y_t, w_t, Eps_arr, Sig_arr)
-        TEVPDIfcPlot.plot_dissipation(ax, t_arr, Eps_arr, Sig_arr, ax_i)
+        TEVPDIfcPlot.plot_work(cls, t_arr, s_x_t, s_y_t, w_t, Eps_arr, Sig_arr)
+        TEVPDIfcPlot.plot_dissipation(cls, t_arr, Eps_arr, Sig_arr, ax_i)
