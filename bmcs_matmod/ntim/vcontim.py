@@ -209,6 +209,9 @@ c_NT, S_NT = sp.symbols(r'c_NT, S_NT')
 
 class VConTIMExpr(bu.SymbExpr):
 
+    # switch on expression reduction
+    cse = True
+
     # control and state variables
     w, s_x, s_y, s_z, Eps, Sig = w, s_x, s_y, s_z, Eps, Sig
 
@@ -341,18 +344,14 @@ class VCoNTIM(MATSEval,bu.InjectSymbExpr):
         code_file = osp.join(code_dir, code_fname)
 
         print('generated code_file', code_file)
-        h_file = code_file + '.h'
-        c_file = code_file + '.c'
+        h_file = f'{code_file}.h'
+        c_file = f'{code_file}.c'
 
-        h_f = open(h_file, 'w')
-        c_f = open(c_file, 'w')
-
-        if True:
+        with open(h_file, 'w') as h_f:
+            c_f = open(c_file, 'w')
             for function_C in C_code:
-
                 h_f.write(function_C[1][1])
                 c_f.write(function_C[0][1])
-        h_f.close()
         c_f.close()
 
     ipw_view = bu.View(
@@ -375,7 +374,7 @@ class VCoNTIM(MATSEval,bu.InjectSymbExpr):
         bu.Item('S_NT', readonly=True),
     )
 
-    damage_interaction = tr.Enum('final', 'geometric','arithmetic')
+    damage_interaction = tr.Enum('final', 'geometric', 'arithmetic')
 
     get_phi_ = tr.Property
     def _get_get_phi_(self):
@@ -557,7 +556,7 @@ class VCoNTIM(MATSEval,bu.InjectSymbExpr):
                 D_[...,1,1] = self.E_T * (1 - omega_T)
                 if dim_T == 2:
                     D_[...,2,2] = self.E_T * (1 - omega_T)
-                if dim_T == 3:
+                elif dim_T == 3:
                     D_[...,3,3] = self.E_T * (1 - omega_T)
                 for eps_name, Eps_ in zip(self.Eps_names, Eps_k):
                     state[eps_name][...] = Eps_[...]

@@ -55,8 +55,9 @@ class MSX(MATS3DEval):
                  ((1.0 + self.nu) * (1.0 - 2 * self.nu))
 
     tree = ['mic', 'integ_scheme']
+    depends_on = ['mic', 'integ_scheme']
 
-    state_var_shapes = tr.Property(depends_on='mic, integ_scheme')
+    state_var_shapes = tr.Property(depends_on='mic_, integ_scheme_')
     @tr.cached_property
     def _get_state_var_shapes(self):
         sv_shapes = {
@@ -147,11 +148,7 @@ class MSX(MATS3DEval):
                            beta_abcd, self.D_abef, beta_abcd)
 
         if self.double_pvw:
-            # ----------------------------------------------------------------------
-            # Return stresses (corrector) and damaged secant stiffness matrix (predictor)
-            # ----------------------------------------------------------------------
-            eps_p_a = self.mic_.get_eps_NT_p(**Eps)
-            if eps_p_a:
+            if eps_p_a := self.mic_.get_eps_NT_p(**Eps):
                 eps_N_p, eps_T_p_a = eps_p_a
                 eps_p_ab = self.NT_to_ab(eps_N_p, eps_T_p_a)
                 eps_e_ab = eps_ab - eps_p_ab
@@ -180,13 +177,13 @@ class MSX(MATS3DEval):
         m.sim.tline.trait_set(step=float(1.0/n_eps))
         m.sim.run()
         energydissipation = EnergyDissipation()
-        W_arr_micro, W_arr_macro = energydissipation.plot_work(m)
+        # W_arr_micro, W_arr_macro = energydissipation.plot_work(m)
 
         eps_t = m.hist.U_t[:, 0]
         sig_t = m.hist.F_t[:, 0]
         ax_sig.plot(eps_t, sig_t, linestyle='solid', color='blue',label=r'$\sigma - \varepsilon$')
-        ax_work.plot(eps_t, W_arr_micro, linestyle='dashed', color='red', label='microplane work')
-        ax_work.plot(eps_t, W_arr_macro, linestyle='solid', color='red', label='macroscopic work')
+        # ax_work.plot(eps_t, W_arr_micro, linestyle='dashed', color='red', label='microplane work')
+        # ax_work.plot(eps_t, W_arr_macro, linestyle='solid', color='red', label='macroscopic work')
         ax_sig.set_xlabel(r'$\varepsilon_{11}$ [-]')
         ax_sig.set_ylabel(r'$\sigma_{11}$ [MPa]')
         ax_sig.legend()
