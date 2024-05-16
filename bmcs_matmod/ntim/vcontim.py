@@ -329,7 +329,7 @@ class VCoNTIM(MATSEval,bu.InjectSymbExpr):
 
         C_code = []
         for symb_name, symb_params in self.symb.symb_expressions:
-            c_func_name = 'get_' + symb_name
+            c_func_name = f'get_{symb_name}'
             c_func = ccode(c_func_name, getattr(self.symb, symb_name), 'SLIDE33')
             C_code.append(c_func)
 
