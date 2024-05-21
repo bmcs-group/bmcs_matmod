@@ -21,14 +21,14 @@ class GSM(bu.Model):
 
     The class definition consists of 
 
-    F = Free energy potential
-    u = external variable
-    T = temperature
-    Eps = symbolic definition of the internal state (sympy.BlockMatrix)
-    Sig = symbolic definition of the internal state (sympy.BlockMatrix)
-    mp = list of material parameters
-    f = threshold function
-    phi_ext = flow potential extension
+    F_expr   = Free energy potential
+    u_vars   = external variable
+    T_var    = temperature
+    Eps_vars = symbolic definition of the internal state (sympy.BlockMatrix)
+    Sig_vars = symbolic definition of the internal state (sympy.BlockMatrix)
+    m_params = list of material parameters
+    f_expr       = threshold function
+    phi_ext_expr = flow potential extension
     """
 
     u_vars = tr.Any
@@ -71,12 +71,44 @@ class GSM(bu.Model):
     within the state domain that govern the irreversible state evolution   
     """ 
 
-    # Derived expressions 
+    # Internal variable representations and conversions
+    Eps_list = tr.Property()
+    @tr.cached_property
+    def _get_Eps_list(self):
+        return [Eps_i.T for Eps_i in self.Eps_vars]
+
     Eps = tr.Property()
     @tr.cached_property
     def _get_Eps(self):
-        return sp.BlockMatrix([Eps_i.T for Eps_i in self.Eps_vars]).T
+        return sp.BlockMatrix(self.Eps_list).T
     
+    n_Eps_explicit = tr.Property
+    @tr.cached_property
+    def _get_n_Eps_explicit(self):
+        return len(self.Eps.as_explicit())
+
+    _Eps_as_array_lambdified = tr.Property
+    @tr.cached_property
+    def _get__Eps_as_array_lambdified(self):
+        return sp.lambdify(self.Eps.blocks, self.Eps.as_explicit())
+
+    def Eps_as_array(self, arr):
+        return self._Eps_as_array_lambdified(arr)[:,0]
+
+    _Eps_as_blocks_lambdified = tr.Property
+    @tr.cached_property
+    def _get__Eps_as_blocks_lambdified(self):
+        return sp.lambdify(self.Eps.as_explicit(), self.Eps_list)
+
+    def Eps_as_blocks(self, arr):
+        return [Eps_i[0] for Eps_i in self._Eps_as_blocks_lambdified(arr)]
+
+    # Conjugate state variable representations and conversions
+    Sig_list = tr.Property()
+    @tr.cached_property
+    def _get_Sig_list(self):
+        return [Sig_i.T for Sig_i in self.Sig_vars]
+
     Sig = tr.Property()
     @tr.cached_property
     def _get_Sig(self):
@@ -87,17 +119,300 @@ class GSM(bu.Model):
     def _get_dF_dEps_(self):
         return sp.BlockMatrix([sp.diff(self.F_expr, var).T for var in self.Eps.blocks]).T
 
+    dDiss_dEps_ = tr.Property()
+    @tr.cached_property
+    def _get_dDiss_dEps_(self):
+        dF_dEps_explicit_ = self.dF_dEps_.as_explicit()
+        return (self.T_var * dF_dEps_explicit_.diff(self.T_var) - dF_dEps_explicit_)
+
+    _dDiss_dEps_lambdified = tr.Property()
+    @tr.cached_property
+    def _get__dDiss_dEps_lambdified(self):
+        return sp.lambdify((self.u_vars, self.T_var, 
+                            self.Eps.as_explicit(), 
+                            self.Sig.as_explicit()) + self.m_params + ('**kw',), 
+                           self.dDiss_dEps_, cse=True)
+
+    def get_dDiss_dEps(self, u, T, Eps, Sig, **m_params):
+        """
+        Calculates the derivative of the dissipation rate with respect 
+        to strain.
+
+        Args:
+            u: Displacement.
+            T: Temperature.
+            Eps: Strain.
+            Sig: Stress.
+            **m_params: Additional model parameters.
+
+        Returns:
+            Calculated derivative of the dissipation rate with respect to strain.
+        """
+        return self._dDiss_dEps_lambdified(u, T, Eps, Sig, **m_params)[:, 0]
+    
     Sig_ = tr.Property()
     @tr.cached_property
     def _get_Sig_(self):
         return sp.BlockMatrix([(sign_i_ * dF_dEps_i_).T for sign_i_, dF_dEps_i_ 
                                in zip(self.Sig_signs, self.dF_dEps_.blocks)]).T
     
-    get_Sig = tr.Property()
+    _Sig_lambdified = tr.Property()
     @tr.cached_property
-    def _get_get_Sig(self):
-        return sp.lambdify((self.u_vars, self.T_var, self.Eps.blocks, self.Sig.blocks) + self.m_params + ('**kw',), 
-                           list(self.Sig_.blocks), cse=True)
+    def _get__Sig_lambdified(self):
+        return sp.lambdify((self.u_vars, self.T_var, 
+                            self.Eps.as_explicit(), 
+                            self.Sig.as_explicit()) + self.m_params + ('**kw',), 
+                           self.Sig_.as_explicit(), cse=True)
+
+    def get_Sig(self, u, T, Eps, Sig, **m_params):
+        """
+        Calculates the stress based on the given inputs.
+
+        Args:
+            u: Displacement.
+            T: Temperature.
+            Eps: Strain.
+            Sig: Stress.
+            **m_params: Additional model parameters.
+
+        Returns:
+            Calculated stress.
+        """
+        return self._Sig_lambdified(u, T, Eps, Sig, **m_params)[:, 0]
+    
+    Phi_ = tr.Property()
+    @tr.cached_property
+    def _get_Phi_(self):
+        phi_ = self.f_expr + self.phi_ext_expr 
+        Phi_list = [-sign_i_ * phi_.diff(Sig_i_) for sign_i_, Sig_i_ 
+                    in zip(self.Sig_signs, self.Sig.blocks)]
+        return sp.BlockMatrix([[Phi_i] for Phi_i in Phi_list])
+    
+    _Phi_lambdified = tr.Property()
+    @tr.cached_property
+    def _get__Phi_lambdified(self):
+        return sp.lambdify((self.u_vars, self.T_var, 
+                            self.Eps.as_explicit(), 
+                            self.Sig.as_explicit()) + self.m_params + ('**kw',), 
+                           self.Phi_.as_explicit(), numpy_dirac, cse=True)
+
+    def get_Phi(self, u, T, Eps, Sig, **m_params):
+        """
+        Calculates the gradient Phi of the flow potential phi based on the 
+        given inputs.
+
+        Args:
+            u: Displacement.
+            T: Temperature.
+            Eps: Strain.
+            Sig: Stress.
+            **m_params: Additional model parameters.
+
+        Returns:
+            Calculated state variable Phi.
+        """
+        _Sig = self.get_Sig(u, T, Eps, Sig, **m_params)
+        return self._Phi_lambdified(u, T, Eps, _Sig, **m_params)[:, 0]
+
+    df_dlambda_ = tr.Property()
+    @tr.cached_property
+    def _get_df_dlambda_(self):
+        # gradient of thermodynamic forces with respect to the kinematic variables
+        dSig_dEps_ = sp.BlockMatrix([[sp.Matrix(Sig_i.diff(Eps_i)[:,0,:,0]) 
+                                      for Sig_i in self.Sig_.blocks] 
+                                      for Eps_i in self.Eps.blocks])
+        # gradient of threshold function w.r.t. thermodynamic forces
+        df_dSig_list = [self.f_expr.diff(Sig_i) for Sig_i in self.Sig.blocks]
+        df_dSig_ = sp.BlockMatrix([[df_dSig_i] for df_dSig_i in df_dSig_list])
+        # gradient of threshold function w.r.t. kinematic variables
+        df_dEps_list = [self.f_expr.diff(Eps_i) for Eps_i in self.Eps.blocks]
+        df_dEps_ = sp.BlockMatrix([[df_dEps_i] for df_dEps_i in df_dEps_list])
+        # derivative of threshold function w.r.t. irreversibility parameter $\lambda$
+        return ((dSig_dEps_.as_explicit() * df_dSig_.as_explicit() + 
+                 df_dEps_.as_explicit()).T * self.Phi_.as_explicit())[0, 0]
+
+    ## lambdified functions
+
+    def get_f(self, u, T, Eps, Sig, **m_params):
+        """
+        Calculates the stress increment based on the given inputs.
+
+        Args:
+            u: Displacement.
+            T: Temperature.
+            Eps: Strain.
+            Sig: Stress.
+            **m_params: Additional model parameters.
+
+        Returns:
+            Calculated stress increment.
+        """
+        _Sig = self.get_Sig(u, T, Eps, Sig, **m_params)
+        return self._f_lambdified(u, T, Eps, _Sig, **m_params)
+
+    _f_lambdified = tr.Property()
+    @tr.cached_property
+    def _get__f_lambdified(self):
+        return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), self.Sig.as_explicit()) + self.m_params + ('**kw',), self.f_expr, 
+                              numpy_dirac, cse=True)
+
+    def get_df_dlambda(self, u, T, Eps, Sig, **m_params):
+        """
+        Calculates the derivative of the stress increment with respect 
+        to the load parameter lambda.
+
+        Args:
+            u: Displacement.
+            T: Temperature.
+            Eps: Strain.
+            Sig: Stress.
+            **m_params: Additional model parameters.
+
+        Returns:
+            Calculated derivative of the stress increment with respect to lambda.
+        """
+        _Sig = self.get_Sig(u, T, Eps, Sig, **m_params)
+        return self._df_dlambda_lambdified(u, T, Eps, _Sig, **m_params)
+    
+    _df_dlambda_lambdified = tr.Property()
+    @tr.cached_property
+    def _get__df_dlambda_lambdified(self):
+        return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), self.Sig.as_explicit()) + self.m_params + ('**kw',), self.df_dlambda_, 
+                            numpy_dirac, cse=True)
+
+    def get_f_df_Sig(self, u, T, Eps, Sig, **m_params):
+        """
+        Calculates the stress increment and its derivative 
+        with respect to the load parameter lambda.
+
+        Args:
+            u: Displacement.
+            T: Temperature.
+            Eps: Strain.
+            Sig: Stress.
+            **m_params: Additional model parameters.
+
+        Returns:
+            List containing the stress increment, its derivative 
+            with respect to lambda, and the updated stress.
+        """
+        _Sig = self.get_Sig(u, T, Eps, Sig, **m_params)
+        return self._f_df_dlambda_lambdified(u, T, Eps, _Sig, **m_params) + [_Sig]
+
+    _f_df_dlambda_lambdified = tr.Property()
+    @tr.cached_property
+    def _get__f_df_dlambda_lambdified(self):
+        f_df_ = [self.f_expr, self.df_dlambda_]
+        return sp.lambdify((self.u_vars, self.T_var, 
+                            self.Eps.as_explicit(), self.Sig.as_explicit()) + self.m_params + ('**kw',), f_df_, 
+                            numpy_dirac, cse=True)
+    
+    def get_t_relax(self, **m_params):
+        """
+        Calculates the relaxation time based on the given model parameters.
+
+        Args:
+            **m_params: Additional model parameters.
+
+        Returns:
+            Calculated relaxation time.
+        """
+        return self._t_relax_lambdified(**m_params)[0]
+
+    _t_relax_lambdified = tr.Property
+    @tr.cached_property
+    def _get__t_relax_lambdified(self):
+        return sp.lambdify(self.m_params + ('**kw',), self.t_relax.T, cse=True)
+    
+    # Evolution equations
+    def get_Eps_k1(self, u_n1, T_n1, Eps_n, lambda_k, Eps_k, Sig_n, **m_params):
+        """
+        Calculates the strain increment Eps_k1 based on the given inputs.
+
+        Args:
+            u_n1: Displacement at time n+1.
+            T_n1: Temperature at time n+1.
+            Eps_n: Strain at time n.
+            lambda_k: Load parameter.
+            Eps_k: Strain at time k.
+            Sig_n: Stress at time n.
+            **m_params: Additional model parameters.
+
+        Returns:
+            Calculated strain increment Eps_k1.
+        """
+        Phi_k = self.get_Phi(u_n1, T_n1, Eps_k, Sig_n, **m_params)
+        Eps_k1 = Eps_n + lambda_k * Phi_k
+        return Eps_k1
+
+    def get_state_n1(self, u_n, du_n1, T_n, dt, Sig_n, Eps_n, k_max, **kw):
+        """
+        Calculates the state at time n+1 based on the given inputs using an iterative algorithm.
+
+        Args:
+            u_n: Displacement at time n.
+            du_n1: Displacement increment from time n to n+1.
+            T_n: Temperature at time n.
+            dt: Time step size.
+            Sig_n: Stress at time n.
+            Eps_n: Strain at time n.
+            k_max: Maximum number of iterations.
+            **kw: Additional keyword arguments.
+
+        Returns:
+            Tuple containing the updated strain Eps_k, stress Sig_k, temperature T_n+1, number of iterations k, and dissipation rate gradient dDiss_dEps.
+        """
+
+        u_n1 = u_n + du_n1
+
+        relax_t = self.get_t_relax(**kw)
+        n_vk = len(relax_t)
+        dt_tau = dt / relax_t
+        inv_1_dt_tau = 1 / (np.ones_like(dt_tau) + dt_tau)
+
+        Eps_k = np.copy(Eps_n)
+        Sig_k = np.copy(Sig_n)
+        f_k, df_k, Sig_k = self.get_f_df_Sig(u_n1, T_n, Eps_k, Sig_k, **kw)
+        f_k = np.atleast_1d(f_k)
+        df_k = np.atleast_1d(df_k)
+        f_k_norm = np.linalg.norm(f_k, axis=-1)
+        f_k_trial = f_k
+        lam_k = np.zeros_like(f_k)
+        k = 0
+        while k < k_max:
+            if np.all(f_k_trial < 0) or np.all(f_k_norm < 1e-4):
+                break
+            # delta_lambda = np.linalg.solve(df_k, -f_k)
+            delta_lambda = -f_k / df_k
+            lam_k += delta_lambda
+            Eps_k = self.get_Eps_k1(u_n1, T_n, Eps_n, lam_k, Eps_k, Sig_k, **kw)
+            f_k, df_k, Sig_k = self.get_f_df_Sig(u_n1, T_n, Eps_k, Sig_k, **kw)
+            f_k = np.atleast_1d(f_k)
+            df_k = np.atleast_1d(df_k)
+            f_k_norm = np.linalg.norm(f_k, axis=-1)
+            k += 1
+        else:
+            raise ValueError('no convergence')
+        
+        # viscoplastic regularization
+        if np.any(f_k_trial > 0):
+            I = np.where(f_k_trial > 0)
+            ### Perzyna type model - exploiting that \gamma = f / eta corresponds to \lambda above ???
+            gamma_vk = lam_k * np.ones_like(Eps_k)
+            gamma_vk[:n_vk] *= (dt_tau * inv_1_dt_tau) 
+            Eps_k = self.get_Eps_k1(u_n1, T_n, Eps_n, gamma_vk, Eps_n, Sig_n, **kw)
+            Sig_k = self.get_Sig(u_n1, T_n, Eps_k, Sig_k, **kw)
+
+        dEps_k = Eps_k - Eps_n
+        dDiss_dEps = self.get_dDiss_dEps(u_n1, T_n, Eps_k, Sig_k, **kw)
+        # dissipation rate
+        dDiss_dt = np.einsum('i,i', dDiss_dEps, dEps_k)
+        C_v_ = kw['C_v_']
+        dT = dt * (dDiss_dt) / C_v_ # / rho_
+
+        return Eps_k, Sig_k, T_n + dT, k, dDiss_dEps
+
+    ####################################################################
 
     lambdified_operators = tr.Property()
     @tr.cached_property
