@@ -150,6 +150,27 @@ class GSM(bu.Model):
             Calculated derivative of the dissipation rate with respect to strain.
         """
         return self._dDiss_dEps_lambdified(u, T, Eps, Sig, **m_params)[:, 0]
+
+    def get_Sig_bI(self, u_aI, T, Eps_bI, Sig_bI, **m_params):
+        return self._Sig_lambdified(u_aI, T, Eps_bI, Sig_bI, **m_params).reshape(Sig_bI.shape)
+
+    def get_Sig_Ib(self, u_Ia, T, Eps_Ib, Sig_Ib, **m_params):
+        """
+        Calculates the stress based on the given inputs.
+
+        Args:
+            u: Displacement.
+            T: Temperature.
+            Eps: Strain.
+            Sig: Stress.
+            **m_params: Additional model parameters.
+
+        Returns:
+            Calculated stress.
+        """
+        u_aI, Eps_bI, Sig_bI = [np.moveaxis(arg, -1, 0) for arg in (u_Ia, Eps_Ib, Sig_Ib)]
+        _Sig_bI = self._Sig_lambdified(u_aI, T, Eps_bI, Sig_bI, **m_params)
+        return np.moveaxis(_Sig_bI.reshape(Sig_bI.shape), 0, -1)
     
     Sig_ = tr.Property()
     @tr.cached_property
@@ -165,9 +186,10 @@ class GSM(bu.Model):
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), 
                            self.Sig_.as_explicit(), numpy_dirac, cse=True)
 
-    def get_Sig(self, u, T, Eps, Sig, **m_params):
+    def get_Phi_bI(self, u_aI, T, Eps_bI, Sig_bI, **m_params):
         """
-        Calculates the stress based on the given inputs.
+        Calculates the gradient Phi of the flow potential phi based on the 
+        given inputs.
 
         Args:
             u: Displacement.
@@ -177,11 +199,10 @@ class GSM(bu.Model):
             **m_params: Additional model parameters.
 
         Returns:
-            Calculated stress.
+            Calculated state variable Phi.
         """
-        _Sig = self._Sig_lambdified(u, T, Eps, Sig, **m_params)
-        return _Sig.reshape(Sig.shape)
-    
+        return self._Phi_lambdified(u_aI, T, Eps_bI, Sig_bI, **m_params)[:, 0]
+
     Phi_ = tr.Property()
     @tr.cached_property
     def _get_Phi_(self):
@@ -198,26 +219,9 @@ class GSM(bu.Model):
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), 
                            self.Phi_.as_explicit(), numpy_dirac, cse=True)
 
-    def get_Phi(self, u, T, Eps, Sig, **m_params):
-        """
-        Calculates the gradient Phi of the flow potential phi based on the 
-        given inputs.
-
-        Args:
-            u: Displacement.
-            T: Temperature.
-            Eps: Strain.
-            Sig: Stress.
-            **m_params: Additional model parameters.
-
-        Returns:
-            Calculated state variable Phi.
-        """
-        return self._Phi_lambdified(u, T, Eps, Sig, **m_params)[:, 0]
-
     ## lambdified functions
 
-    def get_f(self, u, T, Eps, Sig, **m_params):
+    def get_f(self, u_aI, T, Eps_bI, Sig_bI, **m_params):
         """
         Calculates the stress increment based on the given inputs.
 
@@ -231,8 +235,8 @@ class GSM(bu.Model):
         Returns:
             Calculated stress increment.
         """
-        _Sig = self.get_Sig(u, T, Eps, Sig, **m_params)
-        return self._f_lambdified(u, T, Eps, _Sig, **m_params)
+        _Sig_bI = self.get_Sig_bI(u_aI, T, Eps_bI, Sig_bI, **m_params)
+        return self._f_lambdified(u_aI, T, Eps_bI, _Sig_bI, **m_params)
 
     _f_lambdified = tr.Property()
     @tr.cached_property
@@ -240,7 +244,7 @@ class GSM(bu.Model):
         return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), self.Sig.as_explicit()) + self.m_params + ('**kw',), self.f_expr, 
                               numpy_dirac, cse=True)
 
-    def get_df_dlambda(self, u, T, Eps, Sig, **m_params):
+    def get_df_dlambda(self, u_aI, T, Eps_bI, Sig_bI, **m_params):
         """
         Calculates the derivative of the stress increment with respect 
         to the load parameter lambda.
@@ -255,8 +259,8 @@ class GSM(bu.Model):
         Returns:
             Calculated derivative of the stress increment with respect to lambda.
         """
-        _Sig = self.get_Sig(u, T, Eps, Sig, **m_params)
-        return self._df_dlambda_lambdified(u, T, Eps, _Sig, **m_params)
+        _Sig_bI = self.get_Sig_bI(u_aI, T, Eps_bI, Sig_bI, **m_params)
+        return self._df_dlambda_lambdified(u_aI, T, Eps_bI, _Sig_bI, **m_params)
     
     _df_dlambda_lambdified = tr.Property()
     @tr.cached_property
@@ -290,7 +294,7 @@ class GSM(bu.Model):
                             self.Eps.as_explicit(), self.Sig.as_explicit()) + self.m_params + ('**kw',), f_df_, 
                             numpy_dirac, cse=True)
     
-    def get_f_df_Sig(self, u, T, Eps, Sig, **m_params):
+    def get_f_df_Sig_bI(self, u_aI, T, Eps_bI, Sig_bI, **m_params):
         """
         Calculates the threshold function and its derivative 
         with respect to the load parameter lambda.
@@ -306,9 +310,18 @@ class GSM(bu.Model):
             List containing the stress increment, its derivative 
             with respect to lambda, and the updated stress.
         """
-        _Sig = self.get_Sig(u, T, Eps, Sig, **m_params)
-        _f, _df_dlambda = self._f_df_dlambda_lambdified(u, T, Eps, _Sig, **m_params)
-        return _f, _df_dlambda, _Sig
+        _Sig_bI = self.get_Sig_bI(u_aI, T, Eps_bI, Sig_bI, **m_params)
+        _f, _df_dlambda = self._f_df_dlambda_lambdified(u_aI, T, Eps_bI, _Sig_bI, **m_params)
+        return _f, _df_dlambda, _Sig_bI
+
+    def get_f_df_Sig_Ib(self, u_Ia, T, Eps_Ib, Sig_Ib, **m_params):
+        """
+        Calculates the threshold function and its derivative 
+        with respect to the load parameter lambda.
+        """
+        u_aI, Eps_bI, Sig_bI = [np.moveaxis(v, -1, 0) for v in (u_Ia, Eps_Ib, Sig_Ib)]
+        _f, _df_dlambda, _Sig_bI = self.get_f_df_Sig_bI(u_aI, T, Eps_bI, Sig_bI, **m_params)
+        return _f, _df_dlambda, np.moveaxis(_Sig_bI, 0, -1)
 
     def get_t_relax(self, **m_params):
         """
@@ -328,7 +341,7 @@ class GSM(bu.Model):
         return sp.lambdify(self.m_params + ('**kw',), self.t_relax.T, cse=True)
     
     # Evolution equations
-    def get_Eps_k1(self, u_n1, T_n1, Eps_n, lambda_k, Eps_k, Sig_k, **m_params):
+    def get_Eps_k1_bI(self, u_n1_aI, T_n1, Eps_n_bI, lambda_k, Eps_k_bI, Sig_k_bI, **m_params):
         """
         Calculates the strain increment Eps_k1 based on the given inputs.
 
@@ -344,11 +357,19 @@ class GSM(bu.Model):
         Returns:
             Calculated strain increment Eps_k1.
         """
-        Phi_k = self.get_Phi(u_n1, T_n1, Eps_k, Sig_k, **m_params)
-        Eps_k1 = Eps_n + lambda_k * Phi_k
-        return Eps_k1
+        Phi_k_bI = self.get_Phi_bI(u_n1_aI, T_n1, Eps_k_bI, Sig_k_bI, **m_params)
+        Eps_k1_bI = Eps_n_bI + lambda_k * Phi_k_bI
+        return Eps_k1_bI
+    
+    def get_Eps_k1_Ib(self, u_n1_Ia, T_n1, Eps_n_Ib, lambda_k, Eps_k_Ib, Sig_k_Ib, **m_params):
+        u_n1_aI, Eps_n_bI, Eps_k_bI, Sig_k_bI = [
+            np.moveaxis(arg, -1, 0) for arg in (u_n1_Ia, Eps_n_Ib, Eps_k_Ib, Sig_k_Ib)
+        ]
+        Eps_k1_bI = self.get_Eps_k1_bI(u_n1_aI, T_n1, Eps_n_bI, lambda_k, Eps_k_bI, Sig_k_bI, **m_params)
+        np.moveaxis(Eps_k1_bI, 0, -1)
 
-    def get_state_n1(self, u_n, du_n1, T_n, dt, Sig_n, Eps_n, k_max, **kw):
+
+    def get_state_n1(self, u_n_Ia, du_n1_Ia, T_n, dt, Sig_n_Ib, Eps_n_Ib, k_max, **kw):
         """
         Calculates the state at time n+1 based on the given inputs using an iterative algorithm.
 
@@ -365,20 +386,21 @@ class GSM(bu.Model):
         Returns:
             Tuple containing the updated strain Eps_k, stress Sig_k, temperature T_n+1, number of iterations k, and dissipation rate gradient dDiss_dEps.
         """
-        u_n, du_n1, Sig_n, Eps_n = [
-            np.moveaxis(arg, -1, 0) for arg in (u_n, du_n1, Sig_n, Eps_n)
-        ]
+        u_n1_Ia = u_n_Ia + du_n1_Ia
 
-        u_n1 = u_n + du_n1
+        u_n1_aI, Eps_n_bI, Sig_n_bI = [np.moveaxis(var, -1, 0) 
+                                     for var in (u_n1_Ia, Eps_n_Ib, Sig_n_Ib)]
+
+        Eps_k_bI = np.copy(Eps_n_bI)
+        Sig_k_bI = np.copy(Sig_n_bI)
+        Eps_k_Ib, Sig_k_Ib = [np.moveaxis(var, -1, 0) for var in (Eps_k_bI, Sig_k_bI)]
 
         relax_t = self.get_t_relax(**kw)
         n_vk = len(relax_t)
         dt_tau = dt / relax_t
         inv_1_dt_tau = 1 / (np.ones_like(dt_tau) + dt_tau)
 
-        Eps_k = np.copy(Eps_n)
-        Sig_k = np.copy(Sig_n)
-        f_k, df_k, Sig_k = self.get_f_df_Sig(u_n1, T_n, Eps_k, Sig_k, **kw)
+        f_k, df_k, Sig_k_bI = self.get_f_df_Sig_bI(u_n1_aI, T_n, Eps_k_bI, Sig_k_bI, **kw)
         f_k = np.atleast_1d(f_k)
         df_k = np.atleast_1d(df_k)
         f_k_norm = np.fabs(f_k)
@@ -386,39 +408,44 @@ class GSM(bu.Model):
         lam_k = np.zeros_like(f_k)
         k = 0
         while k < k_max:
-            I_ = np.logical_and(f_k_trial > 0, f_k_norm >= 1e-4)
-            if np.all(I_ == False):
+            I = np.logical_and(f_k_trial > 0, f_k_norm >= 1e-4)
+            if np.all(I == False):
                 break # convergence reached
-            I = np.where(I_)
-            bI = (slice(None), *I)
             lam_k[I] -= f_k[I] / df_k[I] # increment of lambda with delta_lambda = -f / df
-            Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_n[bI], lam_k[I], Eps_k[bI], Sig_k[bI], **kw)
-            f_k[I], df_k[I], Sig_k[bI] = self.get_f_df_Sig(u_n1[bI], T_n[I], Eps_k[bI], Sig_k[bI], **kw)
+            Eps_k_Ib[I] = self.get_Eps_k1_Ib(u_n1_Ia[I], T_n[I], Eps_n_Ib[I], lam_k[I], Eps_k_Ib[I], Sig_k_Ib[I], **kw)
+            f_k[I], df_k[I], Sig_k_Ib[I] = self.get_f_df_Sig_Ib(u_n1_Ia[I], T_n[I], Eps_k_Ib[I], Sig_k_Ib[I], **kw)
             f_k_norm[I] = np.fabs(f_k[I])
             k += 1
         else:
-            raise RuntimeError('no convergence')
+            raise ValueError('no convergence')
+
+        # u_n1, Eps_n, Eps_k, Sig_k = [np.moveaxis(var, 0, -1) for var in (u_n1, Eps_n, Eps_k, Sig_k)]
 
         # viscoplastic regularization
+        print('f_k', f_k_trial)
         if np.any(f_k_trial > 0):
             I = np.where(f_k_trial > 0)
-            bI = (slice(None), *I)
             ### Perzyna type model - exploiting that \gamma = f / eta corresponds to \lambda above ???
-            gamma_vk_bI = lam_k[I][np.newaxis,...] * np.ones_like(Eps_k[bI])
-            gamma_vk_bI[:n_vk] *= (dt_tau * inv_1_dt_tau)[:, np.newaxis]
-            # Check the singularity emerging upon update from zero state directly to the inelastic range
-            # Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_n[bI], gamma_vk_bI, Eps_k[bI], Sig_k[bI], **kw)
-            Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_n[bI], gamma_vk_bI, Eps_n[bI], Sig_n[bI], **kw)
-            Sig_k[bI] = self.get_Sig(u_n1[bI], T_n[I], Eps_k[bI], Sig_k[bI], **kw)
+            print(lam_k[I].shape, Eps_k_Ib.shape )
+            gamma_vk_Ib = np.einsum('b,b...->b...', lam_k[I],np.ones_like(Eps_k_Ib[I]))
+            print(gamma_vk_Ib[...,:n_vk].shape, (dt_tau * inv_1_dt_tau)[np.newaxis,:].shape)
+            gamma_vk_Ib[...,:n_vk] *= (dt_tau * inv_1_dt_tau)[np.newaxis,:]
+            print('u_n1', u_n1_Ia[I].shape)
+            print('Eps', Eps_n_Ib[I].shape)
+            print('gamma_vk_Ib', gamma_vk_Ib.shape)
+            Eps_k_Ib[I] = self.get_Eps_k1_Ib(u_n1_Ia[I], T_n[I], Eps_n_Ib[I], gamma_vk_Ib, Eps_n_Ib[I], Sig_n_Ib[I], **kw)
+            Sig_k_Ib[I] = self.get_Sig_Ib(u_n1_Ia[I], T_n[I], Eps_k_Ib[I], Sig_k_Ib[I], **kw)
 
-        dEps_k = Eps_k - Eps_n
-        dDiss_dEps = self.get_dDiss_dEps(u_n1, T_n, Eps_k, Sig_k, **kw)
-        # dissipation rate
-        dDiss_dt = np.einsum('b...,b...->...', dDiss_dEps, dEps_k)
-        C_v_ = kw['C_v_']
-        dT = dt * (dDiss_dt) / C_v_ # / rho_
+        return Eps_k_Ib, Sig_k_Ib, T_n, k, None
 
-        return np.moveaxis(Eps_k, 0, -1), np.moveaxis(Sig_k, 0, -1), T_n + dT, k, np.moveaxis(dDiss_dEps, 0, -1)
+        # dEps_k = Eps_k - Eps_n
+        # dDiss_dEps = self.get_dDiss_dEps(u_n1, T_n, Eps_k, Sig_k, **kw)
+        # # dissipation rate
+        # dDiss_dt = np.einsum('i,i', dDiss_dEps, dEps_k)
+        # C_v_ = kw['C_v_']
+        # dT = dt * (dDiss_dt) / C_v_ # / rho_
+
+        # return Eps_k, Sig_k, T_n + dT, k, dDiss_dEps
 
     def get_response(self, u_ta, t_t, T_0, k_max=20, **kw):
         if u_ta.ndim == 2:
@@ -435,31 +462,28 @@ class GSM(bu.Model):
         dF_dEps_record = [Sig_n1]
         T_record = [T_0]
         iter_record = [0]
-
         T_n = T_0 # initial condition
         for n, dt in enumerate(dt_t):
-            try:
-                Eps_n1, Sig_n1, T_n1, k, dF_dEps_ = self.get_state_n1(
-                    u_ta[n], du_ta[n], T_n, dt, Sig_n1, Eps_n1, k_max, **kw
-                )
-            except RuntimeError:
-                print(f'{n+1}({k}) ... no convergence', end='\r')
-                break
+#            try:
+            Eps_n1, Sig_n1, T_n1, k, dF_dEps_ = self.get_state_n1(u_ta[n], du_ta[n], T_n, dt, 
+                                            Sig_n1, Eps_n1, k_max, **kw)
+            # except ValueError:
+            #     break
             Sig_record.append(Sig_n1)
             Eps_record.append(Eps_n1)
             dF_dEps_record.append(dF_dEps_)
             T_record.append(T_n1)
             iter_record.append(k)
-            print(f'{n+1}({k})', end='\r')
+            print(f'{n}({k})', end='\r')
             T_n = T_n1
         Sig_t = np.array(Sig_record, dtype=np.float_)
         Eps_t = np.array(Eps_record, dtype=np.float_)
-        dF_dEps_t = np.array(dF_dEps_record, dtype=np.float_)
+#        dF_dEps_t = np.array(dF_dEps_record, dtype=np.float_)
         T_t = np.array(T_record, dtype=np.float_)
         iter_t = np.array(iter_record,dtype=np.int_)
         n_t = len(Eps_t)
-#        return t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, None
-        return t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, dF_dEps_t
+        # return t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, dF_dEps_t
+        return t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, None
 
     ####################################################################
 
@@ -608,5 +632,4 @@ class GSM(bu.Model):
         result[mask_update] = get_f[-1](*args, **_mp)[mask_update]
         # result now contains the output after applying the corresponding functions based on conditions
         return result
-
 

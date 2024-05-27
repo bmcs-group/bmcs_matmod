@@ -40,8 +40,8 @@ class GSMPlot(bu.Model):
         for (param, rv), color in zip(response_values.items(), ['black', 'red', 'green']):
             # remove all dimensions with the length 1
             t_t, u_ta, T_t, Eps_t, Sig_t, iter_t, _ = [np.squeeze(v) for v in rv]
-            u_p_N_t, u_p_Tx_t, u_p_Ty_t, z_N_t, z_T_t, alpha_N_t, alpha_Tx_t, alpha_Ty_t, omega_N_t, omega_T_t = Eps_t.T
-            sig_N_t, sig_Tx_t, sig_Ty_t, Z_N_t, Z_T_t, X_N_t, X_Tx_t, X_Ty_t, Y_N_t, Y_T_t = Sig_t.T
+            u_p_N_t, u_p_Tx_t, u_p_Ty_t, z_T_t, alpha_Tx_t, alpha_Ty_t, omega_N_t, omega_T_t = Eps_t.T
+            sig_N_t, sig_Tx_t, sig_Ty_t, Z_T_t, X_Tx_t, X_Ty_t, Y_N_t, Y_T_t = Sig_t.T
             ax1.plot(
                 t_t,
                 u_ta[:, a_idx],
