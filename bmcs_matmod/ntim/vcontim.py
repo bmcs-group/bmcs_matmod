@@ -44,7 +44,7 @@ gamma_T = Cymbol('gamma_T', real=True, nonnegative=True)
 K_T = Cymbol('K_T', real=True)
 S_T = Cymbol('S_T', real=True)
 c_T = Cymbol('c_T', real=True)
-bartau = Cymbol(r'\bar{\tau}', real=True, nonnegative=True)
+f_s = Cymbol(r'\bar{\tau}', real=True, nonnegative=True)
 
 E_N = Cymbol('E_N', real=True, nonnegative=True)
 S_N = Cymbol('S_N', real=True)
@@ -182,9 +182,9 @@ f_solved_ = fdc.symb.f_solved
 f_1 = f_solved_.subs({x:sig_eff, y:norm_Q})
 f_2 = f_1.subs(subs_Q)
 f_3 = f_2.subs(subs_tau_eff)
-f_ = f_3.subs(fdc.symb.tau_bar, (bartau+Z))
+f_ = f_3.subs(fdc.symb.f_s, (f_s+Z))
 
-f_eff_ = f_2.subs(fdc.symb.tau_bar, (bartau+Z))
+f_eff_ = f_2.subs(fdc.symb.f_s, (f_s+Z))
 
 # **Executable code generation** $f(\boldsymbol{\mathcal{E}}, \boldsymbol{\mathcal{S}})$
 #
@@ -221,7 +221,7 @@ class VConTIMExpr(bu.SymbExpr):
     K_T = K_T
     S_T = S_T
     c_T = c_T
-    bartau = bartau
+    f_s = f_s
     E_N = E_N
     S_N = S_N
     c_N = c_N
@@ -271,7 +271,7 @@ class VConTIMExpr(bu.SymbExpr):
     tau_eff_z_ = tau_pi_z / (1 - omega_T)
 
     symb_model_params = [
-        'E_T', 'gamma_T', 'K_T', 'S_T', 'c_T', 'bartau',
+        'E_T', 'gamma_T', 'K_T', 'S_T', 'c_T', 'f_s',
         'E_N', 'S_N', 'c_N', 'm', 'f_t', 'f_c', 'f_c0', 'eta', 'r',
         'c_NT', 'S_NT'
     ]
@@ -299,7 +299,7 @@ class VCoNTIM(MATSEval,bu.InjectSymbExpr):
     K_T = bu.Float(8, MAT=True)
     S_T = bu.Float(1, MAT=True)
     c_T = bu.Float(1, MAT=True)
-    bartau = bu.Float(28000, MAT=True)
+    f_s = bu.Float(28000, MAT=True)
     E_N = bu.Float(28000, MAT=True)
     S_N = bu.Float(1, MAT=True)
     c_N = bu.Float(1, MAT=True)
@@ -360,7 +360,7 @@ class VCoNTIM(MATSEval,bu.InjectSymbExpr):
         bu.Item('c_T'),
         bu.Item('gamma_T'),
         bu.Item('K_T'),
-        bu.Item('bartau', latex=r'\bar{\tau}'),
+        bu.Item('f_s', latex=r'\bar{\tau}'),
         bu.Item('E_N'),
         bu.Item('S_N'),
         bu.Item('c_N'),
@@ -611,8 +611,8 @@ class VCoNTIM(MATSEval,bu.InjectSymbExpr):
     def plot_f_state(self, ax, Eps, Sig):
         lower = -self.f_c * 1.05
         upper = self.f_t + 0.05 * self.f_c
-        lower_tau = -self.bartau * 2
-        upper_tau = self.bartau * 2
+        lower_tau = -self.f_s * 2
+        upper_tau = self.f_s * 2
         lower_tau = 0
         upper_tau = 10
         sig, tau_x, tau_y = Sig[:3]
@@ -646,8 +646,8 @@ class VCoNTIM(MATSEval,bu.InjectSymbExpr):
     def plot_f(self, ax):
         lower = -self.f_c * 1.05
         upper = self.f_t + 0.05 * self.f_c
-        lower_tau = -self.bartau * 2
-        upper_tau = self.bartau * 2
+        lower_tau = -self.f_s * 2
+        upper_tau = self.f_s * 2
         sig_ts, tau_x_ts  = np.mgrid[lower:upper:201j,lower_tau:upper_tau:201j]
         Sig_ts = np.zeros((len(self.symb.Eps),) + tau_x_ts.shape)
         Sig_ts[0,:] = sig_ts

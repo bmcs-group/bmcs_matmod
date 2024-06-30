@@ -2,7 +2,7 @@ import matplotlib.pylab as plt
 from scipy.integrate import cumtrapz
 import numpy as np
 import bmcs_utils.api as bu
-from gsm import GSM
+from .gsm import GSM
 
 colors = dict( # color associations
      stored_energy = 'darkgreen', # recoverable
@@ -20,7 +20,8 @@ class GSMPlot(bu.Model):
     """
     gsm = bu.Instance(GSM)
 
-    def param_study_plot(self, param_name, response_values, get_Gamma=None, a_idx=0, **mp):
+    def param_study_plot(self, param_name, response_values, get_Gamma=None, a_idx=0, 
+                         plot_sig_time=False, unit='-', **mp):
         """
         The function is used for visualizing the simulation results. This function accepts four arguments: `param_name`, `s_arr` (array of slip), `t_arr` (array of companion timestamps), and `response_values` (dictionary containing responses).
 
@@ -32,12 +33,12 @@ class GSMPlot(bu.Model):
 
         Each subplot includes a legend depicting the parameter name and its corresponding value, and zero lines for easy reference.
         """
-        fig, ((ax1,  ax2, ax5), (ax3,  ax4, ax6)) = plt.subplots(2,3, tight_layout=True, figsize=(10.5, 7))
+        fig, ((ax1,  ax2, ax5), (ax3,  ax4, ax6)) = plt.subplots(2,3, tight_layout=True, figsize=(12, 6))
         fig.canvas.header_visible = False
         ax1_twin = ax1.twinx()
         ax5_twin = ax5.twinx()
 
-        for (param, rv), color in zip(response_values.items(), ['black', 'red', 'green']):
+        for (param, rv), color in zip(response_values.items(), ['black', 'blue', 'red']):
             # remove all dimensions with the length 1
             t_t, u_ta, T_t, Eps_t, Sig_t, iter_t, _ = [np.squeeze(v) for v in rv]
             u_p_N_t, u_p_Tx_t, u_p_Ty_t, z_T_t, alpha_Tx_t, alpha_Ty_t, omega_N_t, omega_T_t = Eps_t.T
@@ -47,44 +48,47 @@ class GSMPlot(bu.Model):
                 u_ta[:, a_idx],
                 color=color,
                 linewidth=1,
-                label=f"{param_name} = {param}",
+                label=f"{param_name} = {param} {unit}",
             )
-            ax1_twin.plot(t_t, sig_Tx_t, linestyle='dashed', color=color, linewidth=1)
+            if plot_sig_time:
+                ax1_twin.plot(t_t, sig_Tx_t, linestyle='dashed', color=color, linewidth=2)
             ax2.plot(
                 u_ta[:, a_idx],
                 sig_Tx_t,
                 color=color,
                 linewidth=1,
-                label=f"{param_name} = {param}",
+                label=f"{param_name} = {param} {unit}",
             )
-            ax3.plot(t_t, T_t, color=color, linewidth=1, label=f"{param_name} = {param}")
+            ax3.plot(t_t, T_t, color=color, linewidth=1, label=f"{param_name} = {param} {unit}")
             ax4.plot(
-                u_ta[:, a_idx],
+#                u_ta[:, a_idx],
+                t_t,
                 omega_T_t,
                 color=color,
                 linewidth=1,
-                label=f"{param_name} = {param}",
+                label=f"{param_name} = {param} {unit}",
             )
             ax5.plot(
                 t_t,
                 z_T_t,
                 color=color,
                 linewidth=1,
-                label=f"{param_name} = {param}",
+                label=f"{param_name} = {param} {unit}",
             )
             if get_Gamma is not None:
-                ax5_twin.plot(
+                ax6.plot(
                         t_t, (mp['f_s_'] + Z_T_t) * get_Gamma(T_t,**mp),
                         color=color,
                         linewidth=1,
-                        linestyle='dashed'
+                        label=f"{param_name} = {param} {unit}"
                 )
-                ax5_twin.plot(
-                        t_t, Z_T_t,
-                        color=color,
-                        linewidth=1,
-                        linestyle='dotted'
-                )
+
+            ax5_twin.plot(
+                    t_t, Z_T_t,
+                    color=color,
+                    linewidth=3,
+                    linestyle='dotted'
+            )
 
         self._extracted_from_param_study_plot_67(
             ax1, 'loading scenario', 'time [s]', 'slip [mm]'
@@ -102,8 +106,13 @@ class GSMPlot(bu.Model):
             ax4, 'damage evolution', 'slip [mm]', 'damage [-]'
         )
         self._extracted_from_param_study_plot_67(
-            ax5, 'isotropic hardening', 'time [-]', 'z [mm]'
+            ax5, 'isotropic hardening', 'time [s]', r'$z$ [mm]'
         )
+        ax5_twin.set_ylabel(r'$Z$ [MPa]')
+        self._extracted_from_param_study_plot_67(
+            ax6, 'elastic domain', 'time [s]', r'strength [MPa]'
+        )
+        return fig
 
     # TODO Rename this here and in `param_study_plot`
     def _extracted_from_param_study_plot_67(self, arg0, arg1, arg2, arg3):

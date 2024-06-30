@@ -102,10 +102,10 @@ f_cap_domain_ = sp.sign(x_bar-x_0) * sp.sign(-m) * (sp.Abs(y) - y_trans_)  > 0
 
 # # Visualization
 
-f_t, f_c, f_c0, tau_bar = sp.symbols('f_t, f_c, f_c0, tau_bar')
-subs_tension = {x_0:0, x_bar:f_t, y_bar:tau_bar}
-subs_shear = {y_bar:tau_bar, x_0:0}
-subs_compression = {x_0: -f_c0, x_bar:-f_c,  y_bar: tau_bar-m*(-f_c0) }
+f_t, f_c, f_c0, f_s = sp.symbols('f_t, f_c, f_c0, f_s')
+subs_tension = {x_0:0, x_bar:f_t, y_bar:f_s}
+subs_shear = {y_bar:f_s, x_0:0}
+subs_compression = {x_0: -f_c0, x_bar:-f_c,  y_bar: f_s-m*(-f_c0) }
 
 import bmcs_utils.api as bu
 
@@ -122,7 +122,7 @@ class FDoubleCapExpr(bu.SymbExpr):
     # Model parameters
     # -------------------------------------------------------------------------
 
-    f_t, f_c, f_c0, tau_bar, m = f_t, f_c, f_c0,tau_bar, m
+    f_t, f_c, f_c0, f_s, m = f_t, f_c, f_c0, f_s, m
 
     # -------------------------------------------------------------------------
     # Expressions
@@ -138,7 +138,7 @@ class FDoubleCapExpr(bu.SymbExpr):
     # Declaration of the lambdified methods
     #-------------------------------------------------------------------------
 
-    symb_model_params = ['f_t', 'f_c', 'f_c0', 'tau_bar', 'm']
+    symb_model_params = ['f_t', 'f_c', 'f_c0', 'f_s', 'm']
 
     # List of expressions for which the methods `get_`
     symb_expressions = [
@@ -147,7 +147,7 @@ class FDoubleCapExpr(bu.SymbExpr):
 
 max_f_c = 100
 max_f_t = 10
-max_tau_bar = 10
+max_f_s = 10
 
 class FDoubleCap(bu.Model,bu.InjectSymbExpr):
 
@@ -158,7 +158,7 @@ class FDoubleCap(bu.Model,bu.InjectSymbExpr):
     f_t = bu.Float(5, MAT=True)
     f_c = bu.Float(80, MAT=True)
     f_c0 = bu.Float(30, MAT=True)
-    tau_bar = bu.Float(5, MAT=True)
+    f_s = bu.Float(5, MAT=True)
     m = bu.Float(0.1, MAT=True)
     z_scale = bu.Float(1)
 
@@ -166,7 +166,7 @@ class FDoubleCap(bu.Model,bu.InjectSymbExpr):
         bu.Item('f_t', editor=bu.FloatRangeEditor(low=1, high=max_f_t)),
         bu.Item('f_c', editor=bu.FloatRangeEditor(low=10, high=max_f_c)),
         bu.Item('f_c0', latex='f_{c0}', editor=bu.FloatRangeEditor(low=5, high=0.9*max_f_c)),
-        bu.Item('tau_bar', latex=r'\bar{\tau}', editor=bu.FloatRangeEditor(low=1, high=max_tau_bar)),
+        bu.Item('f_s', latex=r'\bar{\tau}', editor=bu.FloatRangeEditor(low=1, high=max_f_s)),
         bu.Item('m', minmax=(0.0001, 0.5)),
         bu.Item('z_scale', latex=r'\eta_{z}', editor=bu.FloatRangeEditor(low=0, high=1)),
     )
@@ -175,10 +175,10 @@ class FDoubleCap(bu.Model,bu.InjectSymbExpr):
 
     def update_plot(self, pb):
         delta_f = 0.1 * self.f_t
-        max_tau_bar = self.tau_bar * 1.1
+        max_f_s = self.f_s * 1.1
         min_sig = -self.f_c - delta_f
         max_sig = self.f_t + delta_f
-        X_a, Y_a = np.mgrid[-min_sig:max_sig:210j, -max_tau_bar:max_tau_bar:210j]
+        X_a, Y_a = np.mgrid[-min_sig:max_sig:210j, -max_f_s:max_f_s:210j]
         Z_a = self.symb.get_f_solved(X_a, Y_a) * self.z_scale
         Z_0 = np.zeros_like(Z_a)
         self.surface.heights = Z_a.astype(np.float32)
@@ -193,8 +193,8 @@ class FDoubleCap(bu.Model,bu.InjectSymbExpr):
         delta_f = 2 * self.f_t
         min_sig = -self.f_c - delta_f
         max_sig = self.f_t + delta_f
-        max_tau_bar = self.tau_bar + self.m * self.f_c0 + delta_f
-        X_a, Y_a = np.mgrid[min_sig:max_sig:210j, -max_tau_bar:max_tau_bar:210j]
+        max_f_s = self.f_s + self.m * self.f_c0 + delta_f
+        X_a, Y_a = np.mgrid[min_sig:max_sig:210j, -max_f_s:max_f_s:210j]
         Z_a = self.symb.get_f_solved(X_a, Y_a)
         return X_a, Y_a, Z_a
 

@@ -131,7 +131,8 @@ class MSX(MATS3DEval):
         )
         return tns_ab
 
-    def get_corr_pred(self, eps_ab, t_n1, **Eps):
+#    def get_corr_pred(self, eps_ab, t_n1, **Eps):
+    def get_corr_pred(self, eps_ab, deps_ab, T, dt, **Eps):
         """
         Corrector predictor computation.
         """
@@ -139,7 +140,8 @@ class MSX(MATS3DEval):
         # Damage tensor (4th order) using product- or sum-type symmetrization:
         # ------------------------------------------------------------------
         eps_a = self._get_e_a(eps_ab)
-        sig_a, D_ab = self.mic_.get_corr_pred(eps_a, t_n1, **Eps)
+        deps_a = self._get_e_a(deps_ab)
+        sig_a, _ = self.mic_.get_corr_pred(eps_a, deps_a, T, dt, **Eps)
         beta_abcd = self._get_beta_abcd(eps_ab, **Eps)
         # ------------------------------------------------------------------
         # Damaged stiffness tensor calculated based on the damage tensor beta4:
