@@ -90,6 +90,11 @@ class GSM(bu.Model):
     to the internal variables
     """
 
+    dF_sign = bu.Float(1)
+    """Sign relating the rate of free energy to the dissipation.
+    For Helmholtz free energy it is negative, for the Gibbs free energy it is positive
+    """
+
     f_expr = tr.Any 
     """Threshold function delineating the reversible and reversible state 
     domains. The function can consist of subdomains within the state space
@@ -192,7 +197,7 @@ class GSM(bu.Model):
     def get_dDiss_dEps(self, u, T, Eps, Sig, **m_params):
         """
         Calculates the derivative of the dissipation rate with respect 
-        to strain.
+        to internal variables.
 
         Args:
             u: Displacement.
@@ -217,8 +222,9 @@ class GSM(bu.Model):
     dDiss_dEps_ = tr.Property()
     @tr.cached_property
     def _get_dDiss_dEps_(self):
-        dF_dEps_explicit_ = self.dF_dEps_.as_explicit()
-        return (self.T_var * dF_dEps_explicit_.diff(self.T_var) - dF_dEps_explicit_)
+        "For Gibbs the energy sign is swapped using the dF_sign parameter = -1"
+        dFG_dEps_explicit_ = self.dF_sign * self.dF_dEps_.as_explicit()
+        return (self.T_var * dFG_dEps_explicit_.diff(self.T_var) - dFG_dEps_explicit_)
 
     
     ######################################
@@ -651,10 +657,20 @@ class GSM(bu.Model):
             lam_k[I] -= f_k[I] / df_k[I] # increment of lambda with delta_lambda = -f / df
             Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_n[bI], lam_k[I], Eps_k[bI], Sig_k[bI], **kw)
             f_k[I], df_k[I], Sig_k[bI] = self.get_f_df_Sig(u_n1[bI], T_n[I], Eps_k[bI], Sig_k[bI], **kw)
+
+            if np.any(np.isnan(f_k[I])):
+                print('there is nan in f_k')
+                raise RuntimeError(f'there is nan in f_k {I}')
+
+            if np.any(np.isnan(Eps_k[bI])):
+                print('there is nan in Eps_k')
+                raise RuntimeError(f'there is nan in Eps_k {I}')
+
             f_k_norm[I] = np.fabs(f_k[I])
             k += 1
         else:
             raise RuntimeError(f'no convergence for indexes {I}')
+        
 
         # viscoplastic regularization
         if self.vp_on and np.any(f_k_trial > 0):
@@ -698,7 +714,7 @@ class GSM(bu.Model):
         Sig_n1 = np.zeros_like(Eps_n1)
         Sig_record = [Sig_n1]
         Eps_record = [Eps_n1]
-        dF_dEps_record = [Sig_n1]
+        dDiss_dEps_record = [Sig_n1]
         T_record = [T_0]
         iter_record = [0]
 
@@ -706,7 +722,7 @@ class GSM(bu.Model):
         T_n = T_0 # initial condition
         for n, dt in enumerate(d_t_t):
             try:
-                Eps_n1, Sig_n1, T_n1, k, dF_dEps_ = self.get_state_n1(
+                Eps_n1, Sig_n1, T_n1, k, dDiss_dEps = self.get_state_n1(
                     u_ta[n], d_u_ta[n], T_n, d_T_t[n], dt, Sig_n1, Eps_n1, k_max, **kw
                 )
             except RuntimeError as e:
@@ -714,16 +730,16 @@ class GSM(bu.Model):
                 break
             Sig_record.append(Sig_n1)
             Eps_record.append(Eps_n1)
-            dF_dEps_record.append(dF_dEps_)
+            dDiss_dEps_record.append(dDiss_dEps)
             T_record.append(T_n1)
             iter_record.append(k)
             print(f'{n+1}({k})', end='\r')
             T_n = T_n1
         Sig_t = np.array(Sig_record, dtype=np.float_)
         Eps_t = np.array(Eps_record, dtype=np.float_)
-        dF_dEps_t = np.array(dF_dEps_record, dtype=np.float_)
+        dDiss_dEps_t = np.array(dDiss_dEps_record, dtype=np.float_)
         T_t = np.array(T_record, dtype=np.float_)
         iter_t = np.array(iter_record,dtype=np.int_)
         n_t = len(Eps_t)
-        return t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, dF_dEps_t
+        return t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, dDiss_dEps_t
 
