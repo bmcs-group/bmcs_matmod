@@ -695,7 +695,7 @@ class GSM(bu.Model):
         C_v_ = kw['C_v_']
         d_T = d_T_n + d_t * (dDiss_dt / C_v_ )# / rho_'
 
-        return np.moveaxis(Eps_k, 0, -1), np.moveaxis(Sig_k, 0, -1), T_n + d_T, k, np.moveaxis(dDiss_dEps, 0, -1)
+        return np.moveaxis(Eps_k, 0, -1), np.moveaxis(Sig_k, 0, -1), T_n + d_T, k, np.moveaxis(dDiss_dEps, 0, -1), lam_k
 
 
     def get_response(self, u_ta, T_t, t_t, k_max=20, **kw):
@@ -717,12 +717,13 @@ class GSM(bu.Model):
         dDiss_dEps_record = [Sig_n1]
         T_record = [T_0]
         iter_record = [0]
+        lam_record = [0]
 
         k = 0
         T_n = T_0 # initial condition
         for n, dt in enumerate(d_t_t):
             try:
-                Eps_n1, Sig_n1, T_n1, k, dDiss_dEps = self.get_state_n1(
+                Eps_n1, Sig_n1, T_n1, k, dDiss_dEps, lam = self.get_state_n1(
                     u_ta[n], d_u_ta[n], T_n, d_T_t[n], dt, Sig_n1, Eps_n1, k_max, **kw
                 )
             except RuntimeError as e:
@@ -733,6 +734,7 @@ class GSM(bu.Model):
             dDiss_dEps_record.append(dDiss_dEps)
             T_record.append(T_n1)
             iter_record.append(k)
+            lam_record.append(lam)
             print(f'{n+1}({k})', end='\r')
             T_n = T_n1
         Sig_t = np.array(Sig_record, dtype=np.float_)
@@ -740,6 +742,7 @@ class GSM(bu.Model):
         dDiss_dEps_t = np.array(dDiss_dEps_record, dtype=np.float_)
         T_t = np.array(T_record, dtype=np.float_)
         iter_t = np.array(iter_record,dtype=np.int_)
+        lam_t = np.array(iter_record,dtype=np.int_)
         n_t = len(Eps_t)
-        return t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, dDiss_dEps_t
+        return t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, dDiss_dEps_t, lam_t
 
