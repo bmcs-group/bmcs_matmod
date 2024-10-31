@@ -670,7 +670,7 @@ class GSM(bu.Model):
             k += 1
         else:
             raise RuntimeError(f'no convergence for indexes {I}')
-        
+
 
         # viscoplastic regularization
         if self.vp_on and np.any(f_k_trial > 0):
@@ -694,6 +694,8 @@ class GSM(bu.Model):
         dDiss_dt = np.einsum('b...,b...->...', dDiss_dEps, dEps_k)
         C_v_ = kw['C_v_']
         d_T = d_T_n + d_t * (dDiss_dt / C_v_ )# / rho_'
+
+        print(f'lam_k_final: {lam_k}')
 
         return np.moveaxis(Eps_k, 0, -1), np.moveaxis(Sig_k, 0, -1), T_n + d_T, k, np.moveaxis(dDiss_dEps, 0, -1), lam_k
 
@@ -735,14 +737,13 @@ class GSM(bu.Model):
             T_record.append(T_n1)
             iter_record.append(k)
             lam_record.append(lam)
-            print(f'{n+1}({k})', end='\r')
             T_n = T_n1
         Sig_t = np.array(Sig_record, dtype=np.float_)
         Eps_t = np.array(Eps_record, dtype=np.float_)
         dDiss_dEps_t = np.array(dDiss_dEps_record, dtype=np.float_)
         T_t = np.array(T_record, dtype=np.float_)
         iter_t = np.array(iter_record,dtype=np.int_)
-        lam_t = np.array(iter_record,dtype=np.int_)
+        lam_t = np.array(lam_record,dtype=np.float_)
         n_t = len(Eps_t)
         return t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, dDiss_dEps_t, lam_t
 
