@@ -160,7 +160,7 @@ class GSM(bu.Model):
     dF_dEps_ = tr.Property()
     @tr.cached_property
     def _get_dF_dEps_(self):
-        return sp.BlockMatrix([sp.diff(self.F_expr, var).T for var in self.Eps.blocks]).T.subs(self.m_param_subs)
+        return sp.BlockMatrix([sp.simplify(sp.diff(self.F_expr, var)).T for var in self.Eps.blocks]).T.subs(self.m_param_subs)
 
     ######################################
 
@@ -486,7 +486,9 @@ class GSM(bu.Model):
     df_dlambda_ = tr.Property()
     @tr.cached_property
     def _get_df_dlambda_(self):
-        return (self.df_dEps_.T * self.Phi_)[0, 0]
+#        return sp.simplify((sp.simplify(self.df_dEps_.T) * sp.simplify(self.Phi_))[0,0])
+        return (self.df_dEps_.T * self.Phi_)[0,0]
+        # return sp.simplify((self.df_dEps_.T * self.Phi_)[0, 0])
 
     ######################################
 
@@ -528,7 +530,7 @@ class GSM(bu.Model):
     dSig_dEps_ = tr.Property()
     @tr.cached_property
     def _get_dSig_dEps_(self):
-        dSig_dEps_ = sp.Matrix([[Sig_i.diff(Eps_i)
+        dSig_dEps_ = sp.Matrix([[sp.simplify(Sig_i.diff(Eps_i))
                                 for Sig_i in self.Sig_.as_explicit()]
                                 for Eps_i in self.Eps.as_explicit()])
         return dSig_dEps_
@@ -656,6 +658,7 @@ class GSM(bu.Model):
             bI = (slice(None), *I)
             lam_k[I] -= f_k[I] / df_k[I] # increment of lambda with delta_lambda = -f / df
             Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_n[bI], lam_k[I], Eps_k[bI], Sig_k[bI], **kw)
+
             f_k[I], df_k[I], Sig_k[bI] = self.get_f_df_Sig(u_n1[bI], T_n[I], Eps_k[bI], Sig_k[bI], **kw)
 
             if np.any(np.isnan(f_k[I])):
@@ -694,8 +697,6 @@ class GSM(bu.Model):
         dDiss_dt = np.einsum('b...,b...->...', dDiss_dEps, dEps_k)
         C_v_ = kw['C_v_']
         d_T = d_T_n + d_t * (dDiss_dt / C_v_ )# / rho_'
-
-        print(f'lam_k_final: {lam_k}')
 
         return np.moveaxis(Eps_k, 0, -1), np.moveaxis(Sig_k, 0, -1), T_n + d_T, k, np.moveaxis(dDiss_dEps, 0, -1), lam_k
 
