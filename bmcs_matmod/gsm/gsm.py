@@ -11,11 +11,48 @@ import traits.api as tr
 import bmcs_utils.api as bu
 import sympy as sp
 import numpy as np
-import sys
+import dill
+import os
+import functools
 
 def get_dirac_delta(x, x_0=0):
     return 0
 numpy_dirac =[{'DiracDelta': get_dirac_delta }, 'numpy']
+
+
+def lambdify_and_cache(func):
+    @functools.wraps(func)
+    def wrapper(self):
+        # Generate the filename based on class name and property name
+        class_name = self.__class__.__name__
+        object_name = self.name
+        property_name = func.__name__
+        cache_dir = '_lambdified_cache'
+        filename = os.path.join(cache_dir, f"{class_name}_{object_name}_{property_name}.pkl")
+
+        # Check if the cache directory exists, if not, create it
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
+            print(f"Created cache directory: {cache_dir}")
+
+        # Check if the file already exists
+        if os.path.exists(filename):
+            # Load the lambdified function from the file
+            with open(filename, 'rb') as f:
+                lambdified_func = dill.load(f)
+            print(f"Loaded lambdified function from {filename}.")
+        else:
+            # Call the original function to get the symbolic expression
+            lambdified_func = func(self)
+
+            # Save the lambdified function to a file
+            with open(filename, 'wb') as f:
+                dill.dump(lambdified_func, f)
+            print(f"Derived and saved lambdified function to {filename}.")
+
+        return lambdified_func
+
+    return wrapper
 
 class GSM(bu.Model):
     """Generalized Standard Material
@@ -182,6 +219,7 @@ class GSM(bu.Model):
 
     _sig_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__sig_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit(), 
@@ -213,6 +251,7 @@ class GSM(bu.Model):
 
     _dDiss_dEps_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__dDiss_dEps_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit(), 
@@ -247,6 +286,7 @@ class GSM(bu.Model):
     
     _Sig_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__Sig_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit(), 
@@ -286,6 +326,7 @@ class GSM(bu.Model):
 
     _Phi_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__Phi_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit(), 
@@ -320,6 +361,7 @@ class GSM(bu.Model):
 
     _Phi_Eps_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__Phi_Eps_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit(), 
@@ -339,6 +381,7 @@ class GSM(bu.Model):
 
     _DScale_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__DScale_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var,
                             self.lambda_var,
@@ -372,6 +415,7 @@ class GSM(bu.Model):
 
     _dDScale_dEps_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__dDScale_dEps_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit()) + self.m_params + ('**kw',), 
@@ -407,6 +451,7 @@ class GSM(bu.Model):
 
     _ddDScale_ddEps_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__ddDScale_ddEps_lambdified(self):
         return sp.lambdify((self.O, self.u_vars, self.T_var, 
                             self.Eps.as_explicit()) + self.m_params + ('**kw',), 
@@ -439,6 +484,7 @@ class GSM(bu.Model):
 
     _f_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__f_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), 
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), 
@@ -470,6 +516,7 @@ class GSM(bu.Model):
     
     _df_dlambda_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__df_dlambda_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), 
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), self.df_dlambda_, 
@@ -477,6 +524,7 @@ class GSM(bu.Model):
 
     _f_df_dlambda_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__f_df_dlambda_lambdified(self):
         f_df_ = [self.f_, self.df_dlambda_]
         return sp.lambdify((self.u_vars, self.T_var, 
@@ -522,6 +570,7 @@ class GSM(bu.Model):
     
     _dSig_dEps_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__dSig_dEps_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), 
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), self.dSig_dEps_, 
@@ -542,6 +591,7 @@ class GSM(bu.Model):
     
     _df_dSig_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__df_dSig_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), 
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), self.df_dSig_, 
@@ -560,6 +610,7 @@ class GSM(bu.Model):
     
     _df_dEps_lambdified = tr.Property()
     @tr.cached_property
+    @lambdify_and_cache
     def _get__df_dEps_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), 
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), self.df_dEps_, 
@@ -699,7 +750,6 @@ class GSM(bu.Model):
         d_T = d_T_n + d_t * (dDiss_dt / C_v_ )# / rho_'
 
         return np.moveaxis(Eps_k, 0, -1), np.moveaxis(Sig_k, 0, -1), T_n + d_T, k, np.moveaxis(dDiss_dEps, 0, -1), lam_k
-
 
     def get_response(self, u_ta, T_t, t_t, k_max=20, **kw):
         """Time integration procedure 

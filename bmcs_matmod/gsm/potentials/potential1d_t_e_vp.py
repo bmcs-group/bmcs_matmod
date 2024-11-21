@@ -11,9 +11,8 @@ class Potential1D_T_E_VP_SymbExpr(SymbExpr):
       gamma = Cymbol(r'\gamma', codename='gamma_', real=True)
       X_0 = Cymbol(r'X_0', codename='X_0_', real=True)
       K_lin = Cymbol(r'K^\mathrm{lin}', codename='K_lin_', real=True)
-      K_quad = Cymbol(r'K^\mathrm{quad}', codename='K_quad_', real=True)
-      z_0 = Cymbol(r'z_0', codename='z_0_', real=True, nonnegative=True)
       k_exp = Cymbol(r"k_\mathrm{exp}", codename='k_exp_', real=True, positive=True)
+      z_0 = Cymbol(r'z_0', codename='z_0_', real=True, nonnegative=True)
       eta = Cymbol(r'\eta', codename='eta_', real=True, nonnegative=True)
       # temperature 
       C_v = Cymbol(r'C_{\mathrm{v}}', codename='C_v_', real=True, nonnegative=True)
@@ -53,9 +52,7 @@ class Potential1D_T_E_VP_SymbExpr(SymbExpr):
       eps_el_a = eps_a - eps_p_a
       E_eff_ab = E_ab
 
-      # Z_z = K_lin * z + K_quad * z ** 2
       Z_z = K_lin * z * sp.exp(-(z/z_0)**k_exp)
-
       int_Z_z = sp.integrate(Z_z, z)
 
       U_e_ = sp.Rational(1,2) * (eps_el_a.T * E_eff_ab * eps_el_a)[0]

@@ -2,6 +2,9 @@
 
 import sympy as sp
 from bmcs_utils.api import Cymbol, SymbExpr
+import traits.api as tr
+
+import os
 
 class Potential1D_T_E_VP_D_SymbExpr(SymbExpr):
       """Single variable one-dimensional potential that can be used to demonstrate the 
@@ -9,10 +12,13 @@ class Potential1D_T_E_VP_D_SymbExpr(SymbExpr):
       """
       # %%
       E = Cymbol(r'E', codename='E_', real=True, nonnegative=True)
-      gamma = Cymbol(r'\gamma', codename='gamma_', real=True)
+      gamma_lin = Cymbol(r'\gamma_\mathrm{lin}', codename='gamma_lin_', real=True)
+      gamma_exp = Cymbol(r'\gamma_\mathrm{exp}', codename='gamma_exp_', real=True, positive=True)
+      alpha_0 = Cymbol(r'\alpha_0', codename='alpha_0_', real=True, nonnegative=True)
       X_0 = Cymbol(r'X_0', codename='X_0_', real=True)
       K_lin = Cymbol(r'K^\mathrm{lin}', codename='K_lin_', real=True)
-      K_quad = Cymbol(r'K^\mathrm{quad}', codename='K_quad_', real=True)
+      k_exp = Cymbol(r"k_\mathrm{exp}", codename='k_exp_', real=True, positive=True)
+      z_0 = Cymbol(r'z_0', codename='z_0_', real=True, nonnegative=True)
       S = Cymbol(r'S', codename='S_', real=True, nonnegative=True)
       r = Cymbol(r'r', codename='r_', real=True, nonnegative=True)
       c = Cymbol(r'c', codename='c_', real=True, nonnegative=True)
@@ -27,7 +33,7 @@ class Potential1D_T_E_VP_D_SymbExpr(SymbExpr):
       f_s = Cymbol(r'f_\mathrm{c}', codename='f_c_')
 
       # %%
-      mparams = (E, gamma, X_0, K_lin, K_quad, S, f_s, c, r, eta, C_v, T_0, alpha_therm, beta)
+      mparams = (E, gamma_lin, gamma_exp, alpha_0, X_0, K_lin, k_exp, z_0, S, f_s, c, r, eta, C_v, T_0, alpha_therm, beta)
       mparams
 
       # %% [markdown]
@@ -42,8 +48,6 @@ class Potential1D_T_E_VP_D_SymbExpr(SymbExpr):
 
       # %%
       T = Cymbol(r'\vartheta', codename='T_', real=True)
-      Gamma = sp.exp(-beta * (T - T_0))
-      Gamma
 
       # %% [markdown]
       # ## Internal state variables
@@ -70,7 +74,7 @@ class Potential1D_T_E_VP_D_SymbExpr(SymbExpr):
 
       # %%
       alpha = Cymbol(r'\alpha', codename='alpha_', real=True, nonnegative=True)
-      gamma_ab = sp.Matrix([[gamma]])
+      gamma_ab = sp.Matrix([[gamma_lin]])
       alpha_a = sp.Matrix([alpha])
       X = Cymbol(r'X', codename='X_', real=True, nonnegative=True)
       X_a = sp.Matrix([X])
@@ -84,19 +88,26 @@ class Potential1D_T_E_VP_D_SymbExpr(SymbExpr):
       E_eff_ab = (sp.eye(1) - omega_ab) * E_ab
       E_eff_ab
 
-      Z_z = K_lin * z + K_quad * z ** 2
-      int_Z_z = sp.integrate(Z_z, z)
+      Gamma = sp.exp(-beta * (T - T_0))
+      Gamma
 
-      #k = 1
-      # %%
-      U_ = ( (1 - omega) * E * alpha_therm * (T - T_0) * (eps - eps_p) )
-      U_e_ = sp.Rational(1,2) * (eps_el_a.T * E_eff_ab * eps_el_a)[0]
-      # U_p_ = sp.Rational(1,2) * (z_a.T * K_ab * z_a + alpha_a.T * gamma_ab * alpha_a)[0]
-      U_p_ =  int_Z_z + sp.Rational(1,2) * (alpha_a.T * gamma_ab * alpha_a)[0]
-      TS_ = C_v * (T - T_0) **2 / (2 * T_0)
-      F_ = U_e_ + U_p_ + - TS_
-      F_ = U_e_ + U_p_ - TS_ # - U_
-      F_
+      F_ = tr.Property()
+      @tr.cached_property
+      def _get_F_(self):
+            X_alpha = self.gamma_lin * self.alpha * sp.exp(-(self.alpha/self.alpha_0)**self.gamma_exp)
+            int_X_alpha = sp.integrate(X_alpha, self.alpha)
+            #int_X_alpha = cached_integrate('int_X_alpha', X_alpha, alpha)
+
+            Z_z = self.K_lin * self.z * sp.exp(-(self.z/self.z_0)**self.k_exp)
+            int_Z_z = sp.integrate(Z_z, self.z)
+            #int_Z_z = cached_integrate('int_Z_z', Z_z, z)
+
+            #k = 1
+            # %%
+            U_e_ = sp.Rational(1,2) * (self.eps_el_a.T * self.E_eff_ab * self.eps_el_a)[0]
+            U_p_ =  int_Z_z + int_X_alpha
+            TS_ = self.C_v * (self.T - self.T_0) **2 / (2 * self.T_0)
+            return U_e_ + U_p_ - TS_
 
       # %% [markdown]
       # ## Dissipation potential
@@ -114,8 +125,6 @@ class Potential1D_T_E_VP_D_SymbExpr(SymbExpr):
             .subs(subs_q)
             .subs(subs_sig_eff)
             .subs(f_s,((f_s + Z) * Gamma ))
-#            .subs(f_s,((f_s + K_lin * z**k) * Gamma ))
-#            .subs(f_s,((f_s + Z) ))
             )
 
       # %%
@@ -128,7 +137,7 @@ class Potential1D_T_E_VP_D_SymbExpr(SymbExpr):
       phi_ext_ = int_dot_omega
 
       # %%
-      t_relax_ = eta / (E + K_lin + gamma)
+      t_relax_ = eta / (E + K_lin + gamma_lin)
       t_relax_ = sp.Matrix([
                         t_relax_,
                         t_relax_,
