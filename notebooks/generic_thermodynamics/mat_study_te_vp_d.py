@@ -2,11 +2,10 @@ from urllib import response
 from bmcs_matmod import GSM
 import matplotlib.pylab as plt 
 import sympy as sp
-from bmcs_utils.api import Cymbol, Model
 import numpy as np
+from bmcs_utils.api import Cymbol, Model, mpl_align_yaxis_to_zero, Float
 from bmcs_matmod.gsm.potentials.potential1d_t_e_vp_d import Potential1D_T_E_VP_D_SymbExpr
 import traits.api as tr
-from bmcs_utils.api import mpl_align_yaxis_to_zero
 from scipy.integrate import cumtrapz
 
 class MatStudy_T_E_VP_D(Model):
@@ -69,63 +68,73 @@ class MatStudy_T_E_VP_D(Model):
     gsm_G.vp_on = True
     gsm_G.update_at_k = False
 
+    material_params = tr.Dict
+    def _material_params_default(self):
+        _f_c = 44
+        _f_t = -0.1 * _f_c
+        _X_0 = (_f_c + _f_t) / 2
+        _f_s = (_f_c - _f_t) / 2
+        _E = 50000
+        _KH_factor = 4
+        _KH = _E * _KH_factor
+        _K_ratio = 0.01 # 0.015
+        _K = _KH * _K_ratio
+        _H = _KH * (1 - _K_ratio)
+        
+        return dict(
+            E_=_E, 
+            gamma_lin_= _H, # _E * 10, 
+            gamma_exp_=0.5,
+            alpha_0_=0.5,
+            K_lin_= _K, # _E / 5,
+            k_exp_=10,
+            z_0_=10,
+            S_=0.008,
+            c_=2.5,
+            r_=2.7,
+            f_c_=_f_s,
+            X_0_=_X_0,  
+            eta_=500,
+            T_0_=20,
+            C_v_=0.01, # 0.0001, 
+            beta_=0.0001,
+            alpha_therm_=0, # 1.2e-5,
+            d_N_ = 1
+        )
 
-    _f_c = 44
-    _f_t = -0.1 * _f_c
-    _X_0 = (_f_c + _f_t) / 2
-    _f_s = (_f_c - _f_t) / 2
-    _E = 50000
-    _KH_factor = 4
-    _KH = _E * _KH_factor
-    _K_ratio = 0.01 # 0.015
-    _K = _KH * _K_ratio
-    _H = _KH * (1 - _K_ratio)
-    material_params = dict(
-        E_=_E, 
-        gamma_lin_= _H, # _E * 10, 
-        gamma_exp_=0.5,
-        alpha_0_=0.5,
-        K_lin_= _K, # _E / 5,
-        k_exp_=10,
-        z_0_=10,
-        S_=0.008,
-        c_=2.5,
-        r_=2.7,
-        f_c_=_f_s,
-        X_0_=_X_0,  
-        eta_=500,
-        T_0_=20,
-        C_v_=0.01, # 0.0001, 
-        beta_=0.0001,
-        alpha_therm_=0, # 1.2e-5,
-        d_N_ = 1
-    )
+    dot_eps = Float(0.01, TIME=True)
+    eps_max = Float(0.0035, TIME=True)
 
-    monotonic_response = tr.Property()
+    monotonic_response = tr.Property(depends_on='state_changed')
     @tr.cached_property
     def _get_monotonic_response(self):
         # params
+        print('recalculating')
         n_t = 151
         n_I = 1
-        u_T_max = 0.0035
-        t_t = np.linspace(0, 1, n_t)
-        u_ta_F = (u_T_max * t_t).reshape(-1, 1)
+        t_max = self.eps_max / self.dot_eps
+        t_t = np.linspace(0, t_max, n_t)
+        u_ta_F = (self.dot_eps * t_t).reshape(-1, 1)
         T_t = 20 + t_t * 0
-        response_monotonic_F = self.gsm_run(self.gsm_F, u_ta_F, T_t, 0.1*t_t, **self.material_params)
+        response_monotonic_F = self.gsm_run(self.gsm_F, u_ta_F, T_t, t_t, **self.material_params)
         _t_t_F, _u_atI_F, _sig_atI_F, _T_t_F, _Eps_btI_F, _Sig_btI_F, _dF_dEps_btI_F = response_monotonic_F
         _max_sig = np.max(_sig_atI_F)
         _max_sig
         t_t = np.linspace(0, 1, n_t)
         u_ta_G = (_max_sig * t_t).reshape(-1, 1)
         T_t = 20 + t_t * 0
-        response_monotonic_G = self.gsm_run(self.gsm_G, u_ta_G, T_t, 0.1*t_t, **self.material_params)
+        response_monotonic_G = self.gsm_run(self.gsm_G, u_ta_G, T_t, t_t, **self.material_params)
         _t_t_G, _u_atI_G, _sig_atI_G, _T_t_G, _Eps_btI_G, _Sig_btI_G, _dF_dEps_btI_G = response_monotonic_G
         Diss_btI_F = cumtrapz(_dF_dEps_btI_F, _Eps_btI_F, initial=0, axis=1)
         Diss_btI_G = cumtrapz(_dF_dEps_btI_G, _Eps_btI_G, initial=0, axis=1)
         return response_monotonic_F, response_monotonic_G, (Diss_btI_F, Diss_btI_G, _max_sig)
 
-    def plot_monotonic(self):
-        fig, ((ax, ax_T, ax_Diss), (ax_omega, ax_3, ax_4)) = plt.subplots(2,3, figsize=(12,6), tight_layout=True)
+    def get_fig_monotonic(self):
+        fig, axes = plt.subplots(2,3, figsize=(12,6), tight_layout=True)
+        return fig, axes
+
+    def plot_monotonic(self, axes):
+        (ax, ax_T, ax_Diss), (ax_omega, ax_3, ax_4) = axes
         response_F, response_G, (Diss_btI_F, Diss_btI_G, _max_sig) = self.monotonic_response
         _t_t_F, _u_atI_F, _sig_atI_F, _T_t_F, _Eps_btI_F, _Sig_btI_F, _dF_dEps_btI_F = response_F
         _t_t_G, _u_atI_G, _sig_atI_G, _T_t_G, _Eps_btI_G, _Sig_btI_G, _dF_dEps_btI_G = response_G
@@ -143,7 +152,7 @@ class MatStudy_T_E_VP_D(Model):
         ax_Diss.plot(_t_t_F, np.sum(Diss_btI_F[...,0], axis=0), alpha=1, label='F')
         ax_Diss.plot(_t_t_G * _t_F_scale, np.sum(Diss_btI_G[...,0], axis=0), alpha=1, label='G')
 
-        ax_omega.plot(_u_atI_F[0, :, 0], _omega_atI[0, :, 0])
+        ax_omega.plot(_sig_atI_G[0, :, 0], _omega_atI[0, :, 0])
         ax_omega.set_xlabel(r'$\varepsilon$/-')
         ax_omega.set_ylabel(r'$\omega$/-')
         return
@@ -230,9 +239,12 @@ class MatStudy_T_E_VP_D(Model):
 
     S_max_levels = np.array([1, 0.95, 0.85, 0.75, 0.65])
 
-    fatigue_response = tr.Property()
+    freq = Float(5, TIME=True)
+
+    fatigue_response = tr.Property(depends_on='state_changed')
     @tr.cached_property
     def _get_fatigue_response(self):
+        print(f'calculating fatigue for {self.freq}')
         response_F, response_G, (Diss_btI_F, _, _max_sig) = self.monotonic_response
         S_max_levels = self.S_max_levels
         responses = {}
@@ -246,7 +258,7 @@ class MatStudy_T_E_VP_D(Model):
 
             print('S_max', S_max)
             # params
-            t_t, s_t = self.generate_cyclic_load(S_max, 0.1, 5, 1000, 66)
+            t_t, s_t = self.generate_cyclic_load(S_max, 0.1, self.freq, 1000, 66)
             #t_t, s_t = generate_cyclic_load(1, 0, 0.01, 10, 30)
             u_ta_fat = (_max_sig * s_t).reshape(-1, 1)
             T_t = 20 + t_t * 0

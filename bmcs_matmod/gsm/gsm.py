@@ -33,14 +33,12 @@ def lambdify_and_cache(func):
         # Check if the cache directory exists, if not, create it
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
-            print(f"Created cache directory: {cache_dir}")
 
         # Check if the file already exists
         if os.path.exists(filename):
             # Load the lambdified function from the file
             with open(filename, 'rb') as f:
                 lambdified_func = dill.load(f)
-            print(f"Loaded lambdified function from {filename}.")
         else:
             # Call the original function to get the symbolic expression
             lambdified_func = func(self)
@@ -48,7 +46,6 @@ def lambdify_and_cache(func):
             # Save the lambdified function to a file
             with open(filename, 'wb') as f:
                 dill.dump(lambdified_func, f)
-            print(f"Derived and saved lambdified function to {filename}.")
 
         return lambdified_func
 
