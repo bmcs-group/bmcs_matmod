@@ -90,8 +90,6 @@ class GSM(tr.HasTraits):
 
     """
 
-    name = tr.Str('unnamed')
-
     u_vars = tr.Any
     """External variable
     """

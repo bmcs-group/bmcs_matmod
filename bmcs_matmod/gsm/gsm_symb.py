@@ -16,45 +16,14 @@ import dill
 import os
 import functools
 
+CACHE_DIR = '_lambdified_cache'
+
 def get_dirac_delta(x, x_0=0):
     return 0
 numpy_dirac =[{'DiracDelta': get_dirac_delta }, 'numpy']
 
-# Directory to store the serialized symbolic instances
-CACHE_DIR = '_lambdified_cache'
 
-def lambdify_and_cache(func):
-    @functools.wraps(func)
-    def wrapper(self):
-        # Generate the filename based on class name and property name
-        class_name = self.__class__.__name__
-        object_name = self.name
-        property_name = func.__name__
-        cache_dir = CACHE_DIR
-        filename = os.path.join(cache_dir, f"{class_name}_{object_name}_{property_name}.pkl")
-
-        # Check if the cache directory exists, if not, create it
-        if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir)
-
-        # Check if the file already exists
-        if os.path.exists(filename):
-            # Load the lambdified function from the file
-            with open(filename, 'rb') as f:
-                lambdified_func = dill.load(f)
-        else:
-            # Call the original function to get the symbolic expression
-            lambdified_func = func(self)
-
-            # Save the lambdified function to a file
-            with open(filename, 'wb') as f:
-                dill.dump(lambdified_func, f)
-
-        return lambdified_func
-
-    return wrapper
-
-class GSM(tr.HasTraits):
+class GSMSymb(tr.HasTraits):
     """Generalized Standard Material
 
     The class definition consists of 
@@ -89,8 +58,6 @@ class GSM(tr.HasTraits):
 
 
     """
-
-    name = tr.Str('unnamed')
 
     u_vars = tr.Any
     """External variable
@@ -221,7 +188,6 @@ class GSM(tr.HasTraits):
 
     _sig_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__sig_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit(), 
@@ -253,7 +219,6 @@ class GSM(tr.HasTraits):
 
     _dDiss_dEps_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__dDiss_dEps_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit(), 
@@ -288,7 +253,6 @@ class GSM(tr.HasTraits):
     
     _Sig_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__Sig_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit(), 
@@ -328,7 +292,6 @@ class GSM(tr.HasTraits):
 
     _Phi_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__Phi_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit(), 
@@ -363,7 +326,6 @@ class GSM(tr.HasTraits):
 
     _Phi_Eps_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__Phi_Eps_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit(), 
@@ -383,7 +345,6 @@ class GSM(tr.HasTraits):
 
     _DScale_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__DScale_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var,
                             self.lambda_var,
@@ -417,7 +378,6 @@ class GSM(tr.HasTraits):
 
     _dDScale_dEps_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__dDScale_dEps_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit()) + self.m_params + ('**kw',), 
@@ -453,7 +413,6 @@ class GSM(tr.HasTraits):
 
     _ddDScale_ddEps_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__ddDScale_ddEps_lambdified(self):
         return sp.lambdify((self.O, self.u_vars, self.T_var, 
                             self.Eps.as_explicit()) + self.m_params + ('**kw',), 
@@ -486,7 +445,6 @@ class GSM(tr.HasTraits):
 
     _f_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__f_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), 
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), 
@@ -518,7 +476,6 @@ class GSM(tr.HasTraits):
     
     _df_dlambda_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__df_dlambda_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), 
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), self.df_dlambda_, 
@@ -526,7 +483,6 @@ class GSM(tr.HasTraits):
 
     _f_df_dlambda_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__f_df_dlambda_lambdified(self):
         f_df_ = [self.f_, self.df_dlambda_]
         return sp.lambdify((self.u_vars, self.T_var, 
@@ -572,7 +528,6 @@ class GSM(tr.HasTraits):
     
     _dSig_dEps_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__dSig_dEps_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), 
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), self.dSig_dEps_, 
@@ -593,7 +548,6 @@ class GSM(tr.HasTraits):
     
     _df_dSig_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__df_dSig_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), 
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), self.df_dSig_, 
@@ -612,7 +566,6 @@ class GSM(tr.HasTraits):
     
     _df_dEps_lambdified = tr.Property()
     @tr.cached_property
-    @lambdify_and_cache
     def _get__df_dEps_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, self.Eps.as_explicit(), 
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), self.df_dEps_, 
@@ -789,7 +742,7 @@ class GSM(tr.HasTraits):
             dDiss_dEps_record.append(dDiss_dEps)
             T_record.append(T_n1)
             iter_record.append(k)
-            lam_record.append(lam)
+            lam_record.append(np.max(lam))
             T_n = T_n1
         Sig_t = np.array(Sig_record, dtype=np.float_)
         Eps_t = np.array(Eps_record, dtype=np.float_)

@@ -2,7 +2,7 @@ import matplotlib.pylab as plt
 from scipy.integrate import cumtrapz
 import numpy as np
 import bmcs_utils.api as bu
-from .gsm import GSM
+from .gsm_symb import GSMSymb
 
 colors = dict( # color associations
      stored_energy = 'darkgreen', # recoverable
@@ -18,7 +18,7 @@ class GSMPlot(bu.Model):
     """
     Thermo-elasto-visco-plastic damage model
     """
-    gsm = bu.Instance(GSM)
+    gsm = bu.Instance(GSMSymb)
 
     def param_study_plot(self, param_name, response_values, get_Gamma=None, a_idx=0, 
                          plot_sig_time=False, unit='-', **mp):
@@ -40,9 +40,9 @@ class GSMPlot(bu.Model):
 
         for (param, rv), color in zip(response_values.items(), ['black', 'blue', 'red']):
             # remove all dimensions with the length 1
-            t_t, u_ta, T_t, Eps_t, Sig_t, iter_t, _ = [np.squeeze(v) for v in rv]
-            u_p_N_t, u_p_Tx_t, u_p_Ty_t, z_T_t, alpha_Tx_t, alpha_Ty_t, omega_N_t, omega_T_t = Eps_t.T
-            sig_N_t, sig_Tx_t, sig_Ty_t, Z_T_t, X_Tx_t, X_Ty_t, Y_N_t, Y_T_t = Sig_t.T
+            t_t, u_ta, T_t, Eps_t, Sig_t, iter_t, _, _ = [np.squeeze(v) for v in rv]
+            u_p_N_t, u_p_Tx_t, u_p_Ty_t, z_N_t, z_T_t, alpha_N_t, alpha_Tx_t, alpha_Ty_t, omega_N_t, omega_T_t = Eps_t.T
+            sig_N_t, sig_Tx_t, sig_Ty_t, Z_N_t, Z_T_t, X_T_t, X_Tx_t, X_Ty_t, Y_N_t, Y_T_t = Sig_t.T
             ax1.plot(
                 t_t,
                 u_ta[:, a_idx],
@@ -128,8 +128,8 @@ class GSMPlot(bu.Model):
         colors = ['blue','red', 'green', 'black', 'magenta' ]
         t_t, u_ta, T_t, Eps_t, Sig_t, iter_t, _ = rv
         s_x_t = u_ta[:,0]
-        u_Tx_pi_, u_Ty_pi_, u_N_pi_, z_, alpha_Tx_, alpha_Ty_, omega_T_, omega_N_ = Eps_t.T
-        tau_x_pi_, tau_y_pi_, sig_pi_, Z_, X_x_, X_y_, Y_T_, Y_N_ = Sig_t.T
+        u_Tx_pi_, u_Ty_pi_, u_N_pi_, z_N_, z_, alpha_Tx_, alpha_Ty_, omega_T_, omega_N_ = Eps_t.T
+        tau_x_pi_, tau_y_pi_, sig_pi_, Z_N_, Z_, X_x_, X_y_, Y_T_, Y_N_ = Sig_t.T
         n_step = len(u_Tx_pi_)
         ax1.plot(s_x_t, tau_x_pi_, color='black', 
                 label='n_steps = %g' % n_step)
@@ -159,8 +159,8 @@ class GSMPlot(bu.Model):
         """
         t_t, u_ta, T_t, Eps_t, Sig_t, iter_t, _ = rv
         u_Tx_, u_Ty_, u_N_, = u_ta.T
-        u_Tx_p_, u_Ty_p_, u_N_p_, z_, alpha_Tx_, alpha_Ty_, omega_T_, omega_N_ = Eps_t.T
-        sig_Tx_p_, sig_Ty_p_, sig_N_p_, Z_, X_x_, X_y_, Y_T_, Y_N_ = Sig_t.T
+        u_Tx_p_, u_Ty_p_, u_N_p_, z_N_, z_T_, alpha_Tx_, alpha_Ty_, omega_T_, omega_N_ = Eps_t.T
+        sig_Tx_p_, sig_Ty_p_, sig_N_p_, z_N_, Z_T__, X_x_, X_y_, Y_T_, Y_N_ = Sig_t.T
 
         W_t = (
                 cumtrapz(sig_Tx_p_, u_Tx_, initial=0) +
@@ -192,11 +192,11 @@ class GSMPlot(bu.Model):
         t_t, u_ta, T_t, Eps_t, Sig_t, iter_t, drho_psi_dEps_t = rv
 
         E_i = cumtrapz(Sig_t, Eps_t, initial=0, axis=0)
-        E_T_x_pi_, E_T_y_pi_, E_N_pi_, E_z_, E_alpha_x_, E_alpha_y_, E_omega_T_, E_omega_N_ = E_i.T
+        E_T_x_pi_, E_T_y_pi_, E_N_pi_, E_z_N_, E_z_T_, E_alpha_x_, E_alpha_y_, E_omega_T_, E_omega_N_ = E_i.T
         E_plastic_work_T = E_T_x_pi_ + E_T_y_pi_
         E_plastic_work_N = E_N_pi_
         E_plastic_work = E_plastic_work_T + E_plastic_work_N
-        E_iso_free_energy = E_z_
+        E_iso_free_energy = E_z_N_ + E_z_T_,
         E_kin_free_energy = E_alpha_x_ + E_alpha_y_
         E_plastic_diss_T = E_plastic_work_T - E_iso_free_energy - E_kin_free_energy
         E_plastic_diss_N = E_plastic_work_N
