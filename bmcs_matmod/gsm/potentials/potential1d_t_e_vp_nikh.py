@@ -3,7 +3,7 @@
 import sympy as sp
 from bmcs_utils.api import Cymbol, SymbExpr
 
-class Potential1D_T_E_VP_SymbExpr(SymbExpr):
+class Potential1D_T_E_VP_NIKH_SymbExpr(SymbExpr):
       """Single variable one-dimensional potential that can be used to demonstrate the 
       interaction between the thermal and mechanical loading. 
       """

@@ -1,4 +1,6 @@
+from turtle import color
 from urllib import response
+
 from bmcs_matmod import GSM
 import matplotlib.pylab as plt 
 import sympy as sp
@@ -7,6 +9,8 @@ from bmcs_utils.api import Cymbol, Model, mpl_align_yaxis_to_zero, Float, SymbEx
 # from bmcs_matmod.gsm.potentials.potential1d_t_e_vp_d import Potential1D_T_E_VP_D_SymbExpr
 import traits.api as tr
 from scipy.integrate import cumtrapz
+from pathlib import Path
+from scipy.interpolate import interp1d
 
 class MatStudy_T_E_VP_D(Model):
 
@@ -71,18 +75,29 @@ class MatStudy_T_E_VP_D(Model):
         n_t = 151
         n_I = 1
         t_max = self.eps_max / self.dot_eps
-        t_t = np.linspace(0, t_max, n_t)
-        u_ta_F = (self.dot_eps * t_t).reshape(-1, 1)
-        T_t = 20 + t_t * 0
-        response_monotonic_F = self.gsm_run(self.gsm_F, u_ta_F, T_t, t_t, **self.material_params)
+        t_t_F = np.linspace(0, t_max, n_t)
+        u_ta_F = (self.dot_eps * t_t_F).reshape(-1, 1)
+        T_t = 20 + t_t_F * 0
+        response_monotonic_F = self.gsm_run(self.gsm_F, u_ta_F, T_t, t_t_F, **self.material_params)
         _t_t_F, _u_atI_F, _sig_atI_F, _T_t_F, _Eps_btI_F, _Sig_btI_F, _dF_dEps_btI_F = response_monotonic_F
-        _max_sig = np.max(_sig_atI_F)
-        _max_sig
-        t_t = np.linspace(0, 1, n_t)
-        u_ta_G = (_max_sig * t_t).reshape(-1, 1)
-        T_t = 20 + t_t * 0
-        response_monotonic_G = self.gsm_run(self.gsm_G, u_ta_G, T_t, t_t, **self.material_params)
+        _argmax_sig = np.argmax(_sig_atI_F)
+        print('argmax_max_sig', _argmax_sig)
+        print('shape', t_t_F.shape, _sig_atI_F.shape)
+#        _max_sig = _sig_atI_F[_argmax_t]
+        _max_sig = _sig_atI_F[0, _argmax_sig, 0]
+        print('max_sig', _max_sig)
+#        t_t_G = np.linspace(0, _t_t_F[_argmax_sig], n_t)
+#        u_ta_G = (_max_sig / t_t).reshape(-1, 1)
+        # u_ta_G = np.linspace(0, _max_sig, n_t).reshape(-1, 1)
+        t_t_G = _t_t_F[:_argmax_sig+1]
+        print('history', t_t_F[_argmax_sig], t_t_G[-1])
+        u_ta_G = _sig_atI_F[0, :_argmax_sig+1, 0].reshape(-1, 1)
+        T_t = 20 + t_t_G * 0
+        # print('max_sig', _max_sig)
+        # print('shape', len(t_t), t_t[-1], u_ta_G[-1])
+        response_monotonic_G = self.gsm_run(self.gsm_G, u_ta_G, T_t, t_t_G, **self.material_params)
         _t_t_G, _u_atI_G, _sig_atI_G, _T_t_G, _Eps_btI_G, _Sig_btI_G, _dF_dEps_btI_G = response_monotonic_G
+        print(_t_t_F[_argmax_sig], _t_t_G[-1])
         Diss_btI_F = cumtrapz(_dF_dEps_btI_F, _Eps_btI_F, initial=0, axis=1)
         Diss_btI_G = cumtrapz(_dF_dEps_btI_G, _Eps_btI_G, initial=0, axis=1)
         return response_monotonic_F, response_monotonic_G, (Diss_btI_F, Diss_btI_G, _max_sig)
@@ -101,17 +116,21 @@ class MatStudy_T_E_VP_D(Model):
         _arg_t_F = _t_t_F[np.argmax(_sig_atI_F)]
         _t_F_scale = _arg_t_F * _t_t_F[-1]
 
-        ax.plot(_u_atI_F[0, :, 0], _sig_atI_F[0, :, 0], label='Helmholtz');
-        ax.plot(_sig_atI_G[0, :, 0], _u_atI_G[0, :, 0], label='Gibbs');
+        ax_3_a = ax_3.twinx()
+        ax_3.plot(_t_t_F, _u_atI_F[0, :, 0], label='Helmholtz', color='blue');
+        ax_3_a.plot(_t_t_G, _u_atI_G[0, :, 0], label='Gibbs', color='orange');
+        self._decorate_plot(ax_3, r'loading history', r'$t$')
+        ax.plot(_u_atI_F[0, :, 0], _sig_atI_F[0, :, 0], label='Helmholtz', color='blue');
+        ax.plot(_sig_atI_G[0, :, 0], _u_atI_G[0, :, 0], label='Gibbs', color='orange');
         self._decorate_plot(ax, r'stress-strain', r'$\varsigma$')
-        ax_T.plot(_u_atI_F[0, :, 0], _T_t_F, label='Helmholtz');
-        ax_T.plot(_sig_atI_G[0, :, 0], _T_t_G, label='Gibbs');
+        ax_T.plot(_u_atI_F[0, :, 0], _T_t_F, label='Helmholtz', color='blue');
+        ax_T.plot(_sig_atI_G[0, :, 0], _T_t_G, label='Gibbs', color='orange');
         self._decorate_plot(ax_T, r'temperature', r'$\vartheta$')
-        ax_Diss.plot(_t_t_F, np.sum(Diss_btI_F[...,0], axis=0), alpha=1, label='F')
-        ax_Diss.plot(_t_t_G * _t_F_scale, np.sum(Diss_btI_G[...,0], axis=0), alpha=1, label='G')
+        ax_Diss.plot(_t_t_F, np.sum(Diss_btI_F[...,0], axis=0), alpha=1, label='F', color='blue')   
+        ax_Diss.plot(_t_t_G * _t_F_scale, np.sum(Diss_btI_G[...,0], axis=0), alpha=1, label='G', color='orange')    
 
-        ax_omega.plot(_sig_atI_G[0, :, 0], _omega_atI[0, :, 0])
-        ax_omega.set_xlabel(r'$\varepsilon$/-')
+        ax_omega.plot(_sig_atI_G[0, :, 0], _omega_atI[0, :, 0], color='orange', lw=2, label='Gibbs')
+        ax_omega.set_xlabel(r'$-\varepsilon$/-')
         ax_omega.set_ylabel(r'$\omega$/-')
         return
 
@@ -122,7 +141,7 @@ class MatStudy_T_E_VP_D(Model):
         arg0.legend()
         arg0.set_title(arg1)
         arg0.set_ylabel(arg2)
-        arg0.set_xlabel(r'$\varepsilon$')
+        arg0.set_xlabel(r'$-\varepsilon$')
 
     @staticmethod
     def generate_cyclic_load(max_s, min_s, freq, total_cycles, points_per_cycle):
@@ -195,9 +214,15 @@ class MatStudy_T_E_VP_D(Model):
                             self.gsm_G.Sig.as_explicit()) + self.gsm_G.m_params + ('**kw',),
                             sig_p_solved_, cse=True)
 
-    S_max_levels = np.array([1, 0.95, 0.85, 0.75, 0.65])
+    S_max_levels = tr.Array(value = [1, 0.95, 0.85, 0.75, 0.65], dtype=np.float_, TIME=True)
+
+    S_min = Float(0.1, TIME=True)
 
     freq = Float(5, TIME=True)
+
+    total_cycles = Float(1000, TIME=True)
+
+    points_per_cycle = Float(66, TIME=True)
 
     fatigue_responses = tr.Property(depends_on='state_changed')
     @tr.cached_property
@@ -215,7 +240,7 @@ class MatStudy_T_E_VP_D(Model):
 
             print('S_max', S_max)
             # params
-            t_t, s_t = self.generate_cyclic_load(S_max, 0.1, self.freq, 1000, 66)
+            t_t, s_t = self.generate_cyclic_load(S_max, self.S_min, self.freq, self.total_cycles, self.points_per_cycle)
             u_ta_fat = (_max_sig * s_t).reshape(-1, 1)
             T_t = 20 + t_t * 0
 
@@ -252,18 +277,18 @@ class MatStudy_T_E_VP_D(Model):
         ax_el.set_title('elastic domain')
         ax_u.set_title('fatigue strain')
 
-        ax_sig_u.set_xlabel(r'$\varepsilon$/-')
-        ax_sig_u.set_ylabel(r'$\sigma$/MPa')
+        ax_sig_u.set_xlabel(r'$-\varepsilon$/-')
+        ax_sig_u.set_ylabel(r'$-\sigma$/MPa')
         ax_omega.set_xlabel(r'$\eta$/-')
         ax_omega.set_ylabel(r'$\omega$/-')
         ax_el.set_xlabel(r'$\eta$/-')
-        ax_el.set_ylabel(r'$\sigma$/MPa')
+        ax_el.set_ylabel(r'$-\sigma$/MPa')
         ax_u.set_xlabel(r'$\eta$/-')
-        ax_u.set_ylabel(r'$\varepsilon$/-')
+        ax_u.set_ylabel(r'$-\varepsilon$/-')
 
         if self.include_last_col:
-            ax_T.set_title('temperature')
-            ax_SN.set_title('S-N & dissipation')
+            ax_T.set_title(r'temperature')
+            ax_SN.set_title(r'S-N \& dissipation')
 
             ax_T.set_xlabel(r'$\eta$/-')
             ax_T.set_ylabel(r'$\vartheta$/$^{\circ}$C')
@@ -280,8 +305,19 @@ class MatStudy_T_E_VP_D(Model):
 
     include_last_col = tr.Bool(True)
 
-    def plot_fatigue_response(self, axes, response, S_max, N_S_max, N_S_min, c, alpha_line):
+    def plot_fatigue_load(self, axes, S_max, c, alpha_line):
+        responses, N_S_max, N_S_min, _Diss_plastic_S, _Diss_damage_S = self.fatigue_responses
+        response = responses[S_max]
+        _t_t_fat, _u_atI_fat, _sig_atI_fat, _T_t_fat, _Eps_btI_fat, _Sig_btI_fat, _dF_dEps_btI_fat = response
+        ax_load, = axes
+        ax_load.plot(_t_t_fat, _u_atI_fat[0,:,0], color=c, alpha=alpha_line, label=f'$S_{{\max}} = {S_max}$' )
+
+    def plot_fatigue_response(self, axes, S_max, c, alpha_line):
         # params
+
+        responses, N_S_max, N_S_min, _Diss_plastic_S, _Diss_damage_S = self.fatigue_responses
+        response = responses[S_max]
+
         ax_sig_u, ax_el, ax_T, ax_u, ax_omega, ax_SN, ax_SN_twin = axes
 
         _t_t_fat, _u_atI_fat, _sig_atI_fat, _T_t_fat, _Eps_btI_fat, _Sig_btI_fat, _dF_dEps_btI_fat = response
@@ -303,13 +339,20 @@ class MatStudy_T_E_VP_D(Model):
 
         ax_el.plot(_eta_t_fat, _sig_atI_top[:, 0], color=c, alpha=alpha_line)
         ax_el.plot(_eta_t_fat, _sig_atI_bot[:, 0], color=c, alpha=alpha_line)
-        ax_el.fill_between(_eta_t_fat, _sig_atI_bot[:, 0], _sig_atI_top[:, 0], color=c, alpha=0.1)
+        ax_el.fill_between(_eta_t_fat, _sig_atI_bot[:, 0], _sig_atI_top[:, 0], color=c, alpha=0.05)
 
         _eta_max_n = np.linspace(0, 1, N_S_max[S_max])
         _eta_min_n = np.linspace(0, 1, N_S_min[S_max])
-
         ax_u.plot(_eta_max_n, _sig_t_fat[arg_max_u], '-', lw=2, color=c)
         ax_u.plot(_eta_min_n, _sig_t_fat[arg_min_u], '--', lw=2, color=c)
+        # if N_S_min[S_max] == N_S_max[S_max]:
+        #     ax_el.fill_between(_eta_max_n, _sig_t_fat[arg_min_u], _sig_t_fat[arg_max_u], color=c, alpha=0.1)
+        # else:
+        if len(_eta_min_n) > 0 and len(_eta_max_n) > 0:
+            f_min = interp1d(_eta_min_n, _sig_t_fat[arg_min_u], kind='linear', fill_value="extrapolate")
+            f_max = interp1d(_eta_max_n, _sig_t_fat[arg_max_u], kind='linear', fill_value="extrapolate")
+            _eta_common = np.linspace(0, 1, max(N_S_max[S_max], N_S_min[S_max]))
+            ax_u.fill_between(_eta_common, f_min(_eta_common), f_max(_eta_common), color=c, alpha=0.05)
 
         if ax_T:
             ax_T.plot(_eta_t_fat, _T_t_fat, lw=2, color=c)
@@ -333,21 +376,18 @@ class MatStudy_T_E_VP_D(Model):
         _t_t_F, _u_atI_F, _sig_atI_F, _T_t_F, _Eps_btI_F, _Sig_btI_F, _dF_dEps_btI_F = response_F
         _t_t_G, _u_atI_G, _sig_atI_G, _T_t_G, _Eps_btI_G, _Sig_btI_G, _dF_dEps_btI_G = response_G
 
-        responses, N_S_max, N_S_min, _Diss_plastic_S, _Diss_damage_S = self.fatigue_responses
-
-        colors = ['black', 'red', 'darkslategrey', 'maroon', 'darkblue', 'magenta']
-
         ax_sig_u.plot(_u_atI_F[0,:,0], _sig_atI_F[0,:,0], color='black', ls='dashed')
         ax_sig_u.plot(_sig_atI_G[0,:,0], _u_atI_G[0,:,0], color='black')
 
-    #    for i, (S_max, response) in enumerate(responses.items()):
+        colors = ['black', 'red', 'darkslategrey', 'maroon', 'darkblue', 'magenta']
+
         for i in S_max_select:
             S_max = self.S_max_levels[i+1]
-            response = responses[S_max]
             c = colors[i+1]
-            self.plot_fatigue_response(axes, response, S_max, N_S_max, N_S_min, c, alpha_line)
+            self.plot_fatigue_response(axes, S_max, c, alpha_line)
 
         if ax_SN:
+            responses, N_S_max, N_S_min, _Diss_plastic_S, _Diss_damage_S = self.fatigue_responses
             self.plot_SN_curve(ax_SN, N_S_max, self.S_max_levels, ax_SN_twin,
                                                      _Diss_plastic_S, _Diss_damage_S)
         ax_u.set_ylim(ymin=0)
@@ -368,7 +408,6 @@ class MatStudy_T_E_VP_D(Model):
         ax_SN_twin.legend()
         ax_SN_twin.set_xscale('log')
 
-    from pathlib import Path
     path = Path().home() / 'simdb' / 'data'
     plot_config = {
     #     'one': ([0], True),
@@ -384,5 +423,7 @@ class MatStudy_T_E_VP_D(Model):
             S_max_select, include_last_col = config
             fig = self.plot_S_max_study(S_max_select=S_max_select, include_last_col=include_last_col);
             fname = f'GSM_demo_fatigue_uniaxial_stress_{name}.png'
+            fig.savefig(self.path / fname)
+            fname = f'GSM_demo_fatigue_uniaxial_stress_{name}.pdf'
             fig.savefig(self.path / fname)
         return

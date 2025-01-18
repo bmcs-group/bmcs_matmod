@@ -293,7 +293,7 @@ The Laplace transform is a powerful tool in mathematics and engineering that all
 
 3. **Algebraic Manipulation**:
    - While differential equations can be complex and cumbersome to solve directly in the time domain, their Laplace transforms are often simple algebraic equations.
-   - Common operations (such as differentiation and integration) in the time domain correspond to multiplication and division by $s$ in the Laplace domain, simplifying convolution problems.
+   - Common o**per**ations (such as differentiation and integration) in the time domain correspond to multiplication and division by $s$ in the Laplace domain, simplifying convolution problems.
 
 4. **Linear System Analysis**:
    - Because the Laplace transform preserves linearity, it is particularly useful for linear time-invariant (LTI) systems. Superposition of solutions is preserved, and system dynamics are described by transfer functions.
