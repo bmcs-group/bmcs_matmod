@@ -129,7 +129,7 @@ class GSM(tr.HasTraits):
     to the internal variables
     """
 
-    dF_sign = tr.Float(1)
+    sig_sign = tr.Float(1)
     """Sign relating the rate of free energy to the dissipation.
     For Helmholtz free energy it is negative, for the Gibbs free energy it is positive
     """
@@ -231,7 +231,8 @@ class GSM(tr.HasTraits):
     sig_ = tr.Property()
     @tr.cached_property
     def _get_sig_(self):
-        return self.F_expr.diff(self.u_vars)
+        "For Gibbs for external strain the sign is swapped using the sig_sign parameter = -1"
+        return self.sig_sign * self.F_expr.diff(self.u_vars)
 
     ######################################
     def get_dDiss_dEps(self, u, T, Eps, Sig, **m_params):
@@ -263,8 +264,7 @@ class GSM(tr.HasTraits):
     dDiss_dEps_ = tr.Property()
     @tr.cached_property
     def _get_dDiss_dEps_(self):
-        "For Gibbs the energy sign is swapped using the dF_sign parameter = -1"
-        dFG_dEps_explicit_ = self.dF_sign * self.dF_dEps_.as_explicit()
+        dFG_dEps_explicit_ = self.dF_dEps_.as_explicit()
         return (self.T_var * dFG_dEps_explicit_.diff(self.T_var) - dFG_dEps_explicit_)
 
     
@@ -696,7 +696,11 @@ class GSM(tr.HasTraits):
 
         Eps_k = np.copy(Eps_n)
         Sig_k = np.copy(Sig_n)
+        #### Here for Gibbs - different values for Eps_k and Sig_k - when viscosity on - WHY?
+        # print('u_n1', u_n1, T_n, Eps_k, Sig_k)
         f_k, df_k, Sig_k = self.get_f_df_Sig(u_n1, T_n, Eps_k, Sig_k, **kw)
+        # if f_k > 0:
+        #     print('===================== u_n1', u_n1, T_n, Eps_k, Sig_k)
         f_k = np.atleast_1d(f_k)
         df_k = np.atleast_1d(df_k)
         f_k_norm = np.fabs(f_k)
@@ -727,29 +731,36 @@ class GSM(tr.HasTraits):
         else:
             raise RuntimeError(f'no convergence for indexes {I}')
 
+        # if np.any(f_k_trial > 0):
+        #     print('f_k_trial', f_k_trial)
+        #     print('eps', u_n1, 'T_n', T_n, 
+        #           'Eps_n', Eps_n, 'Sig_n', Sig_n, 'lam_k', lam_k, 'Eps_k', 
+        #           Eps_k, 'Sig_k', Sig_k)
 
-        # viscoplastic regularization
-        if self.vp_on and np.any(f_k_trial > 0):
-            I = np.where(f_k_trial > 0)
-            bI = (slice(None), *I)
-            ### Perzyna type model - exploiting that \gamma = f / eta corresponds to \lambda above ???
-            gamma_vk_bI = lam_k[I][np.newaxis,...] * np.ones_like(Eps_k[bI])
-            gamma_vk_bI[:n_vk] *= (d_t_tau * inv_1_d_t_tau)[:, np.newaxis]
-            # Check the singularity emerging upon update from zero state directly to the inelastic range
-            if self.update_at_k:
-                Eps_kbI = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_k[bI], -lam_k[I], Eps_k[bI], Sig_k[bI], **kw)
-                _, _, Sig_kbI = self.get_f_df_Sig(u_n1[bI], T_n[I], Eps_kbI, Sig_k[bI], **kw)
-                Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_kbI, gamma_vk_bI, Eps_kbI, Sig_kbI, **kw)
-            else:
-                Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_n[bI], gamma_vk_bI, Eps_n[bI], Sig_n[bI], **kw)
-            Sig_k[bI] = self.get_Sig(u_n1[bI], T_n[I], Eps_k[bI], Sig_k[bI], **kw)
+        # # viscoplastic regularization
+        # if self.vp_on and np.any(f_k_trial > 0):
+        #     I = np.where(f_k_trial > 0)
+        #     bI = (slice(None), *I)
+        #     ### Perzyna type model - exploiting that \gamma = f / eta corresponds to \lambda above ???
+        #     viscous_coeff = (d_t_tau * inv_1_d_t_tau)
+        #     gamma_vk_bI = lam_k[I][np.newaxis,...] * np.ones_like(Eps_k[bI])
+        #     gamma_vk_bI[:n_vk] *= viscous_coeff[:, np.newaxis]
+        #     # print('lambda', lam_k[I],'coeff', viscous_coeff, 'gamma', gamma_vk_bI[:n_vk])
+        #     # Check the singularity emerging upon update from zero state directly to the inelastic range
+        #     if self.update_at_k:
+        #         Eps_kbI = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_k[bI], -lam_k[I], Eps_k[bI], Sig_k[bI], **kw)
+        #         _, _, Sig_kbI = self.get_f_df_Sig(u_n1[bI], T_n[I], Eps_kbI, Sig_k[bI], **kw)
+        #         Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_kbI, gamma_vk_bI, Eps_kbI, Sig_kbI, **kw)
+        #     else:
+        #         Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_n[bI], gamma_vk_bI, Eps_n[bI], Sig_n[bI], **kw)
+        #     Sig_k[bI] = self.get_Sig(u_n1[bI], T_n[I], Eps_k[bI], Sig_k[bI], **kw)
 
         dEps_k = Eps_k - Eps_n
         dDiss_dEps = self.get_dDiss_dEps(u_n1, T_n, Eps_k, Sig_k, **kw)
         # dissipation rate
         dDiss_dt = np.einsum('b...,b...->...', dDiss_dEps, dEps_k)
         C_v_ = kw['C_v_']
-        d_T = d_T_n + d_t * (dDiss_dt / C_v_ )# / rho_'
+        d_T = 0 # d_T_n + d_t * (dDiss_dt / C_v_ )# / rho_'
 
         return np.moveaxis(Eps_k, 0, -1), np.moveaxis(Sig_k, 0, -1), T_n + d_T, k, np.moveaxis(dDiss_dEps, 0, -1), lam_k
 
@@ -778,6 +789,7 @@ class GSM(tr.HasTraits):
         T_n = T_0 # initial condition
         for n, dt in enumerate(d_t_t):
             try:
+                print('*** u_ta', u_ta[n], d_u_ta[n])
                 Eps_n1, Sig_n1, T_n1, k, dDiss_dEps, lam = self.get_state_n1(
                     u_ta[n], d_u_ta[n], T_n, d_T_t[n], dt, Sig_n1, Eps_n1, k_max, **kw
                 )
@@ -798,7 +810,8 @@ class GSM(tr.HasTraits):
         iter_t = np.array(iter_record,dtype=np.int_)
         lam_t = np.array(lam_record,dtype=np.float_)
         n_t = len(Eps_t)
-        return t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, dDiss_dEps_t, lam_t
+        return (t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, dDiss_dEps_t, 
+                lam_t, (d_t_t[:n_t], d_u_ta[:n_t]))
     
     def save_to_disk(self):
         """Serialize this instance to disk."""
