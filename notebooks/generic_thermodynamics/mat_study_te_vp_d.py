@@ -1,7 +1,6 @@
 from turtle import color
 from urllib import response
-
-from bmcs_matmod import GSM
+from bmcs_matmod import GSMRM
 import matplotlib.pylab as plt 
 import sympy as sp
 import numpy as np
@@ -14,8 +13,8 @@ from scipy.interpolate import interp1d
 
 class MatStudy_T_E_VP_D(Model):
 
-    gsm_F = GSM.load_from_disk('gsm_F_1d_t_e_vp_d')
-    gsm_G = GSM.load_from_disk('gsm_G_1d_t_e_vp_d')
+    gsm_F = GSMRM.load_from_disk('gsm_F_1d_t_e_vp_d')
+    gsm_G = GSMRM.load_from_disk('gsm_G_1d_t_e_vp_d')
 
     @staticmethod
     def gsm_run(gsm_, u_ta, T_t, t_t, **material_params):

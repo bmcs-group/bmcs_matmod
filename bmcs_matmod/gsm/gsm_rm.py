@@ -54,7 +54,7 @@ def lambdify_and_cache(func):
 
     return wrapper
 
-class GSM(tr.HasTraits):
+class GSMRM(tr.HasTraits):
     """Generalized Standard Material
 
     The class definition consists of 
@@ -129,7 +129,7 @@ class GSM(tr.HasTraits):
     to the internal variables
     """
 
-    dF_sign = tr.Float(1)
+    sig_sign = tr.Float(1)
     """Sign relating the rate of free energy to the dissipation.
     For Helmholtz free energy it is negative, for the Gibbs free energy it is positive
     """
@@ -184,6 +184,35 @@ class GSM(tr.HasTraits):
 
     def Eps_as_blocks(self, arr):
         return [Eps_i[0] for Eps_i in self._Eps_as_blocks_lambdified(arr)]
+       
+    dot_Eps_list = tr.Property
+    @tr.cached_property
+    def _get_dot_Eps_list(self):
+        """
+        Compute the time derivative of internal state variables.
+
+        This cached property method generates a list of symbolic matrices representing
+        the time derivatives of the internal state variables (`Eps_vars`). Each element in the
+        list corresponds to an internal state variable matrix from `Eps_vars`, where each entry
+        in the matrix is replaced by its time derivative.
+
+        Returns:
+            list: A list of `sympy.Matrix` objects, where each matrix contains the
+                time derivatives of the corresponding internal state variable matrix from
+                `Eps_vars`. The time derivatives are represented as `Cymbol` objects
+                with names and codenames indicating the time derivative.
+        """
+        return [
+            sp.Matrix(eps_var.shape[0], eps_var.shape[1], 
+                    lambda i, j: Cymbol(name=f'\\dot{{{eps_var[i, j].name}}}', 
+                                        codename=f'dot_{eps_var[i, j].codename}'))
+            for eps_var in self.Eps_list
+        ]
+    
+    dot_Eps = tr.Property()
+    @tr.cached_property
+    def _get_dot_Eps(self):
+        return sp.BlockMatrix(self.dot_Eps_list).T
 
     # Conjugate state variable representations and conversions
     Sig_list = tr.Property()
@@ -195,6 +224,36 @@ class GSM(tr.HasTraits):
     @tr.cached_property
     def _get_Sig(self):
         return sp.BlockMatrix([Sig_i.T for Sig_i in self.Sig_vars]).T
+
+    dot_Sig_list = tr.Property()
+    @tr.cached_property
+    def _get_dot_Sig_list(self):
+        """
+        Compute the time derivative of thermodynamic forces.
+
+        This cached property method generates a list of symbolic matrices representing
+        the time derivatives of the thermodynamic forces (`Sig_vars`). Each element in the
+        list corresponds to a thermodynamic force matrix from `Sig_vars`, where each entry
+        in the matrix is replaced by its time derivative.
+
+        Returns:
+            list: A list of `sympy.Matrix` objects, where each matrix contains the
+                time derivatives of the corresponding thermodynamic force matrix from
+                `Sig_vars`. The time derivatives are represented as `Cymbol` objects
+                with names and codenames indicating the time derivative.
+        """
+        return [
+            sp.Matrix(sig_var.shape[0], sig_var.shape[1], 
+                    lambda i, j: Cymbol(name=f'\\dot{{{sig_var[i, j].name}}}', 
+                                        codename=f'dot_{sig_var[i, j].codename}'))
+            for sig_var in self.Sig_list
+        ]
+    
+    dot_Sig = tr.Property()
+    @tr.cached_property
+    def _get_dot_Sig(self):
+        return sp.BlockMatrix(self.dot_Sig_list).T
+
 
     dF_dEps_ = tr.Property()
     @tr.cached_property
@@ -231,7 +290,8 @@ class GSM(tr.HasTraits):
     sig_ = tr.Property()
     @tr.cached_property
     def _get_sig_(self):
-        return self.F_expr.diff(self.u_vars)
+        "For Gibbs for external strain the sign is swapped using the sig_sign parameter = -1"
+        return self.sig_sign * self.F_expr.diff(self.u_vars)
 
     ######################################
     def get_dDiss_dEps(self, u, T, Eps, Sig, **m_params):
@@ -263,8 +323,7 @@ class GSM(tr.HasTraits):
     dDiss_dEps_ = tr.Property()
     @tr.cached_property
     def _get_dDiss_dEps_(self):
-        "For Gibbs the energy sign is swapped using the dF_sign parameter = -1"
-        dFG_dEps_explicit_ = self.dF_sign * self.dF_dEps_.as_explicit()
+        dFG_dEps_explicit_ = self.dF_dEps_.as_explicit()
         return (self.T_var * dFG_dEps_explicit_.diff(self.T_var) - dFG_dEps_explicit_)
 
     
@@ -300,6 +359,17 @@ class GSM(tr.HasTraits):
     def _get_Sig_(self):
         return sp.BlockMatrix([(sign_i_ * dF_dEps_i_).T for sign_i_, dF_dEps_i_ 
                                in zip(self.Sig_signs, self.dF_dEps_.blocks)]).T    
+
+    dot_Sig_ = tr.Property()
+    @tr.cached_property
+    def _get_dot_Sig_(self):
+        dot_psi_eps_ = self.F_expr.diff(p1d.eps) * dot_eps
+        dot_psi_Eps_ = (self.dF_dEps_.T * self.dot_Eps.as_explicit())[0,0]
+        dot_psi_x_ = dot_psi_eps_ + dot_psi_Eps_
+        dot_Sig_Eps_ = self.Sig_signs * dot_psi_x_.diff(self.Eps.as_explicit())
+        return sp.BlockMatrix([(sign_i_ * dF_dEps_i_).T for sign_i_, dF_dEps_i_ 
+                               in zip(self.Sig_signs, self.dF_dEps_.blocks)]).T
+
 
     ######################################
 
@@ -370,11 +440,16 @@ class GSM(tr.HasTraits):
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), 
                            self.Phi_Eps_, numpy_dirac, cse=True)
 
+    subs_Sig_Eps = tr.Property()
+    @tr.cached_property
+    def _get_subs_Sig_Eps(self):
+        return dict(zip(self.Sig.as_explicit(), self.Sig_.as_explicit()))
+
     Phi_Eps_ = tr.Property()
     @tr.cached_property
     def _get_Phi_Eps_(self):
-        subs_Sig_Eps = dict(zip(self.Sig.as_explicit(), self.Sig_.as_explicit()))
-        return self.Phi_.subs(subs_Sig_Eps)
+#        subs_Sig_Eps = dict(zip(self.Sig.as_explicit(), self.Sig_.as_explicit()))
+        return self.Phi_.subs(self.subs_Sig_Eps)
 
     ######################################
 
@@ -696,7 +771,11 @@ class GSM(tr.HasTraits):
 
         Eps_k = np.copy(Eps_n)
         Sig_k = np.copy(Sig_n)
+        #### Here for Gibbs - different values for Eps_k and Sig_k - when viscosity on - WHY?
+        # print('u_n1', u_n1, T_n, Eps_k, Sig_k)
         f_k, df_k, Sig_k = self.get_f_df_Sig(u_n1, T_n, Eps_k, Sig_k, **kw)
+        # if f_k > 0:
+        #     print('===================== u_n1', u_n1, T_n, Eps_k, Sig_k)
         f_k = np.atleast_1d(f_k)
         df_k = np.atleast_1d(df_k)
         f_k_norm = np.fabs(f_k)
@@ -727,29 +806,36 @@ class GSM(tr.HasTraits):
         else:
             raise RuntimeError(f'no convergence for indexes {I}')
 
+        # if np.any(f_k_trial > 0):
+        #     print('f_k_trial', f_k_trial)
+        #     print('eps', u_n1, 'T_n', T_n, 
+        #           'Eps_n', Eps_n, 'Sig_n', Sig_n, 'lam_k', lam_k, 'Eps_k', 
+        #           Eps_k, 'Sig_k', Sig_k)
 
-        # viscoplastic regularization
-        if self.vp_on and np.any(f_k_trial > 0):
-            I = np.where(f_k_trial > 0)
-            bI = (slice(None), *I)
-            ### Perzyna type model - exploiting that \gamma = f / eta corresponds to \lambda above ???
-            gamma_vk_bI = lam_k[I][np.newaxis,...] * np.ones_like(Eps_k[bI])
-            gamma_vk_bI[:n_vk] *= (d_t_tau * inv_1_d_t_tau)[:, np.newaxis]
-            # Check the singularity emerging upon update from zero state directly to the inelastic range
-            if self.update_at_k:
-                Eps_kbI = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_k[bI], -lam_k[I], Eps_k[bI], Sig_k[bI], **kw)
-                _, _, Sig_kbI = self.get_f_df_Sig(u_n1[bI], T_n[I], Eps_kbI, Sig_k[bI], **kw)
-                Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_kbI, gamma_vk_bI, Eps_kbI, Sig_kbI, **kw)
-            else:
-                Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_n[bI], gamma_vk_bI, Eps_n[bI], Sig_n[bI], **kw)
-            Sig_k[bI] = self.get_Sig(u_n1[bI], T_n[I], Eps_k[bI], Sig_k[bI], **kw)
+        # # viscoplastic regularization
+        # if self.vp_on and np.any(f_k_trial > 0):
+        #     I = np.where(f_k_trial > 0)
+        #     bI = (slice(None), *I)
+        #     ### Perzyna type model - exploiting that \gamma = f / eta corresponds to \lambda above ???
+        #     viscous_coeff = (d_t_tau * inv_1_d_t_tau)
+        #     gamma_vk_bI = lam_k[I][np.newaxis,...] * np.ones_like(Eps_k[bI])
+        #     gamma_vk_bI[:n_vk] *= viscous_coeff[:, np.newaxis]
+        #     # print('lambda', lam_k[I],'coeff', viscous_coeff, 'gamma', gamma_vk_bI[:n_vk])
+        #     # Check the singularity emerging upon update from zero state directly to the inelastic range
+        #     if self.update_at_k:
+        #         Eps_kbI = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_k[bI], -lam_k[I], Eps_k[bI], Sig_k[bI], **kw)
+        #         _, _, Sig_kbI = self.get_f_df_Sig(u_n1[bI], T_n[I], Eps_kbI, Sig_k[bI], **kw)
+        #         Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_kbI, gamma_vk_bI, Eps_kbI, Sig_kbI, **kw)
+        #     else:
+        #         Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_n[bI], gamma_vk_bI, Eps_n[bI], Sig_n[bI], **kw)
+        #     Sig_k[bI] = self.get_Sig(u_n1[bI], T_n[I], Eps_k[bI], Sig_k[bI], **kw)
 
         dEps_k = Eps_k - Eps_n
         dDiss_dEps = self.get_dDiss_dEps(u_n1, T_n, Eps_k, Sig_k, **kw)
         # dissipation rate
         dDiss_dt = np.einsum('b...,b...->...', dDiss_dEps, dEps_k)
         C_v_ = kw['C_v_']
-        d_T = d_T_n + d_t * (dDiss_dt / C_v_ )# / rho_'
+        d_T = 0 # d_T_n + d_t * (dDiss_dt / C_v_ )# / rho_'
 
         return np.moveaxis(Eps_k, 0, -1), np.moveaxis(Sig_k, 0, -1), T_n + d_T, k, np.moveaxis(dDiss_dEps, 0, -1), lam_k
 
@@ -798,7 +884,8 @@ class GSM(tr.HasTraits):
         iter_t = np.array(iter_record,dtype=np.int_)
         lam_t = np.array(lam_record,dtype=np.float_)
         n_t = len(Eps_t)
-        return t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, dDiss_dEps_t, lam_t
+        return (t_t[:n_t], u_ta[:n_t], T_t, Eps_t, Sig_t, iter_t, dDiss_dEps_t, 
+                lam_t, (d_t_t[:n_t], d_u_ta[:n_t]))
     
     def save_to_disk(self):
         """Serialize this instance to disk."""
