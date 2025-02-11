@@ -1,0 +1,16 @@
+name: bmcs_matmod_env
+channels:
+- conda-forge
+dependencies:
+- jupyter_contrib_nbextensions
+- traits
+- matplotlib-base
+- numpy
+- scipy
+- sympy
+- ipywidgets
+- ipympl
+- pip
+- pip:
+  - bmcs_utils==0.0.35a
+  - -e .
