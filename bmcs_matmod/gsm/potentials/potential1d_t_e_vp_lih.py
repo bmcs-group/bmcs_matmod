@@ -12,7 +12,7 @@ class Potential1D_T_E_VP_LIH_SymbExpr(SymbExpr):
       """
       # %%
       E = Cymbol(r'E', codename='E_', real=True, nonnegative=True)
-      K_lin = Cymbol(r'K^\mathrm{lin}', codename='K_lin_', nonnegative=True)
+      K_lin = Cymbol(r'K', codename='K_lin_', nonnegative=True)
       eta = Cymbol(r'\eta', codename='eta_', real=True, nonnegative=True)
       # temperature 
       C_v = Cymbol(r'C_{\mathrm{v}}', codename='C_v_', real=True, nonnegative=True)

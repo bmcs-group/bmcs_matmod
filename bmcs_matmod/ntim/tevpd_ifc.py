@@ -4,7 +4,7 @@
 # Thermo elasto visco-plastic damage interface model
 
 import sympy as sp
-from bmcs_matmod.gsm import GSM
+from bmcs_matmod.gsm import GSMRM
 from bmcs_utils.api import Cymbol
 import bmcs_utils.api as bu
 from bmcs_matmod.slide.f_double_cap import FDoubleCap, FDoubleCapExpr
@@ -316,11 +316,11 @@ class TEVPDIfc(MATSEval,bu.InjectSymbExpr):
     name = 'TEVPDIfc 3.4'
     symb_class = TEVPDIfcSymb
 
-    gsm = tr.Property(bu.Instance(GSM))
+    gsm = tr.Property(bu.Instance(GSMRM))
     @tr.cached_property
     def _get_gsm(self):
         symb = self.symb_class
-        return GSM(
+        return GSMRM(
             u_vars = symb.u_vars,
             sig_vars = symb.sig_a,
             T_var = symb.T_var,

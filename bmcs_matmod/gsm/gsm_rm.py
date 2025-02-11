@@ -54,7 +54,7 @@ def lambdify_and_cache(func):
 
     return wrapper
 
-class GSM(tr.HasTraits):
+class GSMRM(tr.HasTraits):
     """Generalized Standard Material
 
     The class definition consists of 
@@ -184,6 +184,35 @@ class GSM(tr.HasTraits):
 
     def Eps_as_blocks(self, arr):
         return [Eps_i[0] for Eps_i in self._Eps_as_blocks_lambdified(arr)]
+       
+    dot_Eps_list = tr.Property
+    @tr.cached_property
+    def _get_dot_Eps_list(self):
+        """
+        Compute the time derivative of internal state variables.
+
+        This cached property method generates a list of symbolic matrices representing
+        the time derivatives of the internal state variables (`Eps_vars`). Each element in the
+        list corresponds to an internal state variable matrix from `Eps_vars`, where each entry
+        in the matrix is replaced by its time derivative.
+
+        Returns:
+            list: A list of `sympy.Matrix` objects, where each matrix contains the
+                time derivatives of the corresponding internal state variable matrix from
+                `Eps_vars`. The time derivatives are represented as `Cymbol` objects
+                with names and codenames indicating the time derivative.
+        """
+        return [
+            sp.Matrix(eps_var.shape[0], eps_var.shape[1], 
+                    lambda i, j: Cymbol(name=f'\\dot{{{eps_var[i, j].name}}}', 
+                                        codename=f'dot_{eps_var[i, j].codename}'))
+            for eps_var in self.Eps_list
+        ]
+    
+    dot_Eps = tr.Property()
+    @tr.cached_property
+    def _get_dot_Eps(self):
+        return sp.BlockMatrix(self.dot_Eps_list).T
 
     # Conjugate state variable representations and conversions
     Sig_list = tr.Property()
@@ -195,6 +224,36 @@ class GSM(tr.HasTraits):
     @tr.cached_property
     def _get_Sig(self):
         return sp.BlockMatrix([Sig_i.T for Sig_i in self.Sig_vars]).T
+
+    dot_Sig_list = tr.Property()
+    @tr.cached_property
+    def _get_dot_Sig_list(self):
+        """
+        Compute the time derivative of thermodynamic forces.
+
+        This cached property method generates a list of symbolic matrices representing
+        the time derivatives of the thermodynamic forces (`Sig_vars`). Each element in the
+        list corresponds to a thermodynamic force matrix from `Sig_vars`, where each entry
+        in the matrix is replaced by its time derivative.
+
+        Returns:
+            list: A list of `sympy.Matrix` objects, where each matrix contains the
+                time derivatives of the corresponding thermodynamic force matrix from
+                `Sig_vars`. The time derivatives are represented as `Cymbol` objects
+                with names and codenames indicating the time derivative.
+        """
+        return [
+            sp.Matrix(sig_var.shape[0], sig_var.shape[1], 
+                    lambda i, j: Cymbol(name=f'\\dot{{{sig_var[i, j].name}}}', 
+                                        codename=f'dot_{sig_var[i, j].codename}'))
+            for sig_var in self.Sig_list
+        ]
+    
+    dot_Sig = tr.Property()
+    @tr.cached_property
+    def _get_dot_Sig(self):
+        return sp.BlockMatrix(self.dot_Sig_list).T
+
 
     dF_dEps_ = tr.Property()
     @tr.cached_property
@@ -301,6 +360,17 @@ class GSM(tr.HasTraits):
         return sp.BlockMatrix([(sign_i_ * dF_dEps_i_).T for sign_i_, dF_dEps_i_ 
                                in zip(self.Sig_signs, self.dF_dEps_.blocks)]).T    
 
+    dot_Sig_ = tr.Property()
+    @tr.cached_property
+    def _get_dot_Sig_(self):
+        dot_psi_eps_ = self.F_expr.diff(p1d.eps) * dot_eps
+        dot_psi_Eps_ = (self.dF_dEps_.T * self.dot_Eps.as_explicit())[0,0]
+        dot_psi_x_ = dot_psi_eps_ + dot_psi_Eps_
+        dot_Sig_Eps_ = self.Sig_signs * dot_psi_x_.diff(self.Eps.as_explicit())
+        return sp.BlockMatrix([(sign_i_ * dF_dEps_i_).T for sign_i_, dF_dEps_i_ 
+                               in zip(self.Sig_signs, self.dF_dEps_.blocks)]).T
+
+
     ######################################
 
     phi_ = tr.Property()
@@ -370,11 +440,16 @@ class GSM(tr.HasTraits):
                             self.Sig.as_explicit()) + self.m_params + ('**kw',), 
                            self.Phi_Eps_, numpy_dirac, cse=True)
 
+    subs_Sig_Eps = tr.Property()
+    @tr.cached_property
+    def _get_subs_Sig_Eps(self):
+        return dict(zip(self.Sig.as_explicit(), self.Sig_.as_explicit()))
+
     Phi_Eps_ = tr.Property()
     @tr.cached_property
     def _get_Phi_Eps_(self):
-        subs_Sig_Eps = dict(zip(self.Sig.as_explicit(), self.Sig_.as_explicit()))
-        return self.Phi_.subs(subs_Sig_Eps)
+#        subs_Sig_Eps = dict(zip(self.Sig.as_explicit(), self.Sig_.as_explicit()))
+        return self.Phi_.subs(self.subs_Sig_Eps)
 
     ######################################
 
@@ -789,7 +864,6 @@ class GSM(tr.HasTraits):
         T_n = T_0 # initial condition
         for n, dt in enumerate(d_t_t):
             try:
-                print('*** u_ta', u_ta[n], d_u_ta[n])
                 Eps_n1, Sig_n1, T_n1, k, dDiss_dEps, lam = self.get_state_n1(
                     u_ta[n], d_u_ta[n], T_n, d_T_t[n], dt, Sig_n1, Eps_n1, k_max, **kw
                 )
