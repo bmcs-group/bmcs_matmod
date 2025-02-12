@@ -8,5 +8,6 @@ ipywidgets
 ipympl
 ipytree
 k3d
+dill
 bmcs_utils==0.0.36a0
 -e .
