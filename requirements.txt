@@ -6,5 +6,7 @@ scipy
 sympy
 ipywidgets
 ipympl
+ipytree
+k3d
 bmcs_utils==0.0.36a0
 -e .
