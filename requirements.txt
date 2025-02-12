@@ -1,1 +1,10 @@
-bmcs_utils
+traits
+jupyter
+matplotlib
+numpy
+scipy
+sympy
+ipywidgets
+ipympl
+bmcs_utils==0.0.36a0
+-e .
