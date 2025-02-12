@@ -1,4 +1,4 @@
-name: bmcs_matmod2
+name: bmcs_matmod
 channels:
 - conda-forge
 dependencies:

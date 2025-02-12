@@ -526,9 +526,9 @@ class GSMMPDP(tr.HasTraits):
         """
         n_I = np.atleast_1d(eps_n).shape[0]
         if self.phi_ == sp.S.Zero:
-            d_A = np.zeros((n_I, self.n_Eps_explicit), dtype=np.float_)
+            d_A = np.zeros((n_I, self.n_Eps_explicit), dtype=np.float64)
         else:
-            d_A = np.zeros((n_I, self.n_Eps_explicit+1), dtype=np.float_)
+            d_A = np.zeros((n_I, self.n_Eps_explicit+1), dtype=np.float64)
         tol = 1e-8
         k_I = np.zeros((n_I,), dtype=np.int_)
         Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(eps_n, d_eps, Eps_n, d_A, d_t, **kw)
@@ -572,7 +572,7 @@ class GSMMPDP(tr.HasTraits):
         d_eps_ta = np.diff(eps_ta, axis=0)
         d_t_t = np.diff(t_t, axis=0)
 
-        Eps_n1 = np.zeros(eps_ta.shape[1:] + (self.n_Eps_explicit,), dtype=np.float_)
+        Eps_n1 = np.zeros(eps_ta.shape[1:] + (self.n_Eps_explicit,), dtype=np.float64)
         Sig_n1 = np.zeros_like(Eps_n1)
 
         Sig_record = [Sig_n1]
@@ -595,10 +595,10 @@ class GSMMPDP(tr.HasTraits):
             lam_record.append(lam)
         print(f'Eps_record {Eps_record}')
         print(f'Sig_record {Sig_record}')
-        Sig_t = np.array(Sig_record, dtype=np.float_)
-        Eps_t = np.array(Eps_record, dtype=np.float_)
+        Sig_t = np.array(Sig_record, dtype=np.float64)
+        Eps_t = np.array(Eps_record, dtype=np.float64)
         iter_t = np.array(iter_record,dtype=np.int_)
-        lam_t = np.array(lam_record,dtype=np.float_)
+        lam_t = np.array(lam_record,dtype=np.float64)
         n_t = len(Eps_t)
         return (t_t[:n_t], eps_ta[:n_t], Eps_t, Sig_t, iter_t, 
                 lam_t, (d_t_t[:n_t], d_eps_ta[:n_t]))
