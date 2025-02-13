@@ -460,32 +460,29 @@ class GSMMPDP(tr.HasTraits):
         f_ = self.f_expr
 
         # gamma_mech = -((self.Y_ * Sig).T * dot_Eps)[0]
-        # gamma_mech = -(self.dF_dEps_.as_explicit().T * dot_Eps)[0]
-        # L_ = -gamma_mech + dot_lam * self.phi_
+        gamma_mech = -(self.dF_dEps_.as_explicit().T * dot_Eps)[0]
 
-        delta_psi_ = self.F_expr.subs(subs_n1) - self.F_expr.subs(subs_n)
-        delta_gamma_mech = -(delta_psi_)
-        if self.phi_ == sp.S.Zero:
-            L_ = -delta_gamma_mech + delta_t * self.pi_expr
-        else:
-            L_ = -delta_gamma_mech + (delta_t * self.pi_expr + dot_lam * self.phi_)
-        L_n1 = L_.subs(self.subs_Sig_Eps).subs(subs_n1)
-        dL_dEps_n1 = L_n1.diff(delta_Eps)
+        # residuum vector in n+1 step
 
-        # # residuum vector in n+1 step
-
-        # # dL_dEps_ = L_.diff(Sig).subs(self.subs_Sig_Eps)
-        # dL_dEps_ = L_.subs(self.subs_Sig_Eps).diff(Eps)
-        # dL_dEps_n1 = dL_dEps_.subs(subs_n1)
         if self.f_expr == sp.S.Zero:
+            L_ = -gamma_mech + delta_t * self.pi_expr
+            L_n1 = L_.subs(self.subs_Sig_Eps).subs(subs_n1)
+            dL_dEps_n1 = L_n1.diff(delta_Eps)
+
             f_n1 = sp.S.Zero
             R_n1 = dL_dEps_n1
             delta_A = delta_Eps
         else:
+            L_ = -gamma_mech + (delta_t * self.pi_expr + dot_lam * self.phi_)
+            # dL_dEps_ = L_.diff(Sig).subs(self.subs_Sig_Eps)
+            dL_dEps_ = L_.subs(self.subs_Sig_Eps).diff(Eps)
+            dL_dEps_n1 = dL_dEps_.subs(subs_n1)
+
             f_Eps_ = f_.subs(self.subs_Sig_Eps)
             f_n1 = f_Eps_.subs(subs_n1)
             R_n1 = dL_dEps_n1.row_insert(dL_dEps_n1.shape[0], sp.Matrix([f_n1]))
             delta_A = sp.Matrix([delta_Eps, delta_lam])
+
         Sig_n1 = Sig_.subs(subs_n1)
 
         # construct the jacobian of the residuum
@@ -496,7 +493,7 @@ class GSMMPDP(tr.HasTraits):
         # replace zeros and constant terms with symbolic variables to broadcast properly
         dR_dA_n1_OI = self.replace_zeros_and_ones_with_symbolic(dR_dA_n1, delta_A)
 
-        return (delta_gamma_mech, L_n1, dR_dA_n1), (eps_n, delta_eps, Eps_n, delta_A, delta_t, self.Ox, self.Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI
+        return (gamma_mech, L_, dR_dA_n1), (eps_n, delta_eps, Eps_n, delta_A, delta_t, self.Ox, self.Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI
     
     ######################################
 
@@ -548,6 +545,7 @@ class GSMMPDP(tr.HasTraits):
             norm_R_n1 = np.linalg.norm(R_n1, axis=-1)
             I[norm_R_n1 <= tol] = False
 
+        # Distinguish the case with and without constraint function.
         if self.phi_ == sp.S.Zero:
             lam_k = np.zeros_like(d_A[..., -1])
             Eps_n1 = Eps_n + d_A
@@ -559,6 +557,9 @@ class GSMMPDP(tr.HasTraits):
 
     def get_response(self, eps_ta, t_t, k_max=20, *args):
         """Time integration procedure 
+
+        TODO - consider the stacked evaluation of the response - include the naming of the variables 
+        indicating the dimensions of the input arrays and the output arrays.
         """
         if eps_ta.ndim == 2:
             eps_ta = eps_ta[:,np.newaxis,:]
