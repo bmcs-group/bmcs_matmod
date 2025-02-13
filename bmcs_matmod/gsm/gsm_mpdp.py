@@ -10,7 +10,6 @@ equations in the computational environment.
 from re import M
 import traits.api as tr
 #import bmcs_utils.api as bu
-from bmcs_utils.api import Cymbol
 import sympy as sp
 import numpy as np
 import dill
@@ -178,8 +177,7 @@ class GSMMPDP(tr.HasTraits):
         """
         return [
             sp.Matrix(eps_var.shape[0], eps_var.shape[1], 
-                    lambda i, j: Cymbol(name=f'\\dot{{{eps_var[i, j].name}}}', 
-                                        codename=f'dot_{eps_var[i, j].codename}'))
+                    lambda i, j: sp.Symbol(name=f'\\dot{{{eps_var[i, j].name}}}'))
             for eps_var in self.Eps_list
         ]
     
@@ -218,8 +216,7 @@ class GSMMPDP(tr.HasTraits):
         """
         return [
             sp.Matrix(sig_var.shape[0], sig_var.shape[1], 
-                    lambda i, j: Cymbol(name=f'\\dot{{{sig_var[i, j].name}}}', 
-                                        codename=f'dot_{sig_var[i, j].codename}'))
+                    lambda i, j: sp.Symbol(name=f'\\dot{{{sig_var[i, j].name}}}'))
             for sig_var in self.Sig_list
         ]
     
@@ -236,7 +233,7 @@ class GSMMPDP(tr.HasTraits):
 
     ######################################
 
-    def get_sig(self, u, T, Eps, Sig, **m_params):
+    def get_sig(self, u, T, Eps, Sig, *args):
         """
         Calculates the displacement for a given stress level
 
@@ -250,14 +247,14 @@ class GSMMPDP(tr.HasTraits):
         Returns:
             Calculated displacement for a stress level and control stress.
         """
-        return self._sig_lambdified(u, T, Eps, Sig, **m_params)[:, 0]
+        return self._sig_lambdified(u, T, Eps, Sig, *args)[:, 0]
 
     _sig_lambdified = tr.Property()
     @tr.cached_property
     def _get__sig_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit(), 
-                            self.Sig.as_explicit()) + self.m_params + ('**kw',), 
+                            self.Sig.as_explicit()) + self.m_params + ('*args',), 
                            self.sig_, numpy_dirac, cse=True)
 
     sig_ = tr.Property()
@@ -267,7 +264,7 @@ class GSMMPDP(tr.HasTraits):
         return self.sig_sign * self.F_expr.diff(self.u_vars)
 
     ######################################
-    def get_dDiss_dEps(self, u, T, Eps, Sig, **m_params):
+    def get_dDiss_dEps(self, u, T, Eps, Sig, *args):
         """
         Calculates the derivative of the dissipation rate with respect 
         to internal variables.
@@ -282,14 +279,14 @@ class GSMMPDP(tr.HasTraits):
         Returns:
             Calculated derivative of the dissipation rate with respect to strain.
         """
-        return self._dDiss_dEps_lambdified(u, T, Eps, Sig, **m_params)[:, 0]
+        return self._dDiss_dEps_lambdified(u, T, Eps, Sig, *args)[:, 0]
 
     _dDiss_dEps_lambdified = tr.Property()
     @tr.cached_property
     def _get__dDiss_dEps_lambdified(self):
         return sp.lambdify((self.u_vars, self.T_var, 
                             self.Eps.as_explicit(), 
-                            self.Sig.as_explicit()) + self.m_params + ('**kw',), 
+                            self.Sig.as_explicit()) + self.m_params + ('*args',), 
                            self.dDiss_dEps_, numpy_dirac, cse=True)
 
     dDiss_dEps_ = tr.Property()
@@ -300,7 +297,7 @@ class GSMMPDP(tr.HasTraits):
 
     
     ######################################
-    def get_Sig(self, eps, Eps, **m_params):
+    def get_Sig(self, eps, Eps, *args):
         """
         Calculates the stress based on the given inputs.
 
@@ -309,14 +306,14 @@ class GSMMPDP(tr.HasTraits):
             T: Temperature.
             Eps: Strain.
             Sig: Stress.
-            **m_params: Additional model parameters.
+            *args: Additional model parameters.
 
         Returns:
             Calculated stress.
         """
         eps_sp_ = np.moveaxis(np.atleast_1d(eps), -1, 0)
         Eps_sp_ = np.moveaxis(Eps, -1, 0)
-        Sig_sp = self._Sig_lambdified(eps_sp_, Eps_sp_, **m_params)
+        Sig_sp = self._Sig_lambdified(eps_sp_, Eps_sp_, *args)
         Sig_sp_ = Sig_sp.reshape(Eps_sp_.shape)
         return np.moveaxis(Sig_sp_, 0, -1)
 
@@ -328,7 +325,7 @@ class GSMMPDP(tr.HasTraits):
     @tr.cached_property
     def _get__Sig_lambdified(self):
         return sp.lambdify((self.u_vars[0], 
-                            self.Eps.as_explicit()) + self.m_params + ('**kw',), 
+                            self.Eps.as_explicit()) + self.m_params + ('*args',), 
                            self.Sig_.as_explicit(), numpy_dirac, cse=True)
 
     Sig_ = tr.Property()
@@ -367,14 +364,14 @@ class GSMMPDP(tr.HasTraits):
 
     ######################################
 
-    def get_Sig_f_R_dR_n1(self, eps_n, d_eps, Eps_n, d_A, d_t, **kw):
+    def get_Sig_f_R_dR_n1(self, eps_n, d_eps, Eps_n, d_A, d_t, *args):
         eps_n_sp_ = np.moveaxis(np.atleast_1d(eps_n), -1, 0)
         d_eps_sp_ = np.moveaxis(np.atleast_1d(d_eps), -1, 0)
         O_ = np.zeros_like(eps_n_sp_)
         I_ = np.ones_like(eps_n_sp_)
         d_A_sp_ = np.moveaxis(d_A, -1, 0)
         Eps_n_sp_ = np.moveaxis(Eps_n, -1, 0)
-        Sig_sp_, f_sp_, R_sp_, d_R_sp_ = self._get_Sig_f_R_dR_n1_lambdified(eps_n_sp_, d_eps_sp_, Eps_n_sp_, d_A_sp_, d_t, O_, I_, **kw)
+        Sig_sp_, f_sp_, R_sp_, d_R_sp_ = self._get_Sig_f_R_dR_n1_lambdified(eps_n_sp_, d_eps_sp_, Eps_n_sp_, d_A_sp_, d_t, O_, I_, *args)
         if self.phi_ == sp.S.Zero:
             f_sp_ = np.zeros_like(eps_n_sp_)
         Sig_sp_ = Sig_sp_.reshape(Eps_n_sp_.shape)
@@ -389,12 +386,12 @@ class GSMMPDP(tr.HasTraits):
         numpy_dirac =[{'DiracDelta': get_dirac_delta }, 'numpy']
 
         _, (eps_n, delta_eps, Eps_n, delta_A, delta_t, self.Ox, self.Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI = self.Sig_f_R_dR_n1
-        return sp.lambdify((eps_n, delta_eps, Eps_n, delta_A, delta_t, self.Ox, self.Ix)  + self.m_params + ('**kw',), 
+        return sp.lambdify((eps_n, delta_eps, Eps_n, delta_A, delta_t, self.Ox, self.Ix)  + self.m_params + ('*args',), 
                             (Sig_n1, f_n1, R_n1, dR_dA_n1_OI), numpy_dirac, cse=True)
 
     
-    Ox = Cymbol(name='O', codename='O', real=True)
-    Ix = Cymbol(name='I', codename='I', real=True)
+    Ox = sp.Symbol('O', real=True)
+    Ix = sp.Symbol('I', real=True)
 
     def replace_zeros_and_ones_with_symbolic(self, dR_dA_, delta_A):
         # Function to replace zero elements with a symbolic variable
@@ -420,25 +417,22 @@ class GSMMPDP(tr.HasTraits):
         ## Manual construction of the residuum
         Eps = self.Eps.as_explicit()
         eps = self.u_vars[0]
-        dot_Eps = sp.Matrix([Cymbol(name=f'\\dot{{{var.name}}}',
-                                    codename=f'dot_{var.codename}') for var in list(Eps)])
-        dot_eps = Cymbol(name=f'\\dot{{{eps.name}}}', codename=f'dot_{eps.codename}')
-        dot_lam = Cymbol(r'\dot{\lambda}', codename='dot_lam', real=True)
+        dot_Eps = sp.Matrix([sp.Symbol(f'\\dot{{{var.name}}}') for var in list(Eps)])
+        dot_eps = sp.Symbol(f'\\dot{{{eps.name}}}')
+        dot_lam = sp.Symbol(r'\dot{\lambda}', real=True)
 
         # time
-        t = Cymbol(r't', codename='t', real=True)
-        delta_t = Cymbol(r'\Delta t', codename='delta_t', real=True)
+        t = sp.Symbol(r't', real=True)
+        delta_t = sp.Symbol(r'\Delta t', real=True)
 
         # fundamental state
-        Eps_n = sp.Matrix([Cymbol(f'{var.name}_{{(n)}}', codename=f'{var.name}_{{(n)}}', real=True) for var in Eps])
-        eps_n = Cymbol(r'\varepsilon_{(n)}', codename='eps_n', real=True)
+        Eps_n = sp.Matrix([sp.Symbol(f'{var.name}_{{(n)}}', real=True) for var in Eps])
+        eps_n = sp.Symbol(r'\varepsilon_{(n)}', real=True)
 
         # increment
-        delta_Eps = sp.Matrix([Cymbol(f'\\Delta{{{var.name}}}', codename=f'delta_{{{var.name}}}',
-                                    real=True) for var in Eps])
-        delta_eps = Cymbol(r'\Delta{\varepsilon}', codename='delta_eps_n', real=True)
-        delta_lam = Cymbol(r'\Delta{\lambda}', codename='delta_lam_n', real=True)
-
+        delta_Eps = sp.Matrix([sp.Symbol(f'\\Delta{{{var.name}}}', real=True) for var in Eps])
+        delta_eps = sp.Symbol(r'\Delta{\varepsilon}', real=True)
+        delta_lam = sp.Symbol(r'\Delta{\lambda}', real=True)
         # updated state
         Eps_n1 = Eps_n + delta_Eps
         eps_n1 = eps_n + delta_eps
@@ -506,7 +500,7 @@ class GSMMPDP(tr.HasTraits):
     
     ######################################
 
-    def get_state_n1(self, eps_n, d_eps, d_t, Eps_n, k_max, **kw):
+    def get_state_n1(self, eps_n, d_eps, d_t, Eps_n, k_max, *args):
         """
         Calculates the state at time n+1 based on the given inputs using an iterative algorithm.
 
@@ -518,7 +512,7 @@ class GSMMPDP(tr.HasTraits):
             Sig_n: Stress at time n.
             Eps_n: Strain at time n.
             k_max: Maximum number of iterations.
-            **kw: Additional keyword arguments.
+            *args: Additional arguments.
 
         Returns:
             Tuple containing the updated strain Eps_k, stress Sig_k, temperature T_n+1, number of iterations k, 
@@ -531,7 +525,7 @@ class GSMMPDP(tr.HasTraits):
             d_A = np.zeros((n_I, self.n_Eps_explicit+1), dtype=np.float64)
         tol = 1e-8
         k_I = np.zeros((n_I,), dtype=np.int_)
-        Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(eps_n, d_eps, Eps_n, d_A, d_t, **kw)
+        Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(eps_n, d_eps, Eps_n, d_A, d_t, *args)
         I_inel = f_n1 > 0
         I = np.copy(I_inel)
         if self.phi_ == sp.S.Zero:
@@ -540,11 +534,14 @@ class GSMMPDP(tr.HasTraits):
         for k in range(k_max):
             if np.all(I == False):
                 break
-            d_A[I] += np.linalg.solve(dR_dA_n1[I], -R_n1[I])
+            # Since numpy version 2.0 np.linalg.solve conducts the stacked evaluation only if the right-hand side
+            # has the shape (..., n, k) where n is the number of equations and k is the number of right-hand sides.
+            # Therefore, the extension and reduction of the last dimension is necessary. 
+            d_A[I] += np.linalg.solve(dR_dA_n1[I], -R_n1[I][..., np.newaxis])[..., 0]
             # d_A[d_A[..., 2] > 1] = 0.9999
             # TODO include thermodynamic stresses in get_f_R_dR_n1
             # print(f'eps_n:{eps_n.shape}, d_eps:{d_eps.shape}, Eps_n:{Eps_n.shape}, d_A:{d_A.shape}, d_t:{d_t}')
-            Sig_n1[I], f_n1[I], R_n1[I], dR_dA_n1[I] = self.get_Sig_f_R_dR_n1(eps_n[I], d_eps[I], Eps_n[I], d_A[I], d_t, **kw)
+            Sig_n1[I], f_n1[I], R_n1[I], dR_dA_n1[I] = self.get_Sig_f_R_dR_n1(eps_n[I], d_eps[I], Eps_n[I], d_A[I], d_t, *args)
             k_I[I] += 1
             # This contains redundancy - only the inelastic strains need to be considered.
             # However, the implementation is kept simple for now.
@@ -560,7 +557,7 @@ class GSMMPDP(tr.HasTraits):
 
         return Eps_n1, Sig_n1, lam_k, k_I
 
-    def get_response(self, eps_ta, t_t, k_max=20, **kw):
+    def get_response(self, eps_ta, t_t, k_max=20, *args):
         """Time integration procedure 
         """
         if eps_ta.ndim == 2:
@@ -577,14 +574,14 @@ class GSMMPDP(tr.HasTraits):
 
         Sig_record = [Sig_n1]
         Eps_record = [Eps_n1]
-        iter_record = [0]
-        lam_record = [0]
+        iter_record = [np.zeros(eps_ta.shape[1:])]
+        lam_record = [np.zeros(eps_ta.shape[1:])]
 
         for n, dt in enumerate(d_t_t):
             print('increment', n+1, end='\r')
             try:
                 Eps_n1, Sig_n1, lam, k = self.get_state_n1(
-                    eps_ta[n], d_eps_ta[n], dt, Eps_n1, k_max, **kw
+                    eps_ta[n], d_eps_ta[n], dt, Eps_n1, k_max, *args
                 )
             except RuntimeError as e:
                 print(f'{n+1}({k}) ... {str(e)}', end='\r')
