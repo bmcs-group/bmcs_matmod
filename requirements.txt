@@ -1,13 +1,1 @@
-traits
-jupyter
-matplotlib
-numpy
-scipy
-sympy
-ipywidgets
-ipympl
-ipytree
-k3d
-dill
-bmcs_utils==0.0.36a0
--e .
+conda create -n myenv python=3.8

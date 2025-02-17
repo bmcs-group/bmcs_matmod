@@ -411,6 +411,8 @@ class GSMMPDP(tr.HasTraits):
                         new_matrix[i, j] = dR_dA_[i, j]
         return new_matrix
     
+    diff_along_rates = tr.Bool(True)
+
     Sig_f_R_dR_n1 = tr.Property()
     @tr.cached_property
     def _get_Sig_f_R_dR_n1(self):
@@ -451,7 +453,6 @@ class GSMMPDP(tr.HasTraits):
         subs_Eps_n = dict(zip(Eps, Eps_n))
         subs_eps_n = {eps: eps_n}
 
-        subs_n = {**subs_Eps_n, **subs_eps_n}
         subs_n1 = {**subs_dot_Eps, **subs_dot_eps, **subs_dot_lam, **subs_Eps_n1, **subs_eps_n1}
 
         Sig = self.Sig.as_explicit()
@@ -459,28 +460,36 @@ class GSMMPDP(tr.HasTraits):
 
         f_ = self.f_expr
 
-        # gamma_mech = -((self.Y_ * Sig).T * dot_Eps)[0]
-        gamma_mech = -(self.dF_dEps_.as_explicit().T * dot_Eps)[0]
+        gamma_mech = ((self.Y * self.Sig.as_explicit()).T * self.dot_Eps.as_explicit())[0]
 
-        # residuum vector in n+1 step
-
-        if self.f_expr == sp.S.Zero:
+        # Residuum vector in n+1 step
+        if self.diff_along_rates:
+            # Define the Lagrangian (total potential energy), discretize and derive the jacobian w.r.t. delta_Eps
             L_ = -gamma_mech + delta_t * self.pi_expr
             L_n1 = L_.subs(self.subs_Sig_Eps).subs(subs_n1)
             dL_dEps_n1 = L_n1.diff(delta_Eps)
 
+        else:
+            # Define the Lagrangian (total potential energy), its jacobian w.r.t Eps and discretize)
+            L_ = -gamma_mech + (delta_t * self.pi_expr + dot_lam * self.phi_)
+            dL_dEps_ = L_.diff(Sig).subs(self.subs_Sig_Eps)
+            dL_dEps_n1 = dL_dEps_.subs(subs_n1)
+
+        if self.phi_ == sp.S.Zero:
+            # Threshold function is zero in this case
             f_n1 = sp.S.Zero
+
+            # Define the residuum vector and the increment vector
             R_n1 = dL_dEps_n1
             delta_A = delta_Eps
         else:
-            L_ = -gamma_mech + (delta_t * self.pi_expr + dot_lam * self.phi_)
-            # dL_dEps_ = L_.diff(Sig).subs(self.subs_Sig_Eps)
-            dL_dEps_ = L_.subs(self.subs_Sig_Eps).diff(Eps)
-            dL_dEps_n1 = dL_dEps_.subs(subs_n1)
-
+            # Define the threshold function and discretize
             f_Eps_ = f_.subs(self.subs_Sig_Eps)
             f_n1 = f_Eps_.subs(subs_n1)
-            R_n1 = dL_dEps_n1.row_insert(dL_dEps_n1.shape[0], sp.Matrix([f_n1]))
+
+            # Enhance the residuum vector with the threshold function 
+            R_n1 = sp.Matrix([dL_dEps_n1, sp.Matrix([[f_n1]])])
+            # and the increment vector with inelastic multiplier
             delta_A = sp.Matrix([delta_Eps, delta_lam])
 
         Sig_n1 = Sig_.subs(subs_n1)
