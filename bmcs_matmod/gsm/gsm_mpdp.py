@@ -118,6 +118,41 @@ class GSMMPDP(tr.HasTraits):
     within the state domain that govern the irreversible state evolution   
     """ 
 
+    lam_phi_ = tr.Property()
+
+    @tr.cached_property
+    def _get_lam_phi_(self):
+        if self.phi_ == sp.S.Zero:
+            return ([], sp.S.Zero)
+        lam_phi = sp.Symbol(r'\lambda_{\mathrm{\phi}}', real=True)
+        return ([lam_phi], lam_phi * self.phi_)
+
+    n_lam = tr.Property()
+
+    @tr.cached_property
+    def _get_n_lam(self):
+        lam_phi_k, _ = self.lam_phi_
+        return len(lam_phi_k)
+
+    h_k = tr.List(tr.Any, value=[])
+    """List of $k$ equality constraints that will be included 
+    in the Lagrangian for the minimum principle of dissipation potential.
+    """
+
+    h_k_lam = tr.Property()
+
+    @tr.cached_property
+    def _get_h_k_lam(self):
+        lam_k = [sp.Symbol(f'\\lambda_{{{k}}}', real=True) for k in range(len(self.h_k))]
+        lam_sum = sum(l * h for l, h in zip(lam_k, self.h_k)) if self.h_k else sp.S.Zero
+        return (lam_k, lam_sum)
+
+    n_Lam = tr.Property()
+
+    @tr.cached_property
+    def _get_n_Lam(self):
+        return len(self.h_k)
+
     vp_on = tr.Bool(True)
     """Viscoplasticity on or off   
     """ 
@@ -137,9 +172,9 @@ class GSMMPDP(tr.HasTraits):
     def _get_Eps(self):
         return sp.BlockMatrix(self.Eps_list).T
     
-    n_Eps_explicit = tr.Property
+    n_Eps = tr.Property
     @tr.cached_property
-    def _get_n_Eps_explicit(self):
+    def _get_n_Eps(self):
         return len(self.Eps.as_explicit())
 
     _Eps_as_array_lambdified = tr.Property
@@ -373,7 +408,7 @@ class GSMMPDP(tr.HasTraits):
         Eps_n_sp_ = np.moveaxis(Eps_n, -1, 0)
         Sig_sp_, f_sp_, R_sp_, d_R_sp_ = self._get_Sig_f_R_dR_n1_lambdified(eps_n_sp_, d_eps_sp_, Eps_n_sp_, d_A_sp_, d_t, O_, I_, *args)
         if self.phi_ == sp.S.Zero:
-            f_sp_ = np.zeros_like(eps_n_sp_)
+            f_sp_ = np.ones_like(eps_n_sp_)
         Sig_sp_ = Sig_sp_.reshape(Eps_n_sp_.shape)
         return np.moveaxis(Sig_sp_, 0, -1), np.moveaxis(f_sp_, 0, -1), np.moveaxis(R_sp_[:, 0], 0, -1), np.moveaxis(d_R_sp_, (0, 1), (-2, -1))
 
@@ -421,7 +456,8 @@ class GSMMPDP(tr.HasTraits):
         eps = self.u_vars[0]
         dot_Eps = sp.Matrix([sp.Symbol(f'\\dot{{{var.name}}}') for var in list(Eps)])
         dot_eps = sp.Symbol(f'\\dot{{{eps.name}}}')
-        dot_lam = sp.Symbol(r'\dot{\lambda}', real=True)
+        lam, lam_phi = self.lam_phi_
+        Lam, lam_h_sum = self.h_k_lam
 
         # time
         t = sp.Symbol(r't', real=True)
@@ -434,7 +470,9 @@ class GSMMPDP(tr.HasTraits):
         # increment
         delta_Eps = sp.Matrix([sp.Symbol(f'\\Delta{{{var.name}}}', real=True) for var in Eps])
         delta_eps = sp.Symbol(r'\Delta{\varepsilon}', real=True)
-        delta_lam = sp.Symbol(r'\Delta{\lambda}', real=True)
+        # delta_lam = sp.Symbol(r'\Delta{\lambda}', real=True)
+        delta_lam = sp.Matrix([sp.Symbol(f'\\Delta{{{var.name}}}', real=True) for var in lam])
+        delta_Lam = sp.Matrix([sp.Symbol(f'\\Delta{{{var.name}}}', real=True) for var in Lam])
         # updated state
         Eps_n1 = Eps_n + delta_Eps
         eps_n1 = eps_n + delta_eps
@@ -444,16 +482,18 @@ class GSMMPDP(tr.HasTraits):
         dot_eps_n = delta_eps / delta_t
         dot_lam_n = delta_lam# / delta_t
 
+
         # derive substitutions
         subs_dot_Eps = dict(zip(dot_Eps, dot_Eps_n))
         subs_dot_eps = {dot_eps: dot_eps_n}
-        subs_dot_lam = {dot_lam: dot_lam_n}
+        subs_delta_lam = dict(zip(lam, delta_lam))
+        subs_delta_Lam = dict(zip(Lam, delta_Lam))
         subs_Eps_n1 = dict(zip(Eps, Eps_n1))
         subs_eps_n1 = {eps: eps_n1}
         subs_Eps_n = dict(zip(Eps, Eps_n))
         subs_eps_n = {eps: eps_n}
 
-        subs_n1 = {**subs_dot_Eps, **subs_dot_eps, **subs_dot_lam, **subs_Eps_n1, **subs_eps_n1}
+        subs_n1 = {**subs_dot_Eps, **subs_dot_eps, **subs_delta_lam, **subs_delta_Lam, **subs_Eps_n1, **subs_eps_n1}
 
         Sig = self.Sig.as_explicit()
         Sig_ = self.Sig_.as_explicit()
@@ -462,39 +502,19 @@ class GSMMPDP(tr.HasTraits):
 
         gamma_mech = ((self.Y * self.Sig.as_explicit()).T * self.dot_Eps.as_explicit())[0]
 
-        # Residuum vector in n+1 step
-        if self.diff_along_rates:
-            # Define the Lagrangian (total potential energy), discretize and derive the jacobian w.r.t. delta_Eps
-            L_ = -gamma_mech + delta_t * self.pi_expr
-            L_n1 = L_.subs(self.subs_Sig_Eps).subs(subs_n1)
-            dL_dEps_n1 = L_n1.diff(delta_Eps)
+        # Full Lagrangian for the minimum principle of dissipation potential
+        L_ = -gamma_mech + lam_h_sum + lam_phi 
 
-        else:
-            # Define the Lagrangian (total potential energy), its jacobian w.r.t Eps and discretize)
-            L_ = -gamma_mech + (delta_t * self.pi_expr + dot_lam * self.phi_)
-            dL_dEps_ = L_.diff(Sig).subs(self.subs_Sig_Eps)
-            dL_dEps_n1 = dL_dEps_.subs(subs_n1)
+        # Generalized forces and flux increments
+        S = sp.Matrix([Sig, sp.Matrix(Lam), sp.Matrix(lam)])
+        delta_A = sp.Matrix([delta_Eps, sp.Matrix(delta_Lam), sp.Matrix(delta_lam)])
 
-        if self.phi_ == sp.S.Zero:
-            # Threshold function is zero in this case
-            f_n1 = sp.S.Zero
+        # Derivative of the Lagrangian with respect to the generalized forces
+        dL_dS_ = L_.diff(S)
+        dL_dS_A_ = dL_dS_.subs(self.subs_Sig_Eps)
+        R_n1 = dL_dS_A_.subs(subs_n1)
 
-            # Define the residuum vector and the increment vector
-            R_n1 = dL_dEps_n1
-            delta_A = delta_Eps
-        else:
-            # Define the threshold function and discretize
-            f_Eps_ = f_.subs(self.subs_Sig_Eps)
-            f_n1 = f_Eps_.subs(subs_n1)
-
-            # Enhance the residuum vector with the threshold function 
-            R_n1 = sp.Matrix([dL_dEps_n1, sp.Matrix([[f_n1]])])
-            # and the increment vector with inelastic multiplier
-            delta_A = sp.Matrix([delta_Eps, delta_lam])
-
-        Sig_n1 = Sig_.subs(subs_n1)
-
-        # construct the jacobian of the residuum
+        # Jacobian of the residuum
         dR_dA_n1 = R_n1.jacobian(delta_A)
         dR_dA_n1 = dR_dA_n1.replace(sp.Derivative, lambda *args: 0)
         dR_dA_n1 = dR_dA_n1.replace(sp.DiracDelta, lambda *args: 0)
@@ -502,7 +522,14 @@ class GSMMPDP(tr.HasTraits):
         # replace zeros and constant terms with symbolic variables to broadcast properly
         dR_dA_n1_OI = self.replace_zeros_and_ones_with_symbolic(dR_dA_n1, delta_A)
 
-        return (gamma_mech, L_, dR_dA_n1), (eps_n, delta_eps, Eps_n, delta_A, delta_t, self.Ox, self.Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI
+        # Values of the static threshold function
+        f_Eps_ = f_.subs(self.subs_Sig_Eps)
+        f_n1 = f_Eps_.subs(subs_n1)
+
+        # External stress
+        Sig_n1 = Sig_.subs(subs_n1)
+
+        return (gamma_mech, L_, dL_dS_, dL_dS_A_, dR_dA_n1), (eps_n, delta_eps, Eps_n, delta_A, delta_t, self.Ox, self.Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI
     
     ######################################
 
@@ -525,17 +552,12 @@ class GSMMPDP(tr.HasTraits):
             and dissipation rate gradient dDiss_dEps.
         """
         n_I = np.atleast_1d(eps_n).shape[0]
-        if self.phi_ == sp.S.Zero:
-            d_A = np.zeros((n_I, self.n_Eps_explicit), dtype=np.float64)
-        else:
-            d_A = np.zeros((n_I, self.n_Eps_explicit+1), dtype=np.float64)
+        d_A = np.zeros((n_I, self.n_Eps + self.n_Lam + self.n_lam), dtype=np.float64)
         tol = 1e-8
         k_I = np.zeros((n_I,), dtype=np.int_)
         Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(eps_n, d_eps, Eps_n, d_A, d_t, *args)
         I_inel = f_n1 > 0
         I = np.copy(I_inel)
-        if self.phi_ == sp.S.Zero:
-            I[...] = True
     
         for k in range(k_max):
             if np.all(I == False):
@@ -545,8 +567,6 @@ class GSMMPDP(tr.HasTraits):
             # Therefore, the extension and reduction of the last dimension is necessary. 
             d_A[I] += np.linalg.solve(dR_dA_n1[I], -R_n1[I][..., np.newaxis])[..., 0]
             # d_A[d_A[..., 2] > 1] = 0.9999
-            # TODO include thermodynamic stresses in get_f_R_dR_n1
-            # print(f'eps_n:{eps_n.shape}, d_eps:{d_eps.shape}, Eps_n:{Eps_n.shape}, d_A:{d_A.shape}, d_t:{d_t}')
             Sig_n1[I], f_n1[I], R_n1[I], dR_dA_n1[I] = self.get_Sig_f_R_dR_n1(eps_n[I], d_eps[I], Eps_n[I], d_A[I], d_t, *args)
             k_I[I] += 1
             # This contains redundancy - only the inelastic strains need to be considered.
@@ -554,13 +574,19 @@ class GSMMPDP(tr.HasTraits):
             norm_R_n1 = np.linalg.norm(R_n1, axis=-1)
             I[norm_R_n1 <= tol] = False
 
-        # Distinguish the case with and without constraint function.
-        if self.phi_ == sp.S.Zero:
-            lam_k = np.zeros_like(d_A[..., -1])
-            Eps_n1 = Eps_n + d_A
-        else:
-            lam_k = d_A[..., -1]
-            Eps_n1 = np.where(I_inel[:, np.newaxis], Eps_n + d_A[..., :-1], Eps_n)
+        # # Distinguish the case with and without constraint function.
+        # if self.phi_ == sp.S.Zero:
+        #     lam_k = np.zeros_like(d_A[..., -1])
+        #     Eps_n1 = Eps_n + d_A[..., :self.n_Eps]
+        # else:
+        #     lam_k = d_A[..., -1]
+        # lam_k = np.where(
+        #     I_inel[..., np.newaxis],
+        #     d_A[..., self.n_Eps:],
+        #     np.zeros_like(d_A[..., self.n_Eps:])
+        # )
+        lam_k = d_A[..., self.n_Eps:]
+        Eps_n1 = np.where(I_inel[:, np.newaxis], Eps_n + d_A[..., :self.n_Eps], Eps_n)
 
         return Eps_n1, Sig_n1, lam_k, k_I
 
@@ -579,18 +605,19 @@ class GSMMPDP(tr.HasTraits):
         d_eps_ta = np.diff(eps_ta, axis=0)
         d_t_t = np.diff(t_t, axis=0)
 
-        Eps_n1 = np.zeros(eps_ta.shape[1:] + (self.n_Eps_explicit,), dtype=np.float64)
+        Eps_n1 = np.zeros(eps_ta.shape[1:] + (self.n_Eps,), dtype=np.float64)
         Sig_n1 = np.zeros_like(Eps_n1)
+        lam_n1 = np.zeros(eps_ta.shape[1:] + (self.n_lam + self.n_Lam,), dtype=np.float64)
 
         Sig_record = [Sig_n1]
         Eps_record = [Eps_n1]
         iter_record = [np.zeros(eps_ta.shape[1:])]
-        lam_record = [np.zeros(eps_ta.shape[1:])]
+        lam_record = [lam_n1]
 
         for n, dt in enumerate(d_t_t):
             print('increment', n+1, end='\r')
             try:
-                Eps_n1, Sig_n1, lam, k = self.get_state_n1(
+                Eps_n1, Sig_n1, lam_n1, k = self.get_state_n1(
                     eps_ta[n], d_eps_ta[n], dt, Eps_n1, k_max, *args
                 )
             except RuntimeError as e:
@@ -598,10 +625,8 @@ class GSMMPDP(tr.HasTraits):
                 break
             Sig_record.append(Sig_n1)
             Eps_record.append(Eps_n1)
+            lam_record.append(lam_n1)
             iter_record.append(k)
-            lam_record.append(lam)
-        print(f'Eps_record {Eps_record}')
-        print(f'Sig_record {Sig_record}')
         Sig_t = np.array(Sig_record, dtype=np.float64)
         Eps_t = np.array(Eps_record, dtype=np.float64)
         iter_t = np.array(iter_record,dtype=np.int_)
