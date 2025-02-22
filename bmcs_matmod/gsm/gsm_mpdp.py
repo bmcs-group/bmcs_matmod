@@ -118,20 +118,30 @@ class GSMMPDP(tr.HasTraits):
     within the state domain that govern the irreversible state evolution   
     """ 
 
-    lam_phi_ = tr.Property()
+    d_t = sp.Symbol(r'\mathrm{d}t', real=True)
+    """Time increment
+    """
+
+    dot_eps = tr.Property()
 
     @tr.cached_property
-    def _get_lam_phi_(self):
+    def _get_dot_eps(self):
+        return sp.Symbol(f'\\dot{{{self.u_vars[0].name}}}')
+
+    lam_phi_f_ = tr.Property()
+
+    @tr.cached_property
+    def _get_lam_phi_f_(self):
         if self.phi_ == sp.S.Zero:
-            return ([], sp.S.Zero)
+            return ([], sp.S.Zero, sp.S.Zero)
         lam_phi = sp.Symbol(r'\lambda_{\mathrm{\phi}}', real=True)
-        return ([lam_phi], lam_phi * self.phi_)
+        return ([lam_phi], lam_phi * self.phi_, self.f_expr )
 
     n_lam = tr.Property()
 
     @tr.cached_property
     def _get_n_lam(self):
-        lam_phi_k, _ = self.lam_phi_
+        lam_phi_k, _, _ = self.lam_phi_f_
         return len(lam_phi_k)
 
     h_k = tr.List(tr.Any, value=[])
@@ -139,13 +149,14 @@ class GSMMPDP(tr.HasTraits):
     in the Lagrangian for the minimum principle of dissipation potential.
     """
 
-    h_k_lam = tr.Property()
+    H_Lam = tr.Property()
 
     @tr.cached_property
-    def _get_h_k_lam(self):
-        lam_k = [sp.Symbol(f'\\lambda_{{{k}}}', real=True) for k in range(len(self.h_k))]
-        lam_sum = sum(l * h for l, h in zip(lam_k, self.h_k)) if self.h_k else sp.S.Zero
-        return (lam_k, lam_sum)
+    def _get_H_Lam(self):
+        dot_Lam = [sp.Symbol(f'\\dot{{\\lambda}}_{{{k}}}', real=True) for k in range(len(self.h_k))]
+        delta_Lam = sp.Matrix([sp.Symbol(f'\\Delta\\lambda_{{{k}}}', real=True) for k in range(len(self.h_k))])
+        dot_lam_sum = sum(l * h for l, h in zip(dot_Lam, self.h_k)) if self.h_k else sp.S.Zero
+        return (dot_Lam, delta_Lam, dot_lam_sum)
 
     n_Lam = tr.Property()
 
@@ -268,7 +279,7 @@ class GSMMPDP(tr.HasTraits):
 
     ######################################
 
-    def get_sig(self, u, T, Eps, Sig, *args):
+    def get_sig(self, eps, Eps, *args):
         """
         Calculates the displacement for a given stress level
 
@@ -282,24 +293,26 @@ class GSMMPDP(tr.HasTraits):
         Returns:
             Calculated displacement for a stress level and control stress.
         """
-        return self._sig_lambdified(u, T, Eps, Sig, *args)[:, 0]
+        eps_sp_ = np.moveaxis(np.atleast_1d(eps), -1, 0)
+        Eps_sp_ = np.moveaxis(Eps, -1, 0)
+        sig_sp_ = self._sig_lambdified(eps_sp_, Eps_sp_, *args)
+        sig_sp_ = sig_sp_.reshape(eps_sp_.shape)
+        return np.moveaxis(sig_sp_, 0, -1)
 
     _sig_lambdified = tr.Property()
     @tr.cached_property
     def _get__sig_lambdified(self):
-        return sp.lambdify((self.u_vars, self.T_var, 
-                            self.Eps.as_explicit(), 
-                            self.Sig.as_explicit()) + self.m_params + ('*args',), 
+        return sp.lambdify((self.u_vars[0], self.Eps.as_explicit()) + self.m_params + ('*args',), 
                            self.sig_, numpy_dirac, cse=True)
 
     sig_ = tr.Property()
     @tr.cached_property
     def _get_sig_(self):
         "For Gibbs for external strain the sign is swapped using the sig_sign parameter = -1"
-        return self.sig_sign * self.F_expr.diff(self.u_vars)
+        return self.sig_sign * self.F_expr.diff(self.u_vars[0])
 
     ######################################
-    def get_dDiss_dEps(self, u, T, Eps, Sig, *args):
+    def get_dDiss_dEps(self, eps, T, Eps, Sig, *args):
         """
         Calculates the derivative of the dissipation rate with respect 
         to internal variables.
@@ -314,12 +327,12 @@ class GSMMPDP(tr.HasTraits):
         Returns:
             Calculated derivative of the dissipation rate with respect to strain.
         """
-        return self._dDiss_dEps_lambdified(u, T, Eps, Sig, *args)[:, 0]
+        return self._dDiss_dEps_lambdified(eps, T, Eps, Sig, *args)[:, 0]
 
     _dDiss_dEps_lambdified = tr.Property()
     @tr.cached_property
     def _get__dDiss_dEps_lambdified(self):
-        return sp.lambdify((self.u_vars, self.T_var, 
+        return sp.lambdify((self.u_vars[0], self.T_var, 
                             self.Eps.as_explicit(), 
                             self.Sig.as_explicit()) + self.m_params + ('*args',), 
                            self.dDiss_dEps_, numpy_dirac, cse=True)
@@ -455,9 +468,9 @@ class GSMMPDP(tr.HasTraits):
         Eps = self.Eps.as_explicit()
         eps = self.u_vars[0]
         dot_Eps = sp.Matrix([sp.Symbol(f'\\dot{{{var.name}}}') for var in list(Eps)])
-        dot_eps = sp.Symbol(f'\\dot{{{eps.name}}}')
-        lam, lam_phi = self.lam_phi_
-        Lam, lam_h_sum = self.h_k_lam
+        dot_eps = self.dot_eps
+        lam, lam_phi, f_ = self.lam_phi_f_
+        dot_Lam, delta_Lam, dot_Lam_H_ = self.H_Lam
 
         # time
         t = sp.Symbol(r't', real=True)
@@ -472,7 +485,6 @@ class GSMMPDP(tr.HasTraits):
         delta_eps = sp.Symbol(r'\Delta{\varepsilon}', real=True)
         # delta_lam = sp.Symbol(r'\Delta{\lambda}', real=True)
         delta_lam = sp.Matrix([sp.Symbol(f'\\Delta{{{var.name}}}', real=True) for var in lam])
-        delta_Lam = sp.Matrix([sp.Symbol(f'\\Delta{{{var.name}}}', real=True) for var in Lam])
         # updated state
         Eps_n1 = Eps_n + delta_Eps
         eps_n1 = eps_n + delta_eps
@@ -480,20 +492,20 @@ class GSMMPDP(tr.HasTraits):
         # rate of change
         dot_Eps_n = delta_Eps / delta_t
         dot_eps_n = delta_eps / delta_t
-        dot_lam_n = delta_lam# / delta_t
+        dot_lam_n = delta_lam / delta_t
 
 
         # derive substitutions
         subs_dot_Eps = dict(zip(dot_Eps, dot_Eps_n))
         subs_dot_eps = {dot_eps: dot_eps_n}
         subs_delta_lam = dict(zip(lam, delta_lam))
-        subs_delta_Lam = dict(zip(Lam, delta_Lam))
+        subs_dot_Lam = dict(zip(dot_Lam, delta_Lam))
         subs_Eps_n1 = dict(zip(Eps, Eps_n1))
         subs_eps_n1 = {eps: eps_n1}
-        subs_Eps_n = dict(zip(Eps, Eps_n))
-        subs_eps_n = {eps: eps_n}
+        subs_dt = {self.d_t: delta_t}
 
-        subs_n1 = {**subs_dot_Eps, **subs_dot_eps, **subs_delta_lam, **subs_delta_Lam, **subs_Eps_n1, **subs_eps_n1}
+        subs_n1 = {**subs_dot_Eps, **subs_dot_eps, **subs_delta_lam, 
+                   **subs_dot_Lam, **subs_Eps_n1, **subs_eps_n1, **subs_dt}
 
         Sig = self.Sig.as_explicit()
         Sig_ = self.Sig_.as_explicit()
@@ -503,14 +515,34 @@ class GSMMPDP(tr.HasTraits):
         gamma_mech = ((self.Y * self.Sig.as_explicit()).T * self.dot_Eps.as_explicit())[0]
 
         # Full Lagrangian for the minimum principle of dissipation potential
-        L_ = -gamma_mech + lam_h_sum + lam_phi 
+        L_ = -gamma_mech + dot_Lam_H_ + lam_phi 
 
         # Generalized forces and flux increments
-        S = sp.Matrix([Sig, sp.Matrix(Lam), sp.Matrix(lam)])
+        S = sp.Matrix([Sig, sp.Matrix(dot_Lam), sp.Matrix(lam)])
         delta_A = sp.Matrix([delta_Eps, sp.Matrix(delta_Lam), sp.Matrix(delta_lam)])
 
         # Derivative of the Lagrangian with respect to the generalized forces
         dL_dS_ = L_.diff(S)
+        dL_dS_ = sp.Matrix(dL_dS_)
+        if self.phi_ != sp.S.Zero:
+            # To handle the non-associated flow rule within the inequality constraint
+            # represented by the threshold function, the respective residuum equation
+            # representing the consistency condition is overwritten with the threshold
+            # function without the non-associated enhancement. Still, the evolution 
+            # equation retains the non-associated flow rule. This is equivalent as if
+            # a shift of the non-associated enhancement is performed to set it zero at the 
+            # level of the threshold function. The derivative of the flow enhancement w.r.t. 
+            # the thermodynamic force defining the evolution equation remains unchanged. 
+            # Such arrangement can always be found by a suitable choice of the integration
+            # constant of the evolution equation, requiring that the flow enhancement is zeroed
+            # exactly at the level of the inelastic threshold.  
+            def phi_FB(a, b):
+                # Fisher-Burmeister function for the inequality constraint ensuring 
+                # the non-negativity of the threshold function
+                return sp.sqrt(a**2 + b**2) - (a + b)
+            print(f_, delta_lam[0])
+            dL_dS_[-1] = f_ #  phi_FB(lam[0], -f_)
+
         dL_dS_A_ = dL_dS_.subs(self.subs_Sig_Eps)
         R_n1 = dL_dS_A_.subs(subs_n1)
 
@@ -532,6 +564,61 @@ class GSMMPDP(tr.HasTraits):
         return (gamma_mech, L_, dL_dS_, dL_dS_A_, dR_dA_n1), (eps_n, delta_eps, Eps_n, delta_A, delta_t, self.Ox, self.Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI
     
     ######################################
+
+    def get_state_n1x(self, eps_n, d_eps, d_t, Eps_n, k_max, *args):
+        """
+        Calculates the state at time n+1 based on the given inputs using an iterative algorithm.
+
+        Args:
+            eps_n: strain at time n.
+            d_eps: strain increment from time n to n+1.
+            T_n: Temperature at time n.
+            dt: Time step size.
+            Sig_n: Stress at time n.
+            Eps_n: Strain at time n.
+            k_max: Maximum number of iterations.
+            *args: Additional arguments.
+
+        Returns:
+            Tuple containing the updated strain Eps_k, stress Sig_k, temperature T_n+1, number of iterations k, 
+            and dissipation rate gradient dDiss_dEps.
+        """
+        n_I = np.atleast_1d(eps_n).shape[0]
+        tol = 1e-8
+        k_I = np.zeros((n_I,), dtype=np.int_)
+        d_A = np.zeros((n_I, self.n_Eps + self.n_Lam + self.n_lam), dtype=np.float64)
+        Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(eps_n, d_eps, Eps_n, d_A, d_t, *args)
+
+        print(f'f_n1 {f_n1}, R_n1 {R_n1}')
+        I = np.ones((n_I,), dtype=np.bool_)
+        for k in range(k_max):
+            print(f'iteration {k+1}')
+            try:
+                d_A[I] += -np.linalg.solve(dR_dA_n1[I], R_n1[I][..., np.newaxis])[..., 0]
+            except np.linalg.LinAlgError as e:
+                print("SingularMatrix encountered in dR_dA_n1[I]:", dR_dA_n1[I])
+                print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
+                raise
+            if self.f_expr != sp.S.Zero:
+                print(f'd_A_eq {d_A[..., :]}')
+                d_A[..., -1] = np.maximum(d_A[..., -1], 0)
+                print(f'd_A_in {d_A[..., :]}')
+
+            Sig_n1[I], f_n1[I], R_n1[I], dR_dA_n1[I] = self.get_Sig_f_R_dR_n1(eps_n[I], d_eps[I], Eps_n[I], d_A[I], d_t, *args)
+            print(f'f_n1 {f_n1}, R_n1 {R_n1}')
+            k_I[I] += 1
+            # This contains redundancy - only the inelastic strains need to be considered.
+            # However, the implementation is kept simple for now.
+            norm_R_n1 = np.linalg.norm(R_n1, axis=-1)
+            print(f'norm_R_n1 {norm_R_n1}')
+            I[norm_R_n1 <= tol] = False
+            if np.all(I == False):
+                break
+
+        lam_k = d_A[..., self.n_Eps:]
+        Eps_n1 = Eps_n + d_A[..., :self.n_Eps]
+
+        return Eps_n1, Sig_n1, lam_k, k_I
 
     def get_state_n1(self, eps_n, d_eps, d_t, Eps_n, k_max, *args):
         """
@@ -556,17 +643,28 @@ class GSMMPDP(tr.HasTraits):
         tol = 1e-8
         k_I = np.zeros((n_I,), dtype=np.int_)
         Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(eps_n, d_eps, Eps_n, d_A, d_t, *args)
+        # Distinguish the models containing equality constraint and an inequality constraint.
+        # This case is currently not handled properly because the fulfillment of inequality constraint 
+        # inhibits the evaluation of hte equality constraint. 
+        # In such cases the I is set to True and the iteration is stopped. 
+        #I_inel = np.ones_like(f_n1, dtype=np.bool_) 
         I_inel = f_n1 > 0
         I = np.copy(I_inel)
     
+        print(f'd_A {d_A[..., :]}')
+
         for k in range(k_max):
             if np.all(I == False):
                 break
             # Since numpy version 2.0 np.linalg.solve conducts the stacked evaluation only if the right-hand side
             # has the shape (..., n, k) where n is the number of equations and k is the number of right-hand sides.
             # Therefore, the extension and reduction of the last dimension is necessary. 
-            d_A[I] += np.linalg.solve(dR_dA_n1[I], -R_n1[I][..., np.newaxis])[..., 0]
-            # d_A[d_A[..., 2] > 1] = 0.9999
+            try:
+                d_A[I] += np.linalg.solve(dR_dA_n1[I], -R_n1[I][..., np.newaxis])[..., 0]
+            except np.linalg.LinAlgError as e:
+                print("SingularMatrix encountered in dR_dA_n1[I]:", dR_dA_n1[I])
+                print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
+                raise
             Sig_n1[I], f_n1[I], R_n1[I], dR_dA_n1[I] = self.get_Sig_f_R_dR_n1(eps_n[I], d_eps[I], Eps_n[I], d_A[I], d_t, *args)
             k_I[I] += 1
             # This contains redundancy - only the inelastic strains need to be considered.
@@ -574,17 +672,6 @@ class GSMMPDP(tr.HasTraits):
             norm_R_n1 = np.linalg.norm(R_n1, axis=-1)
             I[norm_R_n1 <= tol] = False
 
-        # # Distinguish the case with and without constraint function.
-        # if self.phi_ == sp.S.Zero:
-        #     lam_k = np.zeros_like(d_A[..., -1])
-        #     Eps_n1 = Eps_n + d_A[..., :self.n_Eps]
-        # else:
-        #     lam_k = d_A[..., -1]
-        # lam_k = np.where(
-        #     I_inel[..., np.newaxis],
-        #     d_A[..., self.n_Eps:],
-        #     np.zeros_like(d_A[..., self.n_Eps:])
-        # )
         lam_k = d_A[..., self.n_Eps:]
         Eps_n1 = np.where(I_inel[:, np.newaxis], Eps_n + d_A[..., :self.n_Eps], Eps_n)
 
@@ -615,7 +702,7 @@ class GSMMPDP(tr.HasTraits):
         lam_record = [lam_n1]
 
         for n, dt in enumerate(d_t_t):
-            print('increment', n+1, end='\r')
+            print('increment', n+1) # , end='\r')
             try:
                 Eps_n1, Sig_n1, lam_n1, k = self.get_state_n1(
                     eps_ta[n], d_eps_ta[n], dt, Eps_n1, k_max, *args
