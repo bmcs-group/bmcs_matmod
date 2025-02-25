@@ -651,8 +651,6 @@ class GSMMPDP(tr.HasTraits):
         I_inel = f_n1 > 0
         I = np.copy(I_inel)
     
-        print(f'd_A {d_A[..., :]}')
-
         for k in range(k_max):
             if np.all(I == False):
                 break
@@ -702,7 +700,7 @@ class GSMMPDP(tr.HasTraits):
         lam_record = [lam_n1]
 
         for n, dt in enumerate(d_t_t):
-            print('increment', n+1) # , end='\r')
+            print('increment', n+1, end='\r')
             try:
                 Eps_n1, Sig_n1, lam_n1, k = self.get_state_n1(
                     eps_ta[n], d_eps_ta[n], dt, Eps_n1, k_max, *args
