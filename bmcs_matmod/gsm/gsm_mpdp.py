@@ -421,7 +421,7 @@ class GSMMPDP(tr.HasTraits):
         Eps_n_sp_ = np.moveaxis(Eps_n, -1, 0)
         Sig_sp_, f_sp_, R_sp_, d_R_sp_ = self._get_Sig_f_R_dR_n1_lambdified(eps_n_sp_, d_eps_sp_, Eps_n_sp_, d_A_sp_, d_t, O_, I_, *args)
         if self.phi_ == sp.S.Zero:
-            f_sp_ = np.ones_like(eps_n_sp_)
+            f_sp_ = np.zeros_like(eps_n_sp_)
         Sig_sp_ = Sig_sp_.reshape(Eps_n_sp_.shape)
         return np.moveaxis(Sig_sp_, 0, -1), np.moveaxis(f_sp_, 0, -1), np.moveaxis(R_sp_[:, 0], 0, -1), np.moveaxis(d_R_sp_, (0, 1), (-2, -1))
 
@@ -471,6 +471,9 @@ class GSMMPDP(tr.HasTraits):
         dot_eps = self.dot_eps
         lam, lam_phi, f_ = self.lam_phi_f_
         dot_Lam, delta_Lam, dot_Lam_H_ = self.H_Lam
+
+        # smoothness parameter for Fisher-Burmeister function
+        mu = sp.Symbol(r'\mu', real=True)
 
         # time
         t = sp.Symbol(r't', real=True)
@@ -524,7 +527,7 @@ class GSMMPDP(tr.HasTraits):
         # Derivative of the Lagrangian with respect to the generalized forces
         dL_dS_ = L_.diff(S)
         dL_dS_ = sp.Matrix(dL_dS_)
-        if self.phi_ != sp.S.Zero:
+        if self.f_expr != sp.S.Zero:
             # To handle the non-associated flow rule within the inequality constraint
             # represented by the threshold function, the respective residuum equation
             # representing the consistency condition is overwritten with the threshold
@@ -536,12 +539,13 @@ class GSMMPDP(tr.HasTraits):
             # Such arrangement can always be found by a suitable choice of the integration
             # constant of the evolution equation, requiring that the flow enhancement is zeroed
             # exactly at the level of the inelastic threshold.  
-            def phi_FB(a, b):
-                # Fisher-Burmeister function for the inequality constraint ensuring 
-                # the non-negativity of the threshold function
-                return sp.sqrt(a**2 + b**2) - (a + b)
-            print(f_, delta_lam[0])
-            dL_dS_[-1] = f_ #  phi_FB(lam[0], -f_)
+            # def phi_FB(a, b, mu):
+            #     # Fisher-Burmeister function for the inequality constraint ensuring 
+            #     # the non-negativity of the threshold function
+            #     return sp.sqrt(a**2 + b**2 + mu**2) - (a + b)
+            # print(f_, delta_lam[0])
+            # dL_dS_[-1] = phi_FB(lam[0], -f_, mu)
+            dL_dS_[-1] = f_
 
         dL_dS_A_ = dL_dS_.subs(self.subs_Sig_Eps)
         R_n1 = dL_dS_A_.subs(subs_n1)
@@ -565,7 +569,7 @@ class GSMMPDP(tr.HasTraits):
     
     ######################################
 
-    def get_state_n1x(self, eps_n, d_eps, d_t, Eps_n, k_max, *args):
+    def get_state_n1(self, eps_n, d_eps, d_t, Eps_n, k_max, *args):
         """
         Calculates the state at time n+1 based on the given inputs using an iterative algorithm.
 
@@ -587,40 +591,61 @@ class GSMMPDP(tr.HasTraits):
         tol = 1e-8
         k_I = np.zeros((n_I,), dtype=np.int_)
         d_A = np.zeros((n_I, self.n_Eps + self.n_Lam + self.n_lam), dtype=np.float64)
-        Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(eps_n, d_eps, Eps_n, d_A, d_t, *args)
+        # print(f'eps_n {eps_n}, d_eps {d_eps}, Eps_n {Eps_n}, d_A {d_A}, d_t {d_t}')
+        # print(f'args {args}')
+        Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(
+            eps_n, d_eps, Eps_n, d_A, d_t, *args)
+        # print(f'f_n1 {f_n1}, R_n1 {R_n1}, dR_dA_n1 {dR_dA_n1}')
 
-        print(f'f_n1 {f_n1}, R_n1 {R_n1}')
-        I = np.ones((n_I,), dtype=np.bool_)
-        for k in range(k_max):
-            print(f'iteration {k+1}')
-            try:
-                d_A[I] += -np.linalg.solve(dR_dA_n1[I], R_n1[I][..., np.newaxis])[..., 0]
-            except np.linalg.LinAlgError as e:
-                print("SingularMatrix encountered in dR_dA_n1[I]:", dR_dA_n1[I])
-                print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
-                raise
-            if self.f_expr != sp.S.Zero:
-                print(f'd_A_eq {d_A[..., :]}')
-                d_A[..., -1] = np.maximum(d_A[..., -1], 0)
-                print(f'd_A_in {d_A[..., :]}')
+        I = f_n1 > 0
+        I_inel = np.copy(I)
+        I_el = ~I_inel
 
-            Sig_n1[I], f_n1[I], R_n1[I], dR_dA_n1[I] = self.get_Sig_f_R_dR_n1(eps_n[I], d_eps[I], Eps_n[I], d_A[I], d_t, *args)
-            print(f'f_n1 {f_n1}, R_n1 {R_n1}')
-            k_I[I] += 1
-            # This contains redundancy - only the inelastic strains need to be considered.
-            # However, the implementation is kept simple for now.
-            norm_R_n1 = np.linalg.norm(R_n1, axis=-1)
-            print(f'norm_R_n1 {norm_R_n1}')
-            I[norm_R_n1 <= tol] = False
-            if np.all(I == False):
-                break
+        # Inelastic state update
+        if self.n_lam > 0:
+            for k in range(k_max):
+                if np.all(I == False):
+                    break
+                try:
+                    d_A[I] += np.linalg.solve(dR_dA_n1[I], -R_n1[I][..., np.newaxis])[..., 0]
+                except np.linalg.LinAlgError as e:
+                    print("SingularMatrix encountered in dR_dA_n1[I]:", dR_dA_n1[I])
+                    print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
+                    raise
+                Sig_n1[I], f_n1[I], R_n1[I], dR_dA_n1[I] = self.get_Sig_f_R_dR_n1(eps_n[I], d_eps[I], Eps_n[I], d_A[I], d_t, *args)
+                norm_R_n1 = np.linalg.norm(R_n1, axis=-1)
+                I[norm_R_n1 <= tol] = False
+                k_I[I] += 1
+
+        # Elastic state update
+        if self.n_Lam > 0:
+            for k in range(k_max):
+                if np.all(I_el == False):
+                    break
+                try:
+                    if self.n_lam == 0:
+                        i1 = None
+                    else:
+                        i1 = -1
+                    # Replace the nested indexing d_A[I_el][...,:i1] with a single bracket expression that
+                    # applies the boolean mask and the slice in one operation:
+                    dd_A_I_el = np.linalg.solve(dR_dA_n1[I_el, :i1, :i1], -R_n1[I_el, :i1, np.newaxis])[..., 0]
+                    d_A[I_el, :i1] += dd_A_I_el
+                except np.linalg.LinAlgError as e:
+                    print("SingularMatrix encountered in dR_dA_n1[I]:", dR_dA_n1[I_el])
+                    print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
+                    raise
+                Sig_n1[I_el], f_n1[I_el], R_n1[I_el], dR_dA_n1[I_el] = self.get_Sig_f_R_dR_n1(eps_n[I_el], d_eps[I_el], Eps_n[I_el], d_A[I_el], d_t, *args)
+                norm_R_n1 = np.linalg.norm(R_n1, axis=-1)
+                I_el[norm_R_n1 <= tol] = False
+                k_I[I_el] += 1
 
         lam_k = d_A[..., self.n_Eps:]
         Eps_n1 = Eps_n + d_A[..., :self.n_Eps]
 
         return Eps_n1, Sig_n1, lam_k, k_I
 
-    def get_state_n1(self, eps_n, d_eps, d_t, Eps_n, k_max, *args):
+    def get_state_n1x(self, eps_n, d_eps, d_t, Eps_n, k_max, *args):
         """
         Calculates the state at time n+1 based on the given inputs using an iterative algorithm.
 
