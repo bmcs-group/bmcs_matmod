@@ -279,7 +279,7 @@ class GSMMPDP(tr.HasTraits):
 
     ######################################
 
-    def get_sig(self, eps, Eps, *args):
+    def get_sig(self, eps, Eps, m_params={}):
         """
         Calculates the displacement for a given stress level
 
@@ -293,6 +293,8 @@ class GSMMPDP(tr.HasTraits):
         Returns:
             Calculated displacement for a stress level and control stress.
         """
+        args = [m_params[p] for p in self.m_params]
+
         eps_sp_ = np.moveaxis(np.atleast_1d(eps), -1, 0)
         Eps_sp_ = np.moveaxis(Eps, -1, 0)
         sig_sp_ = self._sig_lambdified(eps_sp_, Eps_sp_, *args)
@@ -700,12 +702,14 @@ class GSMMPDP(tr.HasTraits):
 
         return Eps_n1, Sig_n1, lam_k, k_I
 
-    def get_response(self, eps_ta, t_t, k_max=20, *args):
+    def get_response(self, eps_ta, t_t, m_params={}, k_max=20):
         """Time integration procedure 
 
         TODO - consider the stacked evaluation of the response - include the naming of the variables 
         indicating the dimensions of the input arrays and the output arrays.
         """
+        args = [m_params[p] for p in self.m_params]
+
         if eps_ta.ndim == 2:
             eps_ta = eps_ta[:,np.newaxis,:]
 
