@@ -279,7 +279,7 @@ class GSMMPDP(tr.HasTraits):
 
     ######################################
 
-    def get_sig(self, eps, Eps, m_params={}):
+    def get_sig(self, eps, Eps, m_params):
         """
         Calculates the displacement for a given stress level
 
@@ -571,7 +571,7 @@ class GSMMPDP(tr.HasTraits):
     
     ######################################
 
-    def get_state_n1(self, eps_n, d_eps, d_t, Eps_n, k_max, *args):
+    def get_state_n1(self, eps_n, d_eps, d_t, Eps_n, m_params, k_max):
         """
         Calculates the state at time n+1 based on the given inputs using an iterative algorithm.
 
@@ -589,21 +589,25 @@ class GSMMPDP(tr.HasTraits):
             Tuple containing the updated strain Eps_k, stress Sig_k, temperature T_n+1, number of iterations k, 
             and dissipation rate gradient dDiss_dEps.
         """
+        args = [m_params[p] for p in self.m_params]
+
         n_I = np.atleast_1d(eps_n).shape[0]
         tol = 1e-8
         k_I = np.zeros((n_I,), dtype=np.int_)
         d_A = np.zeros((n_I, self.n_Eps + self.n_Lam + self.n_lam), dtype=np.float64)
+        d_A[..., self.n_Eps:] = 0.01
+#        d_A[..., :] = 0.01
         # print(f'eps_n {eps_n}, d_eps {d_eps}, Eps_n {Eps_n}, d_A {d_A}, d_t {d_t}')
         # print(f'args {args}')
         Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(
             eps_n, d_eps, Eps_n, d_A, d_t, *args)
         # print(f'f_n1 {f_n1}, R_n1 {R_n1}, dR_dA_n1 {dR_dA_n1}')
 
-        I = f_n1 > 0
+        I = f_n1 >= 0
         I_inel = np.copy(I)
         I_el = ~I_inel
 
-        # Inelastic state update
+        # Inelastic state update - only qn inequality constraint is present
         if self.n_lam > 0:
             for k in range(k_max):
                 if np.all(I == False):
@@ -614,6 +618,7 @@ class GSMMPDP(tr.HasTraits):
                     print("SingularMatrix encountered in dR_dA_n1[I]:", dR_dA_n1[I])
                     print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
                     raise
+                d_A[I,-1] = np.maximum(0, d_A[I,-1])
                 Sig_n1[I], f_n1[I], R_n1[I], dR_dA_n1[I] = self.get_Sig_f_R_dR_n1(eps_n[I], d_eps[I], Eps_n[I], d_A[I], d_t, *args)
                 norm_R_n1 = np.linalg.norm(R_n1, axis=-1)
                 I[norm_R_n1 <= tol] = False
@@ -629,6 +634,7 @@ class GSMMPDP(tr.HasTraits):
                         i1 = None
                     else:
                         i1 = -1
+                        d_A[I_el, i1] = 0
                     # Replace the nested indexing d_A[I_el][...,:i1] with a single bracket expression that
                     # applies the boolean mask and the slice in one operation:
                     dd_A_I_el = np.linalg.solve(dR_dA_n1[I_el, :i1, :i1], -R_n1[I_el, :i1, np.newaxis])[..., 0]
@@ -638,7 +644,7 @@ class GSMMPDP(tr.HasTraits):
                     print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
                     raise
                 Sig_n1[I_el], f_n1[I_el], R_n1[I_el], dR_dA_n1[I_el] = self.get_Sig_f_R_dR_n1(eps_n[I_el], d_eps[I_el], Eps_n[I_el], d_A[I_el], d_t, *args)
-                norm_R_n1 = np.linalg.norm(R_n1, axis=-1)
+                norm_R_n1 = np.linalg.norm(R_n1[...,:i1], axis=-1)
                 I_el[norm_R_n1 <= tol] = False
                 k_I[I_el] += 1
 
@@ -708,7 +714,6 @@ class GSMMPDP(tr.HasTraits):
         TODO - consider the stacked evaluation of the response - include the naming of the variables 
         indicating the dimensions of the input arrays and the output arrays.
         """
-        args = [m_params[p] for p in self.m_params]
 
         if eps_ta.ndim == 2:
             eps_ta = eps_ta[:,np.newaxis,:]
@@ -732,7 +737,7 @@ class GSMMPDP(tr.HasTraits):
             print('increment', n+1, end='\r')
             try:
                 Eps_n1, Sig_n1, lam_n1, k = self.get_state_n1(
-                    eps_ta[n], d_eps_ta[n], dt, Eps_n1, k_max, *args
+                    eps_ta[n], d_eps_ta[n], dt, Eps_n1, m_params, k_max
                 )
             except RuntimeError as e:
                 print(f'{n+1}({k}) ... {str(e)}', end='\r')
@@ -746,7 +751,10 @@ class GSMMPDP(tr.HasTraits):
         iter_t = np.array(iter_record,dtype=np.int_)
         lam_t = np.array(lam_record,dtype=np.float64)
         n_t = len(Eps_t)
-        return (t_t[:n_t], eps_ta[:n_t], Eps_t, Sig_t, iter_t, 
+        eps_ta = eps_ta[:n_t]
+        sig_ta = self.get_sig(eps_ta[..., np.newaxis], Eps_t, m_params)
+
+        return (t_t[:n_t], eps_ta, sig_ta, Eps_t, Sig_t, iter_t, 
                 lam_t, (d_t_t[:n_t], d_eps_ta[:n_t]))
     
     def save_to_disk(self):

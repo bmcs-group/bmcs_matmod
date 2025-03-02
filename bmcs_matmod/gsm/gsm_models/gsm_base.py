@@ -4,6 +4,8 @@ from traits.api import \
     HasTraits, Property, cached_property, \
     Instance
 
+from IPython.display import display, Math
+
 from bmcs_matmod.api import GSMMPDP
 
 """
@@ -62,6 +64,49 @@ class GSMBase(HasTraits):
             F_expr=G_,
             dF_sign=-1,
             f_expr=F_gsm.f_expr,
-            phi_ext_expr=F_gsm.phi_ext_expr
+            phi_ext_expr=F_gsm.phi_ext_expr,
+            h_k=F_gsm.h_k
         )
         return G_gsm
+
+    def print_potentials(self, name):
+        print('=============================================')
+        print(f'class {name}')
+        print('=============================================')
+        print(f'Helmholtz')
+        display(Math(r'F =' + sp.latex(sp.simplify(self.F_engine.F_expr))))
+        display(self.F_engine.subs_Sig_Eps)
+        print(f'Gibbs')
+        display(Math(r'G =' + sp.latex(sp.simplify(self.G_engine.F_expr))))
+        display(self.G_engine.subs_Sig_Eps)
+        (gamma_mech, L_, dL_dS_, dL_dS_A_, dR_dA_n1), (eps_n, delta_eps, Eps_n, delta_A, delta_t, Ox, Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI = self.F_engine.Sig_f_R_dR_n1
+        print(f'Mechanical dissipation')
+        display(Math(r'\gamma_{\mathrm{mech}} = ' + sp.latex(sp.simplify(gamma_mech))))
+        print(f'Lagrangian')
+        display(Math(r'L =' + sp.latex(L_)))
+        print(f'Residuum')
+        display(Math(r'\frac{\partial L}{\partial S} =' + sp.latex(dL_dS_) + ' = 0'))
+
+
+    def latex_potentials(self, name):
+        """
+        Returns a KaTeX-friendly string with minimal LaTeX commands.
+        """
+        (gamma_mech, L_, dL_dS_, _, _), _, _, _, _, _ = self.F_engine.Sig_f_R_dR_n1
+
+        latex_lines = []
+        latex_lines.append("## class " + name)
+        latex_lines.append("### Helmholtz free energy")
+        latex_lines.append("$$F = " + sp.latex(sp.simplify(self.F_engine.F_expr)) + "$$")
+        latex_lines.append("$$" + sp.latex(self.F_engine.subs_Sig_Eps) + "$$")
+        latex_lines.append("### Gibbs free energy")
+        latex_lines.append("$$G = " + sp.latex(sp.simplify(self.G_engine.F_expr)) + "$$")
+        latex_lines.append("$$" + sp.latex(self.G_engine.subs_Sig_Eps) + "$$")
+        latex_lines.append("### Mechanical dissipation")
+        latex_lines.append("$$\\gamma_{\\mathrm{mech}} = " + sp.latex(sp.simplify(gamma_mech)) + "$$")
+        latex_lines.append("### Lagrangian")
+        latex_lines.append("$$\mathcal{L} = " + sp.latex(L_) + "$$")
+        latex_lines.append("### Residuum")
+        latex_lines.append("$$\\frac{\\partial \mathcal{L}}{\\partial \mathcal{S}} = " + sp.latex(dL_dS_) + " = 0$$")
+
+        return "\n".join(latex_lines)
