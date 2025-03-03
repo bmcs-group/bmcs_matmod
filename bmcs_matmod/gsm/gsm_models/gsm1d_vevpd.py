@@ -49,7 +49,7 @@ class GSM1D_VEVPD(GSMBase):
 
     # ## Free energy potential
     eps_el = eps - eps_v - eps_p
-    U_e_ = sp.Rational(1,2) * (1 - omega) * E * eps_el**2 + sp.Rational(1,2) * z**2
+    U_e_ = sp.Rational(1,2) * (1 - omega) * E * eps_el**2
     U_p_ =  sp.Rational(1,2) * K * z**2
     F_ = U_e_ + U_p_
 
@@ -82,4 +82,5 @@ class GSM1D_VEVPD(GSMBase):
     
     F_engine.phi_ext_expr = F_engine.dot_eps * (1 - omega)**c * (S/(r+1)) * (Y / S)**(r+1)
 
+    F_engine.dot_Eps_bounds_expr = -(sp.Abs(F_engine.dot_eps) - sp.Abs(dot_eps_ve))
 

@@ -74,5 +74,7 @@ class GSM1D_VEVP(GSMBase):
     sig_ve = F_engine.Sig[0, 0]
     F_engine.h_k = [eta_ve * dot_eps_ve - sig_ve]
 
+    F_engine.dot_Eps_bounds_expr = -(sp.Abs(F_engine.dot_eps) - sp.Abs(dot_eps_ve))
+
 
 

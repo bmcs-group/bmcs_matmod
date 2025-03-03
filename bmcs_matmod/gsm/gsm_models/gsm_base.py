@@ -108,5 +108,7 @@ class GSMBase(HasTraits):
         latex_lines.append("$$\mathcal{L} = " + sp.latex(L_) + "$$")
         latex_lines.append("### Residuum")
         latex_lines.append("$$\\frac{\\partial \mathcal{L}}{\\partial \mathcal{S}} = " + sp.latex(dL_dS_) + " = 0$$")
-
+        if self.F_engine.dot_Eps_bounds_expr is not sp.S.Zero:
+            latex_lines.append("### Bounds of inelastic process")
+            latex_lines.append("$$" + sp.latex(self.F_engine.dot_Eps_bounds_expr) + " \leq 0$$")
         return "\n".join(latex_lines)
