@@ -107,16 +107,21 @@ class GSMMPDP(tr.HasTraits):
     For Helmholtz free energy it is negative, for the Gibbs free energy it is positive
     """
 
-    f_expr = tr.Any(sp.S.Zero) 
-    """Threshold function delineating the reversible and reversible state 
-    domains. The function can consist of subdomains within the state space
-    domain. 
+    dot_Eps_bounds_expr = tr.Any(sp.S.Zero) 
+    """Constraint specifying admissible bounds of internal variables in form of inequalities  
     """
 
     phi_ext_expr = tr.Any(sp.S.Zero)
     """Extension of the threshold function detailing the trajectories
     within the state domain that govern the irreversible state evolution   
     """ 
+
+    f_expr = tr.Any(sp.S.Zero) 
+    """Threshold function delineating the reversible and reversible state 
+    domains. The function can consist of subdomains within the state space
+    domain. 
+    """
+
 
     d_t = sp.Symbol(r'\mathrm{d}t', real=True)
     """Time increment
@@ -347,6 +352,30 @@ class GSMMPDP(tr.HasTraits):
 
     
     ######################################
+
+    def get_dot_Eps_bounds(self, dot_eps, dot_Eps, *args):
+        """
+        """
+        # args = [m_params[p] for p in self.m_params]
+    
+        dot_eps_sp_ = np.moveaxis(np.atleast_1d(dot_eps), -1, 0)
+        dot_Eps_sp_ = np.moveaxis(dot_Eps, -1, 0)
+        dot_Eps_bounds_sp = self._dot_Eps_bounds_lambdified(dot_eps_sp_, dot_Eps_sp_, *args)
+        return np.moveaxis(dot_Eps_bounds_sp, 0, -1)
+    
+    _dot_Eps_bounds_lambdified = tr.Property()
+    @tr.cached_property
+    def _get__dot_Eps_bounds_lambdified(self):
+        return sp.lambdify((self.dot_eps, 
+                            self.dot_Eps.as_explicit()) + self.m_params + ('*args',), 
+                           self.dot_Eps_bounds_, numpy_dirac, cse=True)
+
+    dot_Eps_bounds_ = tr.Property()
+    @tr.cached_property
+    def _get_dot_Eps_bounds_(self):
+        return self.dot_Eps_bounds_expr
+
+    ######################################
     def get_Sig(self, eps, Eps, *args):
         """
         Calculates the stress based on the given inputs.
@@ -423,7 +452,7 @@ class GSMMPDP(tr.HasTraits):
         Eps_n_sp_ = np.moveaxis(Eps_n, -1, 0)
         Sig_sp_, f_sp_, R_sp_, d_R_sp_ = self._get_Sig_f_R_dR_n1_lambdified(eps_n_sp_, d_eps_sp_, Eps_n_sp_, d_A_sp_, d_t, O_, I_, *args)
         if self.phi_ == sp.S.Zero:
-            f_sp_ = np.zeros_like(eps_n_sp_)
+            f_sp_ = -np.ones_like(eps_n_sp_)
         Sig_sp_ = Sig_sp_.reshape(Eps_n_sp_.shape)
         return np.moveaxis(Sig_sp_, 0, -1), np.moveaxis(f_sp_, 0, -1), np.moveaxis(R_sp_[:, 0], 0, -1), np.moveaxis(d_R_sp_, (0, 1), (-2, -1))
 
@@ -595,8 +624,6 @@ class GSMMPDP(tr.HasTraits):
         tol = 1e-8
         k_I = np.zeros((n_I,), dtype=np.int_)
         d_A = np.zeros((n_I, self.n_Eps + self.n_Lam + self.n_lam), dtype=np.float64)
-        d_A[..., self.n_Eps:] = 0.01
-#        d_A[..., :] = 0.01
         # print(f'eps_n {eps_n}, d_eps {d_eps}, Eps_n {Eps_n}, d_A {d_A}, d_t {d_t}')
         # print(f'args {args}')
         Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(
@@ -609,23 +636,32 @@ class GSMMPDP(tr.HasTraits):
 
         # Inelastic state update - only qn inequality constraint is present
         if self.n_lam > 0:
+            # print('Inelastic state update')
             for k in range(k_max):
                 if np.all(I == False):
                     break
                 try:
                     d_A[I] += np.linalg.solve(dR_dA_n1[I], -R_n1[I][..., np.newaxis])[..., 0]
+                    # print(f'd_A {d_A}')
                 except np.linalg.LinAlgError as e:
                     print("SingularMatrix encountered in dR_dA_n1[I]:", dR_dA_n1[I])
                     print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
                     raise
                 d_A[I,-1] = np.maximum(0, d_A[I,-1])
+                # print(f'eps_n {eps_n}, d_eps {d_eps}, Eps_n {Eps_n}, d_A {d_A}, d_t {d_t}')
                 Sig_n1[I], f_n1[I], R_n1[I], dR_dA_n1[I] = self.get_Sig_f_R_dR_n1(eps_n[I], d_eps[I], Eps_n[I], d_A[I], d_t, *args)
+                # print(f'f_n1 {f_n1}, R_n1 {R_n1}, dR_dA_n1 {dR_dA_n1}')
                 norm_R_n1 = np.linalg.norm(R_n1, axis=-1)
                 I[norm_R_n1 <= tol] = False
                 k_I[I] += 1
 
+            # If internal variables are out of bounds set the inelastic state to elastic
+            if self.dot_Eps_bounds_expr != sp.S.Zero:
+                I_el[self.get_dot_Eps_bounds(d_eps, d_A[..., :self.n_Eps], *args) > 0] = True
+
         # Elastic state update
         if self.n_Lam > 0:
+            # print('Elastic state update')
             for k in range(k_max):
                 if np.all(I_el == False):
                     break
@@ -637,13 +673,15 @@ class GSMMPDP(tr.HasTraits):
                         d_A[I_el, i1] = 0
                     # Replace the nested indexing d_A[I_el][...,:i1] with a single bracket expression that
                     # applies the boolean mask and the slice in one operation:
-                    dd_A_I_el = np.linalg.solve(dR_dA_n1[I_el, :i1, :i1], -R_n1[I_el, :i1, np.newaxis])[..., 0]
-                    d_A[I_el, :i1] += dd_A_I_el
+                    d_A[I_el, :i1] -= np.linalg.solve(dR_dA_n1[I_el, :i1, :i1], R_n1[I_el, :i1, np.newaxis])[..., 0]
+                    # print(f'd_A {d_A}')
                 except np.linalg.LinAlgError as e:
                     print("SingularMatrix encountered in dR_dA_n1[I]:", dR_dA_n1[I_el])
                     print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
                     raise
+                # print(f'eps_n {eps_n}, d_eps {d_eps}, Eps_n {Eps_n}, d_A {d_A}, d_t {d_t}')
                 Sig_n1[I_el], f_n1[I_el], R_n1[I_el], dR_dA_n1[I_el] = self.get_Sig_f_R_dR_n1(eps_n[I_el], d_eps[I_el], Eps_n[I_el], d_A[I_el], d_t, *args)
+                # print(f'f_n1 {f_n1}, R_n1 {R_n1}, dR_dA_n1 {dR_dA_n1}')
                 norm_R_n1 = np.linalg.norm(R_n1[...,:i1], axis=-1)
                 I_el[norm_R_n1 <= tol] = False
                 k_I[I_el] += 1
