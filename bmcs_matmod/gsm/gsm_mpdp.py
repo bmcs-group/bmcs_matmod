@@ -638,13 +638,11 @@ class GSMMPDP(tr.HasTraits):
                 if np.all(I == False):
                     break
                 try:
-                    d_A[I] += np.linalg.solve(dR_dA_n1[I], -R_n1[I][..., np.newaxis])[..., 0]
-                    # print(f'd_A {d_A}')
+                    d_A[I] -= np.linalg.solve(dR_dA_n1[I], R_n1[I][..., np.newaxis])[..., 0]
                 except np.linalg.LinAlgError as e:
                     print("SingularMatrix encountered in dR_dA_n1[I]:", dR_dA_n1[I])
                     print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
                     raise
-                d_A[I,-1] = np.maximum(0, d_A[I,-1])
                 # print(f'eps_n {eps_n}, d_eps {d_eps}, Eps_n {Eps_n}, d_A {d_A}, d_t {d_t}')
                 Sig_n1[I], f_n1[I], R_n1[I], dR_dA_n1[I] = self.get_Sig_f_R_dR_n1(eps_n[I], d_eps[I], Eps_n[I], d_A[I], d_t, *args)
                 # print(f'f_n1 {f_n1}, R_n1 {R_n1}, dR_dA_n1 {dR_dA_n1}')
@@ -678,10 +676,9 @@ class GSMMPDP(tr.HasTraits):
                     raise
                 # print(f'eps_n {eps_n}, d_eps {d_eps}, Eps_n {Eps_n}, d_A {d_A}, d_t {d_t}')
                 Sig_n1[I_el], f_n1[I_el], R_n1[I_el], dR_dA_n1[I_el] = self.get_Sig_f_R_dR_n1(eps_n[I_el], d_eps[I_el], Eps_n[I_el], d_A[I_el], d_t, *args)
-                # print(f'f_n1 {f_n1}, R_n1 {R_n1}, dR_dA_n1 {dR_dA_n1}')
                 norm_R_n1 = np.linalg.norm(R_n1[...,:i1], axis=-1)
-                I_el[norm_R_n1 <= tol] = False
                 k_I[I_el] += 1
+                I_el[norm_R_n1 <= tol] = False
 
         lam_k = d_A[..., self.n_Eps:]
         Eps_n1 = Eps_n + d_A[..., :self.n_Eps]

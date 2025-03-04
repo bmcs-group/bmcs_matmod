@@ -103,9 +103,14 @@ class GSMBase(HasTraits):
         )
         return G_gsm
 
-    def print_potentials(self, name):
+    name = Property(tr.Str)
+    
+    def _get_name(self):
+        return self.__class__.__name__
+
+    def print_potentials(self):
         print('=============================================')
-        print(f'class {name}')
+        print(f'class {self.name}')
         print('=============================================')
         print(f'Helmholtz')
         display(Math(r'F =' + sp.latex(sp.simplify(self.F_engine.F_expr))))
@@ -122,14 +127,14 @@ class GSMBase(HasTraits):
         display(Math(r'\frac{\partial L}{\partial S} =' + sp.latex(dL_dS_) + ' = 0'))
 
 
-    def latex_potentials(self, name):
+    def latex_potentials(self):
         """
         Returns a KaTeX-friendly string with minimal LaTeX commands.
         """
         (gamma_mech, L_, dL_dS_, _, _), _, _, _, _, _ = self.F_engine.Sig_f_R_dR_n1
 
         latex_lines = []
-        latex_lines.append("## class " + name)
+        latex_lines.append("## class " + self.name)
         latex_lines.append("### Helmholtz free energy")
         latex_lines.append("$$F = " + sp.latex(sp.simplify(self.F_engine.F_expr)) + "$$")
         latex_lines.append("$$" + sp.latex(self.F_engine.subs_Sig_Eps) + "$$")

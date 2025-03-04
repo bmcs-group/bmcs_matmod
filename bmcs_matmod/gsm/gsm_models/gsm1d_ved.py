@@ -41,7 +41,7 @@ class GSM1D_VED(GSMBase):
 
     # ## Free energy potential
     eps_el = eps - eps_v
-    U_e_ = sp.Rational(1,2) * (1 - omega) * E * eps_el**2 + sp.Rational(1,2) * z**2
+    U_e_ = sp.Rational(1,2) * (1 - omega) * E * eps_el**2 + sp.Rational(1,2) * z**2 / E
     F_ = U_e_
 
     F_engine = GSMMPDP(
