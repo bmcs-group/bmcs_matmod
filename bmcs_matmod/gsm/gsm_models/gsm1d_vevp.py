@@ -15,6 +15,8 @@ class GSM1D_VEVP(GSMBase):
 
 
     mparams = (E, K, f_c, eta_vp, eta_ve)
+    m_param_codenames = {f_c: 'f_c', eta_vp: 'eta_vp', eta_ve: 'eta_ve'}
+
 
     # ## External state variables
 

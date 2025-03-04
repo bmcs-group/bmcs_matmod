@@ -36,6 +36,8 @@ class GSM1D_ED(GSMBase):
     U_e_ = sp.Rational(1,2) * (1 - omega) * E * eps_el**2 + sp.Rational(1,2) * z**2
     F_ = U_e_
 
+    m_param_codenames = {eps_0: 'eps_0'}
+
     F_engine = GSMMPDP(
         name = 'gsm_F_1d_mpdp_ed',
         u_vars = eps_a,

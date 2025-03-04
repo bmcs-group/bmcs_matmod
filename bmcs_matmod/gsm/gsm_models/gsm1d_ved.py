@@ -13,6 +13,8 @@ class GSM1D_VED(GSMBase):
     eta_ve = sp.Symbol(r'\eta_\mathrm{ve}', real=True, nonnegative=True)
     eps_0 = sp.Symbol(r'\varepsilon_0', real=True, positive=True)
 
+    m_param_codenames = {eta_ve: 'eta_ve', eps_0: 'eps_0'}
+
     # ## External state variables
 
     eps = sp.Symbol(r'\varepsilon', real=True)

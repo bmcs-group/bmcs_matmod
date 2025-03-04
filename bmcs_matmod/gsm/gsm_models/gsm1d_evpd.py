@@ -8,15 +8,16 @@ class GSM1D_EVPD(GSMBase):
     """
 
 
-    E = sp.Symbol(r'E', codename='E_', real=True, nonnegative=True)
-    K = sp.Symbol(r'K', codename='K_', real=True)
+    E = sp.Symbol(r'E', real=True, nonnegative=True)
+    K = sp.Symbol(r'K', real=True)
     S = sp.Symbol(r'S', real=True, nonnegative=True)
     c = sp.Symbol(r'c', real=True, nonnegative=True)
     r = sp.Symbol(r'r', real=True, nonnegative=True)
-    f_c = sp.Symbol(r'f_\mathrm{c}', codename='f_c_')
+    f_c = sp.Symbol(r'f_\mathrm{c}')
     eta_vp = sp.Symbol(r'\eta_\mathrm{vp}', real=True, nonnegative=True)
 
     mparams = (E, K, f_c, S, c, r, eta_vp)
+    m_param_codenames = {f_c: 'f_c', eta_vp: 'eta_vp'}
 
     # ## External state variables
 

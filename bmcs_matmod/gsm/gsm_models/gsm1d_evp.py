@@ -10,9 +10,11 @@ class GSM1D_EVP(GSMBase):
     E = sp.Symbol(r'E', real=True, nonnegative=True)
     K = sp.Symbol(r'K', real=True)
     f_c = sp.Symbol(r'f_\mathrm{c}')
-    eta = sp.Symbol(r'\eta_\mathrm{vp}', real=True, nonnegative=True)
+    eta_vp = sp.Symbol(r'\eta_\mathrm{vp}', real=True, nonnegative=True)
 
-    mparams = (E, K, f_c, eta)
+    mparams = (E, K, f_c, eta_vp)
+    m_param_codenames = {f_c: 'f_c', eta_vp: 'eta_vp'}
+
 
     # ## External state variables
 
@@ -62,6 +64,6 @@ class GSM1D_EVP(GSMBase):
     )
 
     dot_eps_p = F_engine.dot_Eps[0,0]
-    f_d_ = F_engine.f_expr - eta * dot_eps_p
+    f_d_ = F_engine.f_expr - eta_vp * dot_eps_p
     F_engine.f_expr = f_d_
 

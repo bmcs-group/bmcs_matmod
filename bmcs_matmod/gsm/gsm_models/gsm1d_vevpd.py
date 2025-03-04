@@ -17,6 +17,8 @@ class GSM1D_VEVPD(GSMBase):
     eta_ve = sp.Symbol(r'\eta_\mathrm{ve}', real=True, nonnegative=True)
 
     mparams = (E, K, f_c, S, c, r, eta_vp, eta_ve)
+    m_param_codenames = {f_c: 'f_c', eta_vp: 'eta_vp', eta_ve: 'eta_ve'}
+
 
     # ## External state variables
 

@@ -35,6 +35,8 @@ class GSM1D_VE(GSMBase):
     Sig_vars = (sig_v_a,)
     Sig_signs =  (-1,)
 
+    m_param_codenames = {eta_ve: 'eta_ve'}
+
     F_engine = GSMMPDP(
         name = 'gsm_F_1d_mpdp_ve',
         diff_along_rates = False,

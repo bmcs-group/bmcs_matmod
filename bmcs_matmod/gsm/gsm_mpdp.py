@@ -284,7 +284,7 @@ class GSMMPDP(tr.HasTraits):
 
     ######################################
 
-    def get_sig(self, eps, Eps, m_params):
+    def get_sig(self, eps, Eps, *args):
         """
         Calculates the displacement for a given stress level
 
@@ -298,8 +298,6 @@ class GSMMPDP(tr.HasTraits):
         Returns:
             Calculated displacement for a stress level and control stress.
         """
-        args = [m_params[p] for p in self.m_params]
-
         eps_sp_ = np.moveaxis(np.atleast_1d(eps), -1, 0)
         Eps_sp_ = np.moveaxis(Eps, -1, 0)
         sig_sp_ = self._sig_lambdified(eps_sp_, Eps_sp_, *args)
@@ -356,8 +354,7 @@ class GSMMPDP(tr.HasTraits):
     def get_dot_Eps_bounds(self, dot_eps, dot_Eps, *args):
         """
         """
-        # args = [m_params[p] for p in self.m_params]
-    
+   
         dot_eps_sp_ = np.moveaxis(np.atleast_1d(dot_eps), -1, 0)
         dot_Eps_sp_ = np.moveaxis(dot_Eps, -1, 0)
         dot_Eps_bounds_sp = self._dot_Eps_bounds_lambdified(dot_eps_sp_, dot_Eps_sp_, *args)
@@ -600,7 +597,9 @@ class GSMMPDP(tr.HasTraits):
     
     ######################################
 
-    def get_state_n1(self, eps_n, d_eps, d_t, Eps_n, m_params, k_max):
+    k_max = tr.Int(10)
+
+    def get_state_n1(self, eps_n, d_eps, d_t, Eps_n, *args):
         """
         Calculates the state at time n+1 based on the given inputs using an iterative algorithm.
 
@@ -618,8 +617,6 @@ class GSMMPDP(tr.HasTraits):
             Tuple containing the updated strain Eps_k, stress Sig_k, temperature T_n+1, number of iterations k, 
             and dissipation rate gradient dDiss_dEps.
         """
-        args = [m_params[p] for p in self.m_params]
-
         n_I = np.atleast_1d(eps_n).shape[0]
         tol = 1e-8
         k_I = np.zeros((n_I,), dtype=np.int_)
@@ -637,7 +634,7 @@ class GSMMPDP(tr.HasTraits):
         # Inelastic state update - only qn inequality constraint is present
         if self.n_lam > 0:
             # print('Inelastic state update')
-            for k in range(k_max):
+            for k in range(self.k_max):
                 if np.all(I == False):
                     break
                 try:
@@ -662,7 +659,7 @@ class GSMMPDP(tr.HasTraits):
         # Elastic state update
         if self.n_Lam > 0:
             # print('Elastic state update')
-            for k in range(k_max):
+            for k in range(self.k_max):
                 if np.all(I_el == False):
                     break
                 try:
@@ -691,62 +688,7 @@ class GSMMPDP(tr.HasTraits):
 
         return Eps_n1, Sig_n1, lam_k, k_I
 
-    def get_state_n1x(self, eps_n, d_eps, d_t, Eps_n, k_max, *args):
-        """
-        Calculates the state at time n+1 based on the given inputs using an iterative algorithm.
-
-        Args:
-            eps_n: strain at time n.
-            d_eps: strain increment from time n to n+1.
-            T_n: Temperature at time n.
-            dt: Time step size.
-            Sig_n: Stress at time n.
-            Eps_n: Strain at time n.
-            k_max: Maximum number of iterations.
-            *args: Additional arguments.
-
-        Returns:
-            Tuple containing the updated strain Eps_k, stress Sig_k, temperature T_n+1, number of iterations k, 
-            and dissipation rate gradient dDiss_dEps.
-        """
-        n_I = np.atleast_1d(eps_n).shape[0]
-        d_A = np.zeros((n_I, self.n_Eps + self.n_Lam + self.n_lam), dtype=np.float64)
-        tol = 1e-8
-        k_I = np.zeros((n_I,), dtype=np.int_)
-        Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(eps_n, d_eps, Eps_n, d_A, d_t, *args)
-        # Distinguish the models containing equality constraint and an inequality constraint.
-        # This case is currently not handled properly because the fulfillment of inequality constraint 
-        # inhibits the evaluation of hte equality constraint. 
-        # In such cases the I is set to True and the iteration is stopped. 
-        #I_inel = np.ones_like(f_n1, dtype=np.bool_) 
-        I_inel = f_n1 > 0
-        I = np.copy(I_inel)
-    
-        for k in range(k_max):
-            if np.all(I == False):
-                break
-            # Since numpy version 2.0 np.linalg.solve conducts the stacked evaluation only if the right-hand side
-            # has the shape (..., n, k) where n is the number of equations and k is the number of right-hand sides.
-            # Therefore, the extension and reduction of the last dimension is necessary. 
-            try:
-                d_A[I] += np.linalg.solve(dR_dA_n1[I], -R_n1[I][..., np.newaxis])[..., 0]
-            except np.linalg.LinAlgError as e:
-                print("SingularMatrix encountered in dR_dA_n1[I]:", dR_dA_n1[I])
-                print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
-                raise
-            Sig_n1[I], f_n1[I], R_n1[I], dR_dA_n1[I] = self.get_Sig_f_R_dR_n1(eps_n[I], d_eps[I], Eps_n[I], d_A[I], d_t, *args)
-            k_I[I] += 1
-            # This contains redundancy - only the inelastic strains need to be considered.
-            # However, the implementation is kept simple for now.
-            norm_R_n1 = np.linalg.norm(R_n1, axis=-1)
-            I[norm_R_n1 <= tol] = False
-
-        lam_k = d_A[..., self.n_Eps:]
-        Eps_n1 = np.where(I_inel[:, np.newaxis], Eps_n + d_A[..., :self.n_Eps], Eps_n)
-
-        return Eps_n1, Sig_n1, lam_k, k_I
-
-    def get_response(self, eps_ta, t_t, m_params={}, k_max=20):
+    def get_response(self, eps_ta, t_t, *args):
         """Time integration procedure 
 
         TODO - consider the stacked evaluation of the response - include the naming of the variables 
@@ -775,7 +717,7 @@ class GSMMPDP(tr.HasTraits):
             print('increment', n+1, end='\r')
             try:
                 Eps_n1, Sig_n1, lam_n1, k = self.get_state_n1(
-                    eps_ta[n], d_eps_ta[n], dt, Eps_n1, m_params, k_max
+                    eps_ta[n], d_eps_ta[n], dt, Eps_n1, *args
                 )
             except RuntimeError as e:
                 print(f'{n+1}({k}) ... {str(e)}', end='\r')
@@ -790,7 +732,7 @@ class GSMMPDP(tr.HasTraits):
         lam_t = np.array(lam_record,dtype=np.float64)
         n_t = len(Eps_t)
         eps_ta = eps_ta[:n_t]
-        sig_ta = self.get_sig(eps_ta[..., np.newaxis], Eps_t, m_params)
+        sig_ta = self.get_sig(eps_ta[..., np.newaxis], Eps_t, *args)
 
         return (t_t[:n_t], eps_ta, sig_ta, Eps_t, Sig_t, iter_t, 
                 lam_t, (d_t_t[:n_t], d_eps_ta[:n_t]))

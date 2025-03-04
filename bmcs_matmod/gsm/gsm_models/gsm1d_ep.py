@@ -12,6 +12,7 @@ class GSM1D_EP(GSMBase):
     f_c = sp.Symbol(r'f_\mathrm{c}')
 
     mparams = (E, K, f_c)
+    m_param_codenames = {f_c: 'f_c'}
 
     # ## External state variables
 
