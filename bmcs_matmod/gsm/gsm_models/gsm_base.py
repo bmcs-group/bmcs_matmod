@@ -177,3 +177,20 @@ class GSMBase(HasTraits):
         """Calculate the thermodynamic forces for the given strain and internal variables."""
         args = self.get_args(**kwargs)
         return self.F_engine.get_Sig(eps, Eps, *args)
+
+    ### Gibbs free energy based solver
+    
+    def get_G_eps(self, sig, Eps, **kwargs):
+        """Calculate the strain for the given stress and internal variables."""
+        args = self.get_args(**kwargs)
+        return self.G_engine.get_sig(sig, Eps, *args)
+
+    def get_G_response(self, sig, Eps, **kwargs):
+        """Calculate the strain and internal variables for the given stress."""
+        args = self.get_args(**kwargs)
+        return self.G_engine.get_response(sig, Eps, *args)
+
+    def get_G_Sig(self, sig, Eps, **kwargs):
+        """Calculate the thermodynamic forces for the given stress and internal variables."""
+        args = self.get_args(**kwargs)
+        return self.G_engine.get_Sig(sig, Eps, *args)
