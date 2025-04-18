@@ -5,9 +5,9 @@ from traits.api import \
     HasTraits, Property, cached_property, \
     Instance
 
-from IPython.display import display, Math
+from IPython.display import display, Math, Markdown
 
-from bmcs_matmod.api import GSMMPDP
+from .gsm_mpdp import GSMMPDP
 
 """
 Framework for GSM-based material models.
@@ -151,6 +151,12 @@ class GSMBase(HasTraits):
             latex_lines.append("### Bounds of inelastic process")
             latex_lines.append("$$" + sp.latex(self.F_engine.dot_Eps_bounds_expr) + " \leq 0$$")
         return "\n".join(latex_lines)
+
+    def markdown(self):
+        """
+        Returns a markdown string with minimal LaTeX commands.
+        """
+        return Markdown(self.latex_potentials())
 
     def get_args(self, **kwargs):
         """Convert keyword parameters to args."""

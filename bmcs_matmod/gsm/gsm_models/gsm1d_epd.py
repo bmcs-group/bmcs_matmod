@@ -1,6 +1,6 @@
 import sympy as sp
 from .gsm_base import GSMBase
-from bmcs_matmod.api import GSMMPDP
+from .gsm_mpdp import GSMMPDP
 
 class GSM1D_EPD(GSMBase):
     """Single variable one-dimensional potential that can be used to demonstrate the
