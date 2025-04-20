@@ -64,6 +64,6 @@ class GSM1D_EVP(GSMBase):
     )
 
     dot_eps_p = F_engine.dot_Eps[0,0]
-    f_d_ = F_engine.f_expr - eta_vp * dot_eps_p
+    f_d_ = F_engine.f_expr - eta_vp * sp.Abs(dot_eps_p)
     F_engine.f_expr = f_d_
 

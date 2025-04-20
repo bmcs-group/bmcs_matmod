@@ -8,12 +8,12 @@ class GSM1D_EVPD(GSMBase):
     """
 
 
-    E = sp.Symbol(r'E', real=True, nonnegative=True)
-    K = sp.Symbol(r'K', real=True)
-    S = sp.Symbol(r'S', real=True, nonnegative=True)
-    c = sp.Symbol(r'c', real=True, nonnegative=True)
-    r = sp.Symbol(r'r', real=True, nonnegative=True)
-    f_c = sp.Symbol(r'f_\mathrm{c}')
+    E = sp.Symbol(r'E', real=True, positive=True)
+    K = sp.Symbol(r'K', real=True, positive=True)
+    S = sp.Symbol(r'S', real=True, positive=True)
+    c = sp.Symbol(r'c', real=True, positive=True)
+    r = sp.Symbol(r'r', real=True, positive=True)
+    f_c = sp.Symbol(r'f_\mathrm{c}', positive=True, real=True)
     eta_vp = sp.Symbol(r'\eta_\mathrm{vp}', real=True, nonnegative=True)
 
     mparams = (E, K, f_c, S, c, r, eta_vp)
@@ -33,7 +33,7 @@ class GSM1D_EVPD(GSMBase):
     sig_p = sp.Symbol(r'\sigma^\mathrm{p}', codename='sig_p_', real=True)
     sig_p_a = sp.Matrix([sig_p])
 
-    omega = sp.Symbol(r'\omega', real=True)
+    omega = sp.Symbol(r'\omega', nonnegative=True, real=True)
     omega_a = sp.Matrix([omega])
     Y = sp.Symbol(r'Y', real=True)
     Y_a = sp.Matrix([Y])
@@ -56,7 +56,6 @@ class GSM1D_EVPD(GSMBase):
     Sig_vars = (sig_p_a, Y_a, Z_a)
     Sig_signs =  (-1, -1, 1)
 
-
     F_engine = GSMMPDP(
         name = 'gsm_F_1d_mpdp_evpd_lih',
         u_vars = eps_a,
@@ -67,10 +66,23 @@ class GSM1D_EVPD(GSMBase):
         Sig_signs = Sig_signs,
         F_expr = F_,
         f_expr = f_,
-        phi_ext_expr = (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)
     )
+
     dot_eps_p_ = F_engine.dot_Eps[0, 0]
+    dot_ez_ = F_engine.dot_Eps[2, 0]
+    dot_eps_ = F_engine.dot_eps
+    dot_eps_e_ = dot_eps_ - dot_eps_p_
     sig_p_ = F_engine.Sig[0, 0]
-    f_d_ = F_engine.f_expr - eta_vp * dot_eps_p_
+
+    stacked_matrix = sp.Matrix.vstack(F_engine.u_vars, F_engine.Eps.as_explicit())
+    dot_stacked_matrix = sp.Matrix.vstack(sp.Matrix([[F_engine.dot_eps]]), F_engine.dot_Eps.as_explicit())
+    dot_f_ = (F_engine.f_expr.subs(F_engine.subs_Sig_Eps).diff(stacked_matrix).T * dot_stacked_matrix)[0,0]  
+
+#    dot_f_ = E * (dot_eps_ - dot_eps_p_) - K * dot_z_
+
+    f_d_ = F_engine.f_expr - eta_vp * sp.sqrt(dot_eps_p_**2) 
     F_engine.f_expr = f_d_
-    F_engine.phi_ext_expr = F_engine.dot_eps * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)
+#    F_engine.phi_ext_expr = sp.Heaviside(dot_eps_e_) * dot_eps_ * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)
+
+    F_engine.phi_ext_expr = sp.Heaviside(dot_f_) * sp.Abs(dot_eps_) * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)
+

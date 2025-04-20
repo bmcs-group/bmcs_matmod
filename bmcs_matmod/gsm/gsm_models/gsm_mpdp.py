@@ -140,7 +140,7 @@ class GSMMPDP(tr.HasTraits):
         if self.phi_ == sp.S.Zero:
             return ([], sp.S.Zero, sp.S.Zero)
         lam_phi = sp.Symbol(r'\lambda_{\mathrm{\phi}}', real=True)
-        return ([lam_phi], lam_phi * self.phi_, self.f_expr )
+        return ([lam_phi], lam_phi * (-self.phi_), self.f_expr )
 
     n_lam = tr.Property()
 
@@ -621,11 +621,11 @@ class GSMMPDP(tr.HasTraits):
         tol = 1e-8
         k_I = np.zeros((n_I,), dtype=np.int_)
         d_A = np.zeros((n_I, self.n_Eps + self.n_Lam + self.n_lam), dtype=np.float64)
-        # print(f'eps_n {eps_n}, d_eps {d_eps}, Eps_n {Eps_n}, d_A {d_A}, d_t {d_t}')
+        # print(f'eps_n {eps_n}, d_eps {d_eps},\n Eps_n {Eps_n},\n d_A {d_A},\n d_t {d_t}')
         # print(f'args {args}')
         Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(
             eps_n, d_eps, Eps_n, d_A, d_t, *args)
-        # print(f'f_n1 {f_n1}, R_n1 {R_n1}, dR_dA_n1 {dR_dA_n1}')
+        # print(f'f_n1 {f_n1},\n R_n1 {R_n1}')
 
         I = f_n1 >= 0
         I_inel = np.copy(I)
@@ -683,6 +683,7 @@ class GSMMPDP(tr.HasTraits):
         lam_k = d_A[..., self.n_Eps:]
         Eps_n1 = Eps_n + d_A[..., :self.n_Eps]
 
+        # print(f'd_A {d_A}')
         return Eps_n1, Sig_n1, lam_k, k_I
 
     def get_response(self, eps_ta, t_t, *args):
@@ -711,7 +712,9 @@ class GSMMPDP(tr.HasTraits):
         lam_record = [lam_n1]
 
         for n, dt in enumerate(d_t_t):
+            # print('===============================================')
             print('increment', n+1, end='\r')
+            # print(f'eps_ta[n] {eps_ta[n]}, d_eps_ta[n] {d_eps_ta[n]}, d_t_t {dt}')
             try:
                 Eps_n1, Sig_n1, lam_n1, k = self.get_state_n1(
                     eps_ta[n], d_eps_ta[n], dt, Eps_n1, *args

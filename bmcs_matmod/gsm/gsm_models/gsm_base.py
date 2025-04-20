@@ -61,9 +61,9 @@ class GSMBase(HasTraits):
 
     # Symbolic attributes (to be defined in subclasses)
 
-    F_engine = Instance(sp.Expr)
+    F_engine = Instance(GSMMPDP)
 
-    G_engine = Property(Instance(sp.Expr), depends_on='F_engine')
+    G_engine = Property(Instance(GSMMPDP), depends_on='F_engine')
     """
     Transform Helmholtz free energy (F_expr) into Gibbs free energy (G_expr)
     using the Legendre transform. Override in subclass if needed.
@@ -73,18 +73,18 @@ class GSMBase(HasTraits):
         F_gsm = self.F_engine
         eps_a = self.eps_a
         sig_a = self.sig_a
-        dF_du = F_gsm.F_expr.diff(eps_a)
-        u_sig_ = sp.Matrix(
+        dF_deps = F_gsm.F_expr.diff(eps_a)
+        eps_sig_ = sp.Matrix(
             [
-            sp.solve(sp.Eq(sig_i, dF_du_i), u_i)[0]
-            for sig_i, u_i, dF_du_i in zip(sig_a, eps_a, dF_du)
+            sp.solve(sp.Eq(sig_i, dF_deps_i), eps_i)[0]
+            for sig_i, eps_i, dF_deps_i in zip(sig_a, eps_a, dF_deps)
             ]
         )
-        subs_u_sig_ = dict(zip(eps_a, u_sig_))
+        subs_u_sig_ = dict(zip(eps_a, eps_sig_))
 
-        sig_x_u_ = (sig_a.T * eps_a)[0]
-        G_expr = sig_x_u_ - F_gsm.F_expr
-        G_ = sp.simplify(G_expr.subs(subs_u_sig_))
+        sig_x_eps_ = (sig_a.T * eps_a)[0]
+        G_expr = sig_x_eps_ - F_gsm.F_expr
+        G_ = sp.simplify(G_expr.subs(subs_eps_sig_))
 
         G_gsm = GSMMPDP(
             name=f'G_{F_gsm.name}',
