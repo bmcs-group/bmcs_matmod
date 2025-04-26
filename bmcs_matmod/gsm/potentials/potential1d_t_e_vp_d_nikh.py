@@ -138,30 +138,48 @@ class Potential1D_T_E_VP_D_NIKH_SymbExpr(SymbExpr):
             Tuple of signs for the conjugate forces.
       """
       # %%
-      E = Cymbol(r'E', codename='E_', real=True, nonnegative=True)
-      gamma_lin = Cymbol(r'\gamma_\mathrm{lin}', codename='gamma_lin_', real=True)
-      gamma_exp = Cymbol(r'\gamma_\mathrm{exp}', codename='gamma_exp_', real=True, positive=True)
-      alpha_0 = Cymbol(r'\alpha_0', codename='alpha_0_', real=True, nonnegative=True)
-      X_0 = Cymbol(r'X_0', codename='X_0_', real=True)
-      K_lin = Cymbol(r'K^\mathrm{lin}', codename='K_lin_', real=True)
-      k_exp = Cymbol(r"k_\mathrm{exp}", codename='k_exp_', real=True, positive=True)
-      z_0 = Cymbol(r'z_0', codename='z_0_', real=True, nonnegative=True)
-      S = Cymbol(r'S', codename='S_', real=True, nonnegative=True)
-      r = Cymbol(r'r', codename='r_', real=True, nonnegative=True)
-      c = Cymbol(r'c', codename='c_', real=True, nonnegative=True)
-      eta = Cymbol(r'\eta', codename='eta_', real=True, nonnegative=True)
+      E = sp.Symbol(r'E', codename='E', real=True, nonnegative=True)
+      gamma_lin = sp.Symbol(r'\gamma_\mathrm{lin}', codename='gamma_lin', real=True)
+      gamma_exp = sp.Symbol(r'\gamma_\mathrm{exp}', codename='gamma_exp', real=True, positive=True)
+      alpha_0 = sp.Symbol(r'\alpha_0', codename='alpha_0', real=True, nonnegative=True)
+      X_0 = sp.Symbol(r'X_0', codename='X_0', real=True)
+      K_lin = sp.Symbol(r'K^\mathrm{lin}', codename='K_lin', real=True)
+      k_exp = sp.Symbol(r"k_\mathrm{exp}", codename='k_exp', real=True, positive=True)
+      z_0 = sp.Symbol(r'z_0', codename='z_0', real=True, nonnegative=True)
+      S = sp.Symbol(r'S', codename='S', real=True, nonnegative=True)
+      r = sp.Symbol(r'r', codename='r', real=True, nonnegative=True)
+      c = sp.Symbol(r'c', codename='c', real=True, nonnegative=True)
+      eta = sp.Symbol(r'\eta', codename='eta', real=True, nonnegative=True)
       # temperature 
-      C_v = Cymbol(r'C_{\mathrm{v}}', codename='C_v_', real=True, nonnegative=True)
-      T_0 = Cymbol(r'\vartheta_0', codename='T_0_', real=True, nonnegative=True)
-      alpha_therm = Cymbol(r'\alpha_\vartheta', codename='alpha_therm_', real=True, nonnegative=True)
-      beta = Cymbol(r'\beta', codename='beta_', real=True, nonnegative=True)
-
+      C_v = sp.Symbol(r'C_{\mathrm{v}}', codename='C_v', real=True, nonnegative=True)
+      T_0 = sp.Symbol(r'\vartheta_0', codename='T_0', real=True, nonnegative=True)
+      alpha_therm = sp.Symbol(r'\alpha_\vartheta', codename='alpha_therm', real=True, nonnegative=True)
+      beta = sp.Symbol(r'\beta', codename='beta', real=True, nonnegative=True)
       # %%
       f_s = Cymbol(r'f_\mathrm{c}', codename='f_c_')
 
       # %%
       mparams = (E, gamma_lin, gamma_exp, alpha_0, X_0, K_lin, k_exp, z_0, S, f_s, c, r, eta, C_v, T_0, alpha_therm, beta)
-      mparams
+      
+      m_param_codenames = {
+            E: 'E',
+            gamma_lin: 'gamma_lin',
+            gamma_exp: 'gamma_exp',
+            alpha_0: 'alpha_0',
+            X_0: 'X_0',
+            K_lin: 'K_lin',
+            k_exp: 'k_exp',
+            z_0: 'z_0',
+            S: 'S',
+            f_s: 'f_c',
+            c: 'c',
+            r: 'r',
+            eta: 'eta',
+            C_v: 'C_v',
+            T_0: 'T_0',
+            alpha_therm: 'alpha_therm',
+            beta: 'beta'
+      }
 
       # %% [markdown]
       # ## External state variables

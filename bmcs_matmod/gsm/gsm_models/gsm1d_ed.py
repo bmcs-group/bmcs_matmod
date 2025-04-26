@@ -40,7 +40,7 @@ class GSM1D_ED(GSMBase):
 
     F_engine = GSMMPDP(
         name = 'gsm_F_1d_mpdp_ed',
-        u_vars = eps_a,
+        eps_vars = eps_a,
         T_var = sp.Symbol('T', real=True),
         sig_vars = sig_a,
         m_params = (E, S, c, r, eps_0),
@@ -49,7 +49,7 @@ class GSM1D_ED(GSMBase):
         Sig_signs = (-1, 1),
         F_expr = F_,
         f_expr = sp.Abs(eps) - (eps_0 + Z),
-        phi_ext_expr = (1 - omega)**c * (S/(r+1)) * (Y / S)**(r+1)
+        phi_ext_expr =  (1 - omega)**c * (S/(r+1)) * (Y / S)**(r+1)
     )
 
 

@@ -20,6 +20,16 @@ def get_dirac_delta(x, x_0=0):
     return 0
 numpy_dirac =[{'DiracDelta': get_dirac_delta }, 'numpy']
 
+import keyword
+
+def is_valid_variable_name(name):
+    """Check if the given name is a valid Python variable name."""
+    if not name.isidentifier():
+        return False
+    if keyword.iskeyword(name):
+        return False
+    return True
+
 # Directory to store the serialized symbolic instances
 CACHE_DIR = '_lambdified_cache'
 
@@ -262,7 +272,42 @@ class GSMRM(tr.HasTraits):
 
     ######################################
 
-    def get_sig(self, u, T, Eps, Sig, **m_params):
+    param_codenames = tr.Property
+    @tr.cached_property
+    def _get_param_codenames(self):
+        """Construct a mapping from symbols to codenames for parameter substitution."""
+        param_codenames = {}
+        for sym in self.m_params:
+            sym_name = sym.name
+            if is_valid_variable_name(sym_name):
+                codename = sym_name
+            else:
+                # Check if a codename is provided in m_param_codenames
+                m_param_codenames = getattr(self, 'm_param_codenames', {})
+                if sym in m_param_codenames:
+                    codename = m_param_codenames[sym]
+                else:
+                    raise ValueError(
+                        f"Symbol '{sym}' has an invalid name '{sym_name}' "
+                        f"and no codename was provided in 'm_param_codenames'."
+                    )
+            param_codenames[sym] = codename
+        return param_codenames
+
+    def get_args(self, **kwargs):
+        """Convert keyword parameters to args."""
+        # Ensure that all required parameters are provided
+        missing_params = [codename for codename in self.param_codenames.values() if codename not in kwargs]
+        if missing_params:
+            raise ValueError(f"Missing parameter values for: {missing_params}")
+        
+        # Extract arguments in the correct order
+        args = [kwargs[self.param_codenames[var]] for var in self.m_params]
+        return args
+
+    ######################################
+
+    def get_sig(self, u, T, Eps, Sig, **kw):
         """
         Calculates the displacement for a given stress level
 
@@ -276,7 +321,8 @@ class GSMRM(tr.HasTraits):
         Returns:
             Calculated displacement for a stress level and control stress.
         """
-        return self._sig_lambdified(u, T, Eps, Sig, **m_params)[:, 0]
+        args = self.get_args(**kw)
+        return self._sig_lambdified(u, T, Eps, Sig, *args)[:, 0]
 
     _sig_lambdified = tr.Property()
     @tr.cached_property
@@ -294,7 +340,7 @@ class GSMRM(tr.HasTraits):
         return self.sig_sign * self.F_expr.diff(self.u_vars)
 
     ######################################
-    def get_dDiss_dEps(self, u, T, Eps, Sig, **m_params):
+    def get_dDiss_dEps(self, u, T, Eps, Sig, *args):
         """
         Calculates the derivative of the dissipation rate with respect 
         to internal variables.
@@ -309,7 +355,7 @@ class GSMRM(tr.HasTraits):
         Returns:
             Calculated derivative of the dissipation rate with respect to strain.
         """
-        return self._dDiss_dEps_lambdified(u, T, Eps, Sig, **m_params)[:, 0]
+        return self._dDiss_dEps_lambdified(u, T, Eps, Sig, *args)[:, 0]
 
     _dDiss_dEps_lambdified = tr.Property()
     @tr.cached_property
@@ -328,7 +374,7 @@ class GSMRM(tr.HasTraits):
 
     
     ######################################
-    def get_Sig(self, u, T, Eps, Sig, **m_params):
+    def get_Sig(self, u, T, Eps, Sig, *args):
         """
         Calculates the stress based on the given inputs.
 
@@ -337,12 +383,12 @@ class GSMRM(tr.HasTraits):
             T: Temperature.
             Eps: Strain.
             Sig: Stress.
-            **m_params: Additional model parameters.
+            *args: Additional model parameters.
 
         Returns:
             Calculated stress.
         """
-        _Sig = self._Sig_lambdified(u, T, Eps, Sig, **m_params)
+        _Sig = self._Sig_lambdified(u, T, Eps, Sig, *args)
         return _Sig.reshape(Sig.shape)
     
     _Sig_lambdified = tr.Property()
@@ -379,7 +425,7 @@ class GSMRM(tr.HasTraits):
         return (self.f_expr + self.phi_ext_expr).subs(self.m_param_subs)
 
 
-    def get_Phi(self, u, T, Eps, Sig, **m_params):
+    def get_Phi(self, u, T, Eps, Sig, *args):
         """
         Calculates the gradient Phi of the flow potential phi based on the 
         given inputs.
@@ -389,12 +435,12 @@ class GSMRM(tr.HasTraits):
             T: Temperature.
             Eps: Strain.
             Sig: Stress.
-            **m_params: Additional model parameters.
+            *args: Additional model parameters.
 
         Returns:
             Calculated state variable Phi.
         """
-        return self._Phi_lambdified(u, T, Eps, Sig, **m_params).reshape(Eps.shape)# [:, 0]
+        return self._Phi_lambdified(u, T, Eps, Sig, *args).reshape(Eps.shape)# [:, 0]
 
     _Phi_lambdified = tr.Property()
     @tr.cached_property
@@ -414,7 +460,7 @@ class GSMRM(tr.HasTraits):
     
     ######################################
 
-    def get_Phi_Eps(self, u, T, Eps, Sig, **m_params):
+    def get_Phi_Eps(self, u, T, Eps, Sig, *args):
         """
         Calculates the gradient Phi of the flow potential phi based on the 
         given inputs.
@@ -429,7 +475,7 @@ class GSMRM(tr.HasTraits):
         Returns:
             Calculated state variable Phi.
         """
-        return self._Phi_Eps_lambdified(u, T, Eps, Sig, **m_params)[:, 0]
+        return self._Phi_Eps_lambdified(u, T, Eps, Sig, *args)[:, 0]
 
     _Phi_Eps_lambdified = tr.Property()
     @tr.cached_property
@@ -453,8 +499,8 @@ class GSMRM(tr.HasTraits):
 
     ######################################
 
-    def get_DScale(self, u, T, lam, Eps, **m_params):
-        return self._DScale_lambdified(u, T, lam, Eps, **m_params)
+    def get_DScale(self, u, T, lam, Eps, *args):
+        return self._DScale_lambdified(u, T, lam, Eps, *args)
 
     _DScale_lambdified = tr.Property()
     @tr.cached_property
@@ -473,7 +519,7 @@ class GSMRM(tr.HasTraits):
 
     ######################################
 
-    def get_dDScale_dEps(self, u, T, Eps, **m_params):
+    def get_dDScale_dEps(self, u, T, Eps, *args):
         """
         Calculates the gradient Phi of the flow potential phi based on the 
         given inputs.
@@ -488,7 +534,7 @@ class GSMRM(tr.HasTraits):
         Returns:
             Calculated state variable Phi.
         """
-        return self._dDScale_dEps_lambdified(u, T, Eps, **m_params)[:, 0]
+        return self._dDScale_dEps_lambdified(u, T, Eps, *args)[:, 0]
 
     _dDScale_dEps_lambdified = tr.Property()
     @tr.cached_property
@@ -506,7 +552,7 @@ class GSMRM(tr.HasTraits):
 
     ######################################
 
-    def get_ddDScale_ddEps(self, u, T, Eps, **m_params):
+    def get_ddDScale_ddEps(self, u, T, Eps, *args):
         """
         Calculates the Hessian of the dissipation potential for the
         given inputs.
@@ -516,13 +562,13 @@ class GSMRM(tr.HasTraits):
             T: Temperature.
             Eps: Strain.
             Sig: Stress.
-            **m_params: Additional model parameters.
+            *args: Additional model parameters.
 
         Returns:
             Calculated Hessian of the dissipation potential.
         """
         O_expand = np.zeros_like(T)
-        return self._ddDScale_ddEps_lambdified(O_expand, u, T, Eps, **m_params)
+        return self._ddDScale_ddEps_lambdified(O_expand, u, T, Eps, *args)
 
     O = Cymbol('O')
 
@@ -542,7 +588,7 @@ class GSMRM(tr.HasTraits):
 
     ######################################
 
-    def get_f(self, u, T, Eps, Sig, **m_params):
+    def get_f(self, u, T, Eps, Sig, *args):
         """
         Calculates the stress increment based on the given inputs.
 
@@ -551,13 +597,13 @@ class GSMRM(tr.HasTraits):
             T: Temperature.
             Eps: Strain.
             Sig: Stress.
-            **m_params: Additional model parameters.
+            *args: Additional model parameters.
 
         Returns:
             Calculated stress increment.
         """
-        _Sig = self.get_Sig(u, T, Eps, Sig, **m_params)
-        return self._f_lambdified(u, T, Eps, _Sig, **m_params)
+        _Sig = self.get_Sig(u, T, Eps, Sig, *args)
+        return self._f_lambdified(u, T, Eps, _Sig, *args)
 
     _f_lambdified = tr.Property()
     @tr.cached_property
@@ -573,7 +619,7 @@ class GSMRM(tr.HasTraits):
         return self.f_expr.subs(self.m_param_subs)
 
     ######################################
-    def get_df_dlambda(self, u, T, Eps, Sig, **m_params):
+    def get_df_dlambda(self, u, T, Eps, Sig, *args):
         """
         Calculates the derivative of the stress increment with respect 
         to the load parameter lambda.
@@ -588,8 +634,8 @@ class GSMRM(tr.HasTraits):
         Returns:
             Calculated derivative of the stress increment with respect to lambda.
         """
-        _Sig = self.get_Sig(u, T, Eps, Sig, **m_params)
-        return self._df_dlambda_lambdified(u, T, Eps, _Sig, **m_params)
+        _Sig = self.get_Sig(u, T, Eps, Sig, *args)
+        return self._df_dlambda_lambdified(u, T, Eps, _Sig, *args)
     
     _df_dlambda_lambdified = tr.Property()
     @tr.cached_property
@@ -617,7 +663,7 @@ class GSMRM(tr.HasTraits):
 
     ######################################
 
-    def get_f_df_Sig(self, u, T, Eps, Sig, **m_params):
+    def get_f_df_Sig(self, u, T, Eps, Sig, *args):
         """
         Calculates the threshold function and its derivative 
         with respect to the load parameter lambda.
@@ -633,17 +679,17 @@ class GSMRM(tr.HasTraits):
             List containing the stress increment, its derivative 
             with respect to lambda, and the updated stress.
         """
-        _Sig = self.get_Sig(u, T, Eps, Sig, **m_params)
-        _f, _df_dlambda = self._f_df_dlambda_lambdified(u, T, Eps, _Sig, **m_params)
+        _Sig = self.get_Sig(u, T, Eps, Sig, *args)
+        _f, _df_dlambda = self._f_df_dlambda_lambdified(u, T, Eps, _Sig, *args)
         return _f, _df_dlambda, _Sig
 
     ######################################
 
-    def get_dSig_dEps(self, u, T, Eps, Sig, **m_params):
+    def get_dSig_dEps(self, u, T, Eps, Sig, *args):
         """
         Gradient of thermodynamic forces with respect to the kinematic variables
         """
-        return self._dSig_dEps_lambdified(u, T, Eps, Sig, **m_params)
+        return self._dSig_dEps_lambdified(u, T, Eps, Sig, *args)
     
     _dSig_dEps_lambdified = tr.Property()
     @tr.cached_property
@@ -663,8 +709,8 @@ class GSMRM(tr.HasTraits):
 
     ######################################
 
-    def get_df_dSig(self, u, T, Eps, Sig, **m_params):
-        return self._df_dSig_lambdified(u, T, Eps, Sig, **m_params)
+    def get_df_dSig(self, u, T, Eps, Sig, *args):
+        return self._df_dSig_lambdified(u, T, Eps, Sig, *args)
     
     _df_dSig_lambdified = tr.Property()
     @tr.cached_property
@@ -682,8 +728,8 @@ class GSMRM(tr.HasTraits):
 
     ######################################
 
-    def get_df_dEps(self, u, T, Eps, Sig, **m_params):
-        return self._df_dEps_lambdified(u, T, Eps, Sig, **m_params)
+    def get_df_dEps(self, u, T, Eps, Sig, *args):
+        return self._df_dEps_lambdified(u, T, Eps, Sig, *args)
     
     _df_dEps_lambdified = tr.Property()
     @tr.cached_property
@@ -703,7 +749,7 @@ class GSMRM(tr.HasTraits):
     ######################################
 
     # Evolution equations
-    def get_Eps_k1(self, u_n1, T_n1, Eps_n, lambda_k, Eps_k, Sig_k, **m_params):
+    def get_Eps_k1(self, u_n1, T_n1, Eps_n, lambda_k, Eps_k, Sig_k, *args):
         """
         Calculates the strain increment Eps_k1 based on the given inputs.
 
@@ -719,11 +765,11 @@ class GSMRM(tr.HasTraits):
         Returns:
             Calculated strain increment Eps_k1.
         """
-        Phi_k = self.get_Phi(u_n1, T_n1, Eps_k, Sig_k, **m_params)
+        Phi_k = self.get_Phi(u_n1, T_n1, Eps_k, Sig_k, *args)
         Eps_k1 = Eps_n + lambda_k * Phi_k
         return Eps_k1
 
-    def get_t_relax(self, **m_params):
+    def get_t_relax(self, *args):
         """
         Calculates the relaxation time based on the given model parameters.
 
@@ -733,7 +779,7 @@ class GSMRM(tr.HasTraits):
         Returns:
             Calculated relaxation time.
         """
-        return self._t_relax_lambdified(**m_params)[0]
+        return self._t_relax_lambdified(*args)[0]
 
     _t_relax_lambdified = tr.Property
     @tr.cached_property
@@ -752,19 +798,21 @@ class GSMRM(tr.HasTraits):
             Sig_n: Stress at time n.
             Eps_n: Strain at time n.
             k_max: Maximum number of iterations.
-            **kw: Additional keyword arguments.
+            *args: Additional arguments.
 
         Returns:
             Tuple containing the updated strain Eps_k, stress Sig_k, temperature T_n+1, number of iterations k, 
             and dissipation rate gradient dDiss_dEps.
         """
+        args = self.get_args(**kw)
+
         u_n, d_u_n1, Sig_n, Eps_n = [
             np.moveaxis(arg, -1, 0) for arg in (u_n, d_u_n1, Sig_n, Eps_n)
         ]
 
         u_n1 = u_n + d_u_n1
 
-        relax_t = self.get_t_relax(**kw)
+        relax_t = self.get_t_relax(*args)
         n_vk = len(relax_t)
         d_t_tau = d_t / relax_t
         inv_1_d_t_tau = 1 / (np.ones_like(d_t_tau) + d_t_tau)
@@ -773,7 +821,7 @@ class GSMRM(tr.HasTraits):
         Sig_k = np.copy(Sig_n)
         #### Here for Gibbs - different values for Eps_k and Sig_k - when viscosity on - WHY?
         # print('u_n1', u_n1, T_n, Eps_k, Sig_k)
-        f_k, df_k, Sig_k = self.get_f_df_Sig(u_n1, T_n, Eps_k, Sig_k, **kw)
+        f_k, df_k, Sig_k = self.get_f_df_Sig(u_n1, T_n, Eps_k, Sig_k, *args)
         # if f_k > 0:
         #     print('===================== u_n1', u_n1, T_n, Eps_k, Sig_k)
         f_k = np.atleast_1d(f_k)
@@ -789,9 +837,9 @@ class GSMRM(tr.HasTraits):
             I = np.where(I_)
             bI = (slice(None), *I)
             lam_k[I] -= f_k[I] / df_k[I] # increment of lambda with delta_lambda = -f / df
-            Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_n[bI], lam_k[I], Eps_k[bI], Sig_k[bI], **kw)
+            Eps_k[bI] = self.get_Eps_k1(u_n1[bI], T_n[I], Eps_n[bI], lam_k[I], Eps_k[bI], Sig_k[bI], *args)
 
-            f_k[I], df_k[I], Sig_k[bI] = self.get_f_df_Sig(u_n1[bI], T_n[I], Eps_k[bI], Sig_k[bI], **kw)
+            f_k[I], df_k[I], Sig_k[bI] = self.get_f_df_Sig(u_n1[bI], T_n[I], Eps_k[bI], Sig_k[bI], *args)
 
             if np.any(np.isnan(f_k[I])):
                 print('there is nan in f_k')
@@ -831,10 +879,10 @@ class GSMRM(tr.HasTraits):
         #     Sig_k[bI] = self.get_Sig(u_n1[bI], T_n[I], Eps_k[bI], Sig_k[bI], **kw)
 
         dEps_k = Eps_k - Eps_n
-        dDiss_dEps = self.get_dDiss_dEps(u_n1, T_n, Eps_k, Sig_k, **kw)
+        dDiss_dEps = self.get_dDiss_dEps(u_n1, T_n, Eps_k, Sig_k, *args)
         # dissipation rate
         dDiss_dt = np.einsum('b...,b...->...', dDiss_dEps, dEps_k)
-        C_v_ = kw['C_v_']
+        C_v_ = kw['C_v']
         d_T = 0 # d_T_n + d_t * (dDiss_dt / C_v_ )# / rho_'
 
         return np.moveaxis(Eps_k, 0, -1), np.moveaxis(Sig_k, 0, -1), T_n + d_T, k, np.moveaxis(dDiss_dEps, 0, -1), lam_k

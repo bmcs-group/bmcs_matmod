@@ -46,9 +46,9 @@ class GSM1D_VED(GSMBase):
 
     F_engine = GSMMPDP(
         name = 'gsm_F_1d_mpdp_ved',
-        u_vars = eps_a,
-        T_var = sp.Symbol('T', real=True),
+        eps_vars = eps_a,
         sig_vars = sig_a,
+        T_var = sp.Symbol('T', real=True),
         m_params = (E, eta_ve, S, c, r, eps_0),
         Eps_vars = (eps_v_a, omega_a, z_a),
         Sig_vars = (sig_v_a, Y_a, Z_a),
@@ -58,7 +58,8 @@ class GSM1D_VED(GSMBase):
     )
     
     dot_eps_ve_ = F_engine.dot_Eps[0, 0]
+    dot_eps = F_engine.dot_eps_a[0, 0]
     sig_ve_ = F_engine.Sig[0, 0]
     F_engine.h_k = [dot_eps_ve_ - sig_ve_ / (1 - omega) / eta_ve]
-    F_engine.phi_ext_expr = F_engine.dot_eps * (1 - omega)**c * (S/(r+1)) * (Y / S)**(r+1)
+    F_engine.phi_ext_expr = sp.Abs(dot_eps-dot_eps_ve_) * (1 - omega)**c * (S/(r+1)) * (Y / S)**(r+1)
 

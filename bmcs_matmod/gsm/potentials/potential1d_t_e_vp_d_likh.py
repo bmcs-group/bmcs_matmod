@@ -131,31 +131,43 @@ class Potential1D_T_E_VP_D_LIKH_SymbExpr(SymbExpr):
       Sig_signs : tuple
             Tuple of signs for the conjugate forces.
       """
-      E = Cymbol(r'E', codename='E_', real=True, nonnegative=True)
-      gamma = Cymbol(r'\gamma', codename='gamma_', real=True)
-      X_0 = Cymbol(r'X_0', codename='X_0_', real=True)
-      K = Cymbol(r'K', codename='K_', real=True)
-      z_0 = Cymbol(r'z_0', codename='z_0_', real=True, nonnegative=True)
-      S = Cymbol(r'S', codename='S_', real=True, nonnegative=True)
-      r = Cymbol(r'r', codename='r_', real=True, nonnegative=True)
-      c = Cymbol(r'c', codename='c_', real=True, nonnegative=True)
-      eta = Cymbol(r'\eta', codename='eta_', real=True, nonnegative=True)
+      E = sp.Symbol(r'E', real=True, nonnegative=True)
+      gamma = sp.Symbol(r'\gamma', real=True)
+      X_0 = sp.Symbol(r'X_0', real=True)
+      K = sp.Symbol(r'K', real=True)
+      z_0 = sp.Symbol(r'z_0', real=True, nonnegative=True)
+      S = sp.Symbol(r'S', real=True, nonnegative=True)
+      r = sp.Symbol(r'r', real=True, nonnegative=True)
+      c = sp.Symbol(r'c', real=True, nonnegative=True)
+      eta = sp.Symbol(r'\eta', real=True, nonnegative=True)
       # temperature 
-      C_v = Cymbol(r'C_{\mathrm{v}}', codename='C_v_', real=True, nonnegative=True)
-      T_0 = Cymbol(r'\vartheta_0', codename='T_0_', real=True, nonnegative=True)
-      alpha_therm = Cymbol(r'\alpha_\vartheta', codename='alpha_therm_', real=True, nonnegative=True)
-      beta = Cymbol(r'\beta', codename='beta_', real=True, nonnegative=True)
+      C_v = sp.Symbol(r'C_{\mathrm{v}}', real=True, nonnegative=True)
+      T_0 = sp.Symbol(r'\vartheta_0', real=True, nonnegative=True)
+      alpha_therm = sp.Symbol(r'\alpha_\vartheta', real=True, nonnegative=True)
+      beta = sp.Symbol(r'\beta', real=True, nonnegative=True)
+      T = Cymbol(r'\vartheta', codename='T_', real=True)
 
-      f_s = Cymbol(r'f_\mathrm{c}', codename='f_c_')
-
+      f_s = sp.Symbol(r'f_\mathrm{c}')
       mparams = (E, gamma, X_0, K, z_0, S, f_s, c, r, eta, C_v, T_0, alpha_therm, beta)
+
+      m_param_codenames = {gamma: 'gamma',
+                           beta: 'beta',
+                           X_0: 'X_0',
+                           K: 'K',
+                           z_0: 'z_0',
+                           S: 'S',
+                           c: 'c',
+                           r: 'r',
+                           eta: 'eta',
+                           C_v: 'C_v',
+                           alpha_therm: 'alpha_therm', 
+                           f_s: 'f_c',
+                           T_0: 'T_0'}
 
       eps = Cymbol(r'\varepsilon', codename='eps_', real=True)
       eps_a = sp.Matrix([eps])
       sig = Cymbol(r'\sigma', codename='sig_', real=True)
       sig_a = sp.Matrix([sig])
-
-      T = Cymbol(r'\vartheta', codename='T_', real=True)
 
       eps_p = Cymbol(r'\varepsilon^\mathrm{p}', codename='eps_p_', real=True)
       eps_p_a = sp.Matrix([eps_p])

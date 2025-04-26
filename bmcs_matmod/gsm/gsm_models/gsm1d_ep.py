@@ -51,7 +51,7 @@ class GSM1D_EP(GSMBase):
     F_engine = GSMMPDP(
         name = 'gsm_F_1d_mpdp_ep_lih',
         diff_along_rates = False,
-        u_vars = eps_a,
+        eps_vars = eps_a,
         sig_vars = sig_a,
         m_params = mparams,
         Eps_vars = Eps_vars,

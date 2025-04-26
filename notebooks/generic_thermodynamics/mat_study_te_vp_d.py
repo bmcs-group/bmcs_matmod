@@ -1,6 +1,6 @@
 from turtle import color
 from urllib import response
-from bmcs_matmod import GSMRM
+from bmcs_matmod.api import GSMRM
 import matplotlib.pylab as plt 
 import sympy as sp
 import numpy as np
@@ -43,24 +43,24 @@ class MatStudy_T_E_VP_D(Model):
         _H = _KH * (1 - _K_ratio)
         
         return dict(
-            E_=_E, 
-            gamma_lin_= _H, # _E * 10, 
-            gamma_exp_=0.5,
-            alpha_0_=0.5,
-            K_lin_= _K, # _E / 5,
-            k_exp_=10,
-            z_0_=10,
-            S_=0.008,
-            c_=2.5,
-            r_=2.7,
-            f_c_=_f_s,
-            X_0_=_X_0,  
-            eta_=500,
-            T_0_=20,
-            C_v_=0.01, # 0.0001, 
-            beta_=0.0001,
-            alpha_therm_=0, # 1.2e-5,
-            d_N_ = 1
+            E=_E, 
+            gamma_lin=_H, # _E * 10, 
+            gamma_exp=0.5,
+            alpha_0=0.5,
+            K_lin=_K, # _E / 5,
+            k_exp=10,
+            z_0=10,
+            S=0.008,
+            c=2.5,
+            r=2.7,
+            f_c=_f_s,
+            X_0=_X_0,  
+            eta=500,
+            T_0=20,
+            C_v=0.01, # 0.0001, 
+            beta=0.0001,
+            alpha_therm=0, # 1.2e-5,
+            d_N=1
         )
 
     dot_eps = Float(0.01, TIME=True)

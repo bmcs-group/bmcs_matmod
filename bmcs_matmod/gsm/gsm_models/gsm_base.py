@@ -63,6 +63,47 @@ class GSMBase(HasTraits):
 
     F_engine = Instance(GSMMPDP)
 
+    eps_a_ = Property(depends_on='F_engine')
+    @cached_property
+    def _get_eps_a_(self):
+        F_gsm = self.F_engine
+        eps_a = F_gsm.eps_a
+        sig_a = F_gsm.sig_a
+        dF_deps = F_gsm.F_expr.diff(eps_a)
+        return sp.Matrix(
+            [
+            sp.solve(sp.Eq(sig_i, dF_deps_i), eps_i)[0]
+            for sig_i, eps_i, dF_deps_i in zip(sig_a, eps_a, dF_deps)
+            ]
+        )
+
+    subs_eps_sig = Property(depends_on='F_engine')
+    @cached_property
+    def _get_subs_eps_sig(self):
+        F_gsm = self.F_engine
+        return dict(zip(F_gsm.eps_a, self.eps_a_))
+
+    dot_eps_a_ = Property(depends_on='F_engine')
+    @cached_property
+    def _get_dot_eps_a_(self):
+        F_gsm = self.F_engine
+        eps_a = F_gsm.eps_a
+        sigEps = sp.Matrix.vstack(F_gsm.sig_a, F_gsm.Eps.as_explicit())
+        dot_sigEps = sp.Matrix.vstack(F_gsm.dot_sig_a, F_gsm.dot_Eps.as_explicit())
+        return sp.simplify(self.eps_a_.jacobian(sigEps) * dot_sigEps)
+
+    subs_dot_eps_sig = Property(depends_on='F_engine')
+    @cached_property
+    def _get_subs_dot_eps_sig(self):
+        F_gsm = self.F_engine
+        return dict(zip(F_gsm.dot_eps_a, self.dot_eps_a_))
+
+    sig_x_eps_ = Property(depends_on='F_engine')
+    @cached_property
+    def _get_sig_x_eps_(self):
+        F_gsm = self.F_engine
+        return (F_gsm.sig_a.T * F_gsm.eps_a)[0]
+
     G_engine = Property(Instance(GSMMPDP), depends_on='F_engine')
     """
     Transform Helmholtz free energy (F_expr) into Gibbs free energy (G_expr)
@@ -71,25 +112,18 @@ class GSMBase(HasTraits):
     @cached_property
     def _get_G_engine(self):
         F_gsm = self.F_engine
-        eps_a = self.eps_a
-        sig_a = self.sig_a
-        dF_deps = F_gsm.F_expr.diff(eps_a)
-        eps_sig_ = sp.Matrix(
-            [
-            sp.solve(sp.Eq(sig_i, dF_deps_i), eps_i)[0]
-            for sig_i, eps_i, dF_deps_i in zip(sig_a, eps_a, dF_deps)
-            ]
-        )
-        subs_u_sig_ = dict(zip(eps_a, eps_sig_))
+        G_expr = self.sig_x_eps_ - F_gsm.F_expr
 
-        sig_x_eps_ = (sig_a.T * eps_a)[0]
-        G_expr = sig_x_eps_ - F_gsm.F_expr
+        subs_eps_sig_ = {**self.subs_eps_sig, **self.subs_dot_eps_sig}
         G_ = sp.simplify(G_expr.subs(subs_eps_sig_))
+        f_ = sp.simplify(F_gsm.f_expr.subs(subs_eps_sig_))
+        phi_ = sp.simplify(F_gsm.phi_ext_expr.subs(subs_eps_sig_))
+        h_k_ = [sp.simplify(h_.subs(subs_eps_sig_)) for h_ in F_gsm.h_k]
 
         G_gsm = GSMMPDP(
             name=f'G_{F_gsm.name}',
-            u_vars=F_gsm.sig_vars,
-            sig_vars=eps_a,
+            eps_vars=F_gsm.sig_vars,
+            sig_vars=self.eps_a,
             T_var=F_gsm.T_var,
             m_params=F_gsm.m_params,
             Eps_vars=F_gsm.Eps_vars,
@@ -97,9 +131,9 @@ class GSMBase(HasTraits):
             Sig_signs=F_gsm.Sig_signs,
             F_expr=G_,
             dF_sign=-1,
-            f_expr=F_gsm.f_expr,
-            phi_ext_expr=F_gsm.phi_ext_expr,
-            h_k=F_gsm.h_k
+            f_expr=f_,
+            phi_ext_expr=phi_,
+            h_k=h_k_
         )
         return G_gsm
 
@@ -118,7 +152,7 @@ class GSMBase(HasTraits):
         print(f'Gibbs')
         display(Math(r'G =' + sp.latex(sp.simplify(self.G_engine.F_expr))))
         display(self.G_engine.subs_Sig_Eps)
-        (gamma_mech, L_, dL_dS_, dL_dS_A_, dR_dA_n1), (eps_n, delta_eps, Eps_n, delta_A, delta_t, Ox, Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI = self.F_engine.Sig_f_R_dR_n1
+        (gamma_mech, L_, dL_dS_, dL_dS_A_, dR_dA_n1), (eps_n, delta_eps, Eps_n, delta_A, delta_t, Ox, Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI = self.G_engine.Sig_f_R_dR_n1
         print(f'Mechanical dissipation')
         display(Math(r'\gamma_{\mathrm{mech}} = ' + sp.latex(sp.simplify(gamma_mech))))
         print(f'Lagrangian')
@@ -138,18 +172,39 @@ class GSMBase(HasTraits):
         latex_lines.append("### Helmholtz free energy")
         latex_lines.append("$$F = " + sp.latex(sp.simplify(self.F_engine.F_expr)) + "$$")
         latex_lines.append("$$" + sp.latex(self.F_engine.subs_Sig_Eps) + "$$")
-        latex_lines.append("### Gibbs free energy")
-        latex_lines.append("$$G = " + sp.latex(sp.simplify(self.G_engine.F_expr)) + "$$")
-        latex_lines.append("$$" + sp.latex(self.G_engine.subs_Sig_Eps) + "$$")
-        latex_lines.append("### Mechanical dissipation")
+        latex_lines.append("#### Mechanical dissipation")
         latex_lines.append("$$\\gamma_{\\mathrm{mech}} = " + sp.latex(sp.simplify(gamma_mech)) + "$$")
-        latex_lines.append("### Lagrangian")
+        latex_lines.append("#### Lagrangian")
         latex_lines.append("$$\mathcal{L} = " + sp.latex(L_) + "$$")
-        latex_lines.append("### Residuum")
+        latex_lines.append("#### Residuum")
         latex_lines.append("$$\\frac{\\partial \mathcal{L}}{\\partial \mathcal{S}} = " + sp.latex(dL_dS_) + " = 0$$")
         if self.F_engine.dot_Eps_bounds_expr is not sp.S.Zero:
-            latex_lines.append("### Bounds of inelastic process")
+            latex_lines.append("#### Bounds of inelastic process")
             latex_lines.append("$$" + sp.latex(self.F_engine.dot_Eps_bounds_expr) + " \leq 0$$")
+
+        (gamma_mech, L_, dL_dS_, _, _), _, _, _, _, _ = self.G_engine.Sig_f_R_dR_n1
+        latex_lines.append("### Legendre transform")
+
+        latex_lines.append("#### Strain substitutions in dissipative terms")
+        latex_lines.append("$$" + sp.latex(self.subs_eps_sig) + "$$")
+        latex_lines.append("$$" + sp.latex(self.subs_dot_eps_sig) + "$$")
+
+        latex_lines.append("### Gibbs free energy")
+        latex_lines.append("$$G = " + sp.latex(self.sig_x_eps_) + r"- \left[" + sp.latex(sp.simplify(self.F_engine.F_expr) )+ r"\right] $$")
+        latex_lines.append("#### Gibbs free energy after strain substitutions")
+        latex_lines.append("$$G = " + sp.latex(sp.simplify(self.G_engine.F_expr)) + "$$")
+        latex_lines.append("$$" + sp.latex(self.G_engine.subs_Sig_Eps) + "$$")
+
+        latex_lines.append("#### Mechanical dissipation")
+        latex_lines.append("$$\\gamma_{\\mathrm{mech}} = " + sp.latex(sp.simplify(gamma_mech)) + "$$")
+        latex_lines.append("#### Lagrangian")
+        latex_lines.append("$$\mathcal{L} = " + sp.latex(L_) + "$$")
+        latex_lines.append("#### Residuum")
+        latex_lines.append("$$\\frac{\\partial \mathcal{L}}{\\partial \mathcal{S}} = " + sp.latex(dL_dS_) + " = 0$$")
+        if self.F_engine.dot_Eps_bounds_expr is not sp.S.Zero:
+            latex_lines.append("#### Bounds of inelastic process")
+            latex_lines.append("$$" + sp.latex(self.F_engine.dot_Eps_bounds_expr) + " \leq 0$$")
+
         return "\n".join(latex_lines)
 
     def markdown(self):
@@ -194,7 +249,8 @@ class GSMBase(HasTraits):
     def get_G_response(self, sig, Eps, **kwargs):
         """Calculate the strain and internal variables for the given stress."""
         args = self.get_args(**kwargs)
-        return self.G_engine.get_response(sig, Eps, *args)
+        resp = self.G_engine.get_response(sig, Eps, *args)
+        return (resp[0], resp[2], resp[1], *resp[3:])
 
     def get_G_Sig(self, sig, Eps, **kwargs):
         """Calculate the thermodynamic forces for the given stress and internal variables."""

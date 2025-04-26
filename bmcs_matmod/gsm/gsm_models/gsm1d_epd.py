@@ -56,7 +56,7 @@ class GSM1D_EPD(GSMBase):
 
     F_engine = GSMMPDP(
         name = 'gsm_F_1d_mpdp_epd_lih',
-        u_vars = eps_a,
+        eps_vars = eps_a,
         sig_vars = sig_a,
         m_params = mparams,
         Eps_vars = Eps_vars,
@@ -64,5 +64,9 @@ class GSM1D_EPD(GSMBase):
         Sig_signs = Sig_signs,
         F_expr = F_,
         f_expr = f_,
-        phi_ext_expr = (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)
     )
+
+    dot_eps = F_engine.dot_eps_a[0]
+    dot_eps_p = F_engine.dot_Eps[0, 0]
+
+    F_engine.phi_ext_expr = sp.Abs(dot_eps - dot_eps_p) * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)

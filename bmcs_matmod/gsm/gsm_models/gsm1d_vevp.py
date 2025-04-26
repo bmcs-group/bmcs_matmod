@@ -59,7 +59,7 @@ class GSM1D_VEVP(GSMBase):
     F_engine = GSMMPDP(
         name = 'gsm_F_1d_mpdp_vevp_lih',
         diff_along_rates = False,
-        u_vars = eps_a,
+        eps_vars = eps_a,
         sig_vars = sig_a,
         m_params = mparams,
         Eps_vars = Eps_vars,
@@ -68,15 +68,17 @@ class GSM1D_VEVP(GSMBase):
         F_expr = F_,
         f_expr = f_,
     )
+    
     dot_eps_p = F_engine.dot_Eps[1, 0]
-    f_d_ = F_engine.f_expr - eta_vp * dot_eps_p
+    f_d_ = F_engine.f_expr - eta_vp * sp.sqrt(dot_eps_p**2)
     F_engine.f_expr = f_d_
 
     dot_eps_ve = F_engine.dot_Eps[0, 0]
     sig_ve = F_engine.Sig[0, 0]
     F_engine.h_k = [eta_ve * dot_eps_ve - sig_ve]
 
-    F_engine.dot_Eps_bounds_expr = -(sp.Abs(F_engine.dot_eps) - sp.Abs(dot_eps_ve))
+    dot_eps = F_engine.dot_eps_a[0, 0]
+    F_engine.dot_Eps_bounds_expr = -(sp.Abs(dot_eps) - sp.Abs(dot_eps_ve))
 
 
 

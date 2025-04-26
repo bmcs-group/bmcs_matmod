@@ -58,7 +58,7 @@ class GSM1D_EVPD(GSMBase):
 
     F_engine = GSMMPDP(
         name = 'gsm_F_1d_mpdp_evpd_lih',
-        u_vars = eps_a,
+        eps_vars = eps_a,
         sig_vars = sig_a,
         m_params = mparams,
         Eps_vars = Eps_vars,
@@ -68,21 +68,14 @@ class GSM1D_EVPD(GSMBase):
         f_expr = f_,
     )
 
-    dot_eps_p_ = F_engine.dot_Eps[0, 0]
-    dot_ez_ = F_engine.dot_Eps[2, 0]
-    dot_eps_ = F_engine.dot_eps
-    dot_eps_e_ = dot_eps_ - dot_eps_p_
-    sig_p_ = F_engine.Sig[0, 0]
+    dot_eps_p = F_engine.dot_Eps[0, 0]
+    dot_eps = F_engine.dot_eps_a[0, 0]
 
-    stacked_matrix = sp.Matrix.vstack(F_engine.u_vars, F_engine.Eps.as_explicit())
-    dot_stacked_matrix = sp.Matrix.vstack(sp.Matrix([[F_engine.dot_eps]]), F_engine.dot_Eps.as_explicit())
-    dot_f_ = (F_engine.f_expr.subs(F_engine.subs_Sig_Eps).diff(stacked_matrix).T * dot_stacked_matrix)[0,0]  
-
-#    dot_f_ = E * (dot_eps_ - dot_eps_p_) - K * dot_z_
-
-    f_d_ = F_engine.f_expr - eta_vp * sp.sqrt(dot_eps_p_**2) 
+    f_d_ = F_engine.f_expr - eta_vp * sp.sqrt(dot_eps_p**2) 
     F_engine.f_expr = f_d_
-#    F_engine.phi_ext_expr = sp.Heaviside(dot_eps_e_) * dot_eps_ * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)
 
-    F_engine.phi_ext_expr = sp.Heaviside(dot_f_) * sp.Abs(dot_eps_) * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)
+    epsEps = sp.Matrix.vstack(F_engine.eps_vars, F_engine.Eps.as_explicit())
+    dot_epsEps = sp.Matrix.vstack(sp.Matrix([[dot_eps]]), F_engine.dot_Eps.as_explicit())
+    dot_f_ = (F_engine.f_expr.subs(F_engine.subs_Sig_Eps).diff(epsEps).T * dot_epsEps)[0,0]
 
+    F_engine.phi_ext_expr = sp.Heaviside(dot_f_) * sp.Abs(dot_eps - dot_eps_p) * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)

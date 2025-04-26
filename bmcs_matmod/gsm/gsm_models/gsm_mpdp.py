@@ -30,7 +30,7 @@ class GSMMPDP(tr.HasTraits):
 
     F_expr   = Free energy potential
 
-    u_vars   = external variable
+    eps_vars   = external variable
     
     T_var    = temperature
     
@@ -61,7 +61,7 @@ class GSMMPDP(tr.HasTraits):
 
     name = tr.Str('unnamed')
 
-    u_vars = tr.Any
+    eps_vars = tr.Any
     """External variable
     """
 
@@ -127,11 +127,42 @@ class GSMMPDP(tr.HasTraits):
     """Time increment
     """
 
-    dot_eps = tr.Property()
+    eps_a = tr.Property()
 
     @tr.cached_property
-    def _get_dot_eps(self):
-        return sp.Symbol(f'\\dot{{{self.u_vars[0].name}}}')
+    def _get_eps_a(self):
+        return sp.BlockMatrix([
+            var if isinstance(var, sp.Matrix) and var.shape[1] == 1 else sp.Matrix([[var]]) 
+            for var in self.eps_vars
+        ]).as_explicit()
+
+
+    # dot_eps = tr.Property()
+
+    # @tr.cached_property
+    # def _get_dot_eps(self):
+    #     return sp.Symbol(f'\\dot{{{self.eps_vars[0].name}}}')
+
+    dot_eps_a = tr.Property()
+
+    @tr.cached_property
+    def _get_dot_eps_a(self):
+        return sp.Matrix([sp.Symbol(f'\\dot{{{var.name}}}') for var in self.eps_a])
+
+    sig_a = tr.Property()
+
+    @tr.cached_property
+    def _get_sig_a(self):
+        return sp.BlockMatrix([
+            var if isinstance(var, sp.Matrix) and var.shape[1] == 1 else sp.Matrix([[var]]) 
+            for var in self.sig_vars
+        ]).as_explicit()
+
+    dot_sig_a = tr.Property()
+
+    @tr.cached_property
+    def _get_dot_sig_a(self):
+        return sp.Matrix([sp.Symbol(f'\\dot{{{var.name}}}') for var in self.sig_vars])
 
     lam_phi_f_ = tr.Property()
 
@@ -307,14 +338,24 @@ class GSMMPDP(tr.HasTraits):
     _sig_lambdified = tr.Property()
     @tr.cached_property
     def _get__sig_lambdified(self):
-        return sp.lambdify((self.u_vars[0], self.Eps.as_explicit()) + self.m_params + ('*args',), 
+        return sp.lambdify((self.eps_vars[0], self.Eps.as_explicit()) + self.m_params + ('*args',), 
                            self.sig_, numpy_dirac, cse=True)
 
     sig_ = tr.Property()
     @tr.cached_property
     def _get_sig_(self):
         "For Gibbs for external strain the sign is swapped using the sig_sign parameter = -1"
-        return self.sig_sign * self.F_expr.diff(self.u_vars[0])
+        return self.sig_sign * self.F_expr.diff(self.eps_vars[0])
+
+    sig_a_ = tr.Property()
+    @tr.cached_property
+    def _get_sig_a_(self):
+        return self.sig_sign * self.F_expr.diff(self.eps_a)
+
+    subs_sig_eps = tr.Property()
+    @tr.cached_property
+    def _get_subs_sig_eps(self):
+        return dict(zip(self.sig_a, self.sig_a_))
 
     ######################################
     def get_dDiss_dEps(self, eps, T, Eps, Sig, *args):
@@ -337,7 +378,7 @@ class GSMMPDP(tr.HasTraits):
     _dDiss_dEps_lambdified = tr.Property()
     @tr.cached_property
     def _get__dDiss_dEps_lambdified(self):
-        return sp.lambdify((self.u_vars[0], self.T_var, 
+        return sp.lambdify((self.eps_vars[0], self.T_var, 
                             self.Eps.as_explicit(), 
                             self.Sig.as_explicit()) + self.m_params + ('*args',), 
                            self.dDiss_dEps_, numpy_dirac, cse=True)
@@ -363,7 +404,8 @@ class GSMMPDP(tr.HasTraits):
     _dot_Eps_bounds_lambdified = tr.Property()
     @tr.cached_property
     def _get__dot_Eps_bounds_lambdified(self):
-        return sp.lambdify((self.dot_eps, 
+        dot_eps = self.dot_eps_a[0]
+        return sp.lambdify((dot_eps, 
                             self.dot_Eps.as_explicit()) + self.m_params + ('*args',), 
                            self.dot_Eps_bounds_, numpy_dirac, cse=True)
 
@@ -400,7 +442,7 @@ class GSMMPDP(tr.HasTraits):
     _Sig_lambdified = tr.Property()
     @tr.cached_property
     def _get__Sig_lambdified(self):
-        return sp.lambdify((self.u_vars[0], 
+        return sp.lambdify((self.eps_vars[0], 
                             self.Eps.as_explicit()) + self.m_params + ('*args',), 
                            self.Sig_.as_explicit(), numpy_dirac, cse=True)
 
@@ -494,14 +536,12 @@ class GSMMPDP(tr.HasTraits):
     def _get_Sig_f_R_dR_n1(self):
         ## Manual construction of the residuum
         Eps = self.Eps.as_explicit()
-        eps = self.u_vars[0]
-        dot_Eps = sp.Matrix([sp.Symbol(f'\\dot{{{var.name}}}') for var in list(Eps)])
-        dot_eps = self.dot_eps
+        eps = self.eps_a[0]
+        # dot_Eps = sp.Matrix([sp.Symbol(f'\\dot{{{var.name}}}') for var in list(Eps)])
+        dot_Eps = self.dot_Eps.as_explicit()
+        dot_eps = self.dot_eps_a[0]
         lam, lam_phi, f_ = self.lam_phi_f_
         dot_Lam, delta_Lam, dot_Lam_H_ = self.H_Lam
-
-        # smoothness parameter for Fisher-Burmeister function
-        mu = sp.Symbol(r'\mu', real=True)
 
         # time
         t = sp.Symbol(r't', real=True)
@@ -543,7 +583,7 @@ class GSMMPDP(tr.HasTraits):
 
         f_ = self.f_expr
 
-        gamma_mech = ((self.Y * self.Sig.as_explicit()).T * self.dot_Eps.as_explicit())[0]
+        gamma_mech = ((self.Y * Sig).T * self.dot_Eps.as_explicit())[0]
 
         # Full Lagrangian for the minimum principle of dissipation potential
         L_ = -gamma_mech + dot_Lam_H_ + lam_phi 
@@ -633,7 +673,7 @@ class GSMMPDP(tr.HasTraits):
 
         # Inelastic state update - only qn inequality constraint is present
         if self.n_lam > 0:
-            # print('Inelastic state update')
+            # print(f'Inelastic state update for points {I_inel}')
             for k in range(self.k_max):
                 if np.all(I == False):
                     break
@@ -656,7 +696,7 @@ class GSMMPDP(tr.HasTraits):
 
         # Elastic state update
         if self.n_Lam > 0:
-            # print('Elastic state update')
+            # print(f'Elastic state update for points {I_el}')
             for k in range(self.k_max):
                 if np.all(I_el == False):
                     break

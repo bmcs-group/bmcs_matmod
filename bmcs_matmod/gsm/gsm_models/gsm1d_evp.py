@@ -7,9 +7,9 @@ class GSM1D_EVP(GSMBase):
     interaction between the individual dissipative mechanisms.
     """
 
-    E = sp.Symbol(r'E', real=True, nonnegative=True)
-    K = sp.Symbol(r'K', real=True)
-    f_c = sp.Symbol(r'f_\mathrm{c}')
+    E = sp.Symbol(r'E', real=True, positive=True)
+    K = sp.Symbol(r'K', real=True, positive=True)
+    f_c = sp.Symbol(r'f_\mathrm{c}', positive=True, real=True)
     eta_vp = sp.Symbol(r'\eta_\mathrm{vp}', real=True, nonnegative=True)
 
     mparams = (E, K, f_c, eta_vp)
@@ -53,7 +53,7 @@ class GSM1D_EVP(GSMBase):
     F_engine = GSMMPDP(
         name = 'gsm_F_1d_mpdp_vep_lih',
         diff_along_rates = False,
-        u_vars = eps_a,
+        eps_vars = eps_a,
         sig_vars = sig_a,
         m_params = mparams,
         Eps_vars = Eps_vars,

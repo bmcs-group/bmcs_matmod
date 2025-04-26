@@ -10,7 +10,6 @@ class Potential1D_T_E_VP_LIH_SymbExpr(SymbExpr):
       """Single variable one-dimensional potential that can be used to demonstrate the 
       interaction between the thermal and mechanical loading. 
       """
-      # %%
       E = Cymbol(r'E', codename='E_', real=True, nonnegative=True)
       K_lin = Cymbol(r'K', codename='K_lin_', nonnegative=True)
       eta = Cymbol(r'\eta', codename='eta_', real=True, nonnegative=True)
@@ -18,17 +17,17 @@ class Potential1D_T_E_VP_LIH_SymbExpr(SymbExpr):
       C_v = Cymbol(r'C_{\mathrm{v}}', codename='C_v_', real=True, nonnegative=True)
       T_0 = Cymbol(r'\vartheta_0', codename='T_0_', real=True, nonnegative=True)
 
-      # %%
       f_c = Cymbol(r'f_\mathrm{c}', codename='f_c_')
 
-      # %%
       mparams = (E, K_lin, f_c, eta, C_v, T_0)
-      mparams
 
-      # %% [markdown]
-      # ## External state variables
+      m_param_codenames = {E: 'E',
+                           K_lin: 'K_lin',
+                           f_c: 'f_c',
+                           eta: 'eta',
+                           C_v: 'C_v',
+                           T_0: 'T_0'}
 
-      # %%
       eps = Cymbol(r'\varepsilon', codename='eps_', real=True)
       eps_a = sp.Matrix([eps])
       sig = Cymbol(r'\sigma', codename='sig_', real=True)
