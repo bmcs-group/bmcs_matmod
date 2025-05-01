@@ -93,6 +93,7 @@ class GSM1D_VEVPD(GSMBase):
     
     # non-associative flow potential extension is normed by the norm of elastic strain rate
     # it is only active if the rate os stress power is positive, i.e. Heaviside(sig_ * dot_eps) > 0
+    sig_ = F_engine.sig_
     F_engine.phi_ext_expr = sp.Heaviside(sig_ * dot_eps) * sp.Abs(dot_eps-dot_eps_vp-dot_eps_ve) * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)
 
     F_engine.dot_Eps_bounds_expr = -(sp.Abs(dot_eps) - sp.Abs(dot_eps_ve))
