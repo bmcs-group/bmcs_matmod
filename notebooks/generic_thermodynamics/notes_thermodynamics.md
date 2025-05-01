@@ -70,7 +70,6 @@ This inequality indicates that at constant temperature and pressure, the Gibbs f
 
 In summary, by considering the system and its surroundings, we've linked the second law of thermodynamics to a minimized capacity function for common conditions (constant $T$ and $p$), i.e., the Gibbs free energy. This allows one to assess the spontaneity of a process by examining whether the Gibbs free energy change $dG$ is negative.
 
-
 # Meaning of the thermodynamic stability (equilibrium)
 
 The idea that an equilibrium corresponds to a minimum in Gibbs free energy can be understood by considering the broader implications of thermodynamic stability and the tendency of systems to move towards configurations with the lowest possible energy under given constraints.
@@ -94,7 +93,7 @@ To summarize, the condition $dG=0$, which marks equilibrium, implies that the sy
 
 In the context of a thermo-viscoelastic problem, using the Gibbs free energy to guide the formulation of a time-stepping scheme can indeed be meaningful, especially when considering processes that occur at constant temperature and under constant stress, which is analogous to pressure in a traditional thermodynamic system.
 
-### Problem Definition
+## Problem Definition
 
 Given the context of a viscoelastic material undergoing creep, where viscoelastic strain $\varepsilon_v$ evolves over time, the problem encompasses both mechanical and thermal considerations. Here, we focus on the mechanical part:
 
@@ -118,14 +117,14 @@ Given the context of a viscoelastic material undergoing creep, where viscoelasti
    \varepsilon_e = \frac{\sigma}{E}
    $$
 
-### Relating to Gibbs Free Energy
+## Relating to Gibbs Free Energy
 
 In a mechanical context, similar principles as thermodynamics apply when considering the work done in processes at constant temperature and stress, akin to constant pressure. The Gibbs free energy in mechanics, otherwise known as the Helmholtz free energy (per unit volume), can be used to understand the stability and behavior under these constraints. The Gibbs free energy relevant to this context is described as:
 $$ 
 G = U - T S + \sigma \varepsilon 
 $$
 
-### Application to the Time-Stepping Scheme
+## Application to the Time-Stepping Scheme
 
 By applying the Gibbs free energy conceptual framework, the evolution toward equilibrium at constant stress lends itself to a similar approach:
 
@@ -146,7 +145,7 @@ You're correct in noting that, for a mechanical system such as a viscoelastic ma
 
 Let's revise the expression to suit the context of thermo-viscoelasticity:
 
-### Helmholtz Free Energy and Internal Energy
+## Helmholtz Free Energy and Internal Energy
 
 1. **Internal Energy**: In the mechanical context, the internal energy $ U $ should reflect the contributions from both elastic deformation and any stored energy due to viscous effects. Thus, it depends on the elastic strain $ \varepsilon_e $ and potentially on the history of the viscous strain $ \varepsilon_v $.
 
@@ -162,7 +161,7 @@ Let's revise the expression to suit the context of thermo-viscoelasticity:
    $$
    This reflects how the energy available to do work is reduced by the energy 'spent' in providing entropy increase under the given temperature $ T $.
 
-### Role of Gibbs Potential in This Context
+## Role of Gibbs Potential in This Context
 
 In the case of processes at constant stress $ \sigma $ and temperature $ T $, the Gibbs potential (or Gibbs free energy for mechanics) is indeed a driving function but you must be careful how it's applied. In mechanics, the work-conjugate pair is stress and strain, not pressure and volume. 
 
@@ -172,7 +171,7 @@ G = F + \sigma \varepsilon_e
 $$
 Given that in mechanical applications, stress $\sigma$ often acts analogously to pressure, while strain $\varepsilon_e$ is similar to volume displacement, this energy incorporates the stored elastic energy and the energy due to applied loads.
 
-### Time Integration and Minimization
+## Time Integration and Minimization
 
 With these definitions, you can devise a time integration scheme for creep by:
 
@@ -195,7 +194,7 @@ Overall, while the formal expression of Gibbs potential is adapted for mechanica
 
 Yes, the time-stepping algorithm can indeed be formulated as a minimization problem for the Gibbs potential $ G $ (or the analogous potential in the mechanical context) at the next time step. This approach leverages the principle that physical systems tend to evolve towards states that minimize the appropriate energy potential, subject to given constraints.
 
-### Minimization Framework
+## Minimization Framework
 
 To set up the time-stepping as a minimization problem, the Gibbs potential should be defined to capture the energy contributions at constant stress and temperature, reflecting the specific characteristics of the viscoelastic material. Here is a broad framework to guide this process:
 
@@ -229,7 +228,7 @@ To set up the time-stepping as a minimization problem, the Gibbs potential shoul
    - Use optimization algorithms such as gradient descent or Newton’s method to minimize $G$.
    - Ensure that constraints are incorporated directly into the optimization routine or by using penalty methods.
 
-### Conclusion
+## Final Thoughts
 
 Formulating the problem as a minimization of Gibbs potential allows the algorithm to naturally evolve the viscoelastic system towards configurations of lower energy, thereby improving stability and accuracy. Such an approach is beneficial for capturing the complex interplay between elasticity, viscosity, and thermal effects, especially in systems under prolonged loading or during creep.
 
@@ -244,11 +243,12 @@ U = U(\varepsilon_e, \varepsilon_v, S, T) = \frac{1}{2} E \varepsilon_e^2 + \phi
 $$
 
 Here:
+
 - $E$ is the elastic modulus, and $\frac{1}{2}E\varepsilon_e^2$ represents the stored elastic energy.
 - $\phi(\varepsilon_v)$ is a function representing any stored or dissipated energy due to the viscous strain $\varepsilon_v$.
 - $S$ is the entropy and $T$ is the temperature, providing thermal contributions to $U$ (though, for simplicity, we might initially exclude the explicit entropy dependence in the mechanical model unless thermal effects are significant).
 
-### Expression for $dU$
+## Expression for $dU$
 
 The total differential of $U$, assuming that $U$ depends primarily on $\varepsilon_e$, $\varepsilon_v$, and potentially temperature $T$, is given by:
 
@@ -298,7 +298,7 @@ $$
 
 This expression emphasizes that changes in internal energy $ U $ come from heat transfer (resulting in changes in entropy $ S $) and work done (resulting in changes in volume $ V $). Let's translate these concepts into the context of a thermo-viscoelastic model, where strain $ \varepsilon $ acts as the analogue to volume $ V $, and stress $ \sigma $ acts as the analogue to pressure $ p $.
 
-### Revising the Expression for $ dU $
+## Revising the Expression for $dU$
 
 For a thermo-mechanical system where mechanical deformation is significant and thermal effects are represented by changes in entropy rather than explicit temperature changes, the differential should properly account for energy exchanges in terms of entropy:
 
@@ -318,7 +318,7 @@ For a thermo-mechanical system where mechanical deformation is significant and t
    - $\sigma d\varepsilon$: Represents mechanical work done on or by the system under stress, analogous to $-p dV$ in classical thermodynamics.
    - The term $\left(\frac{\partial U}{\partial T}\right)_\varepsilon dT$ accounts for any direct effects of temperature changes on internal energy that are not captured through entropy changes alone. This term captures latent thermal effects unassociated with $ dS $.
 
-### Reconnecting with the Original Context
+## Reconnecting with the Original Context
 
 In a viscoelastic context, the following framework allows the analysis to reconcile mechanical interactions under stress with thermodynamic principles:
 
@@ -335,7 +335,7 @@ When integrating these principles into a viscoelastic model, ensure that energy 
 
 Certainly! Let's delve into the thermal evolution equation and understand its connection to traditional thermodynamic principles, especially focusing on the relationship between energy dissipation and heat.
 
-### Interpretation of the Thermal Evolution Equation
+## Interpretation of the Thermal Evolution Equation
 
 1. **Thermal Evolution Equation**:
    - The equation $\dot{T} = \frac{1}{C} \left(\frac{\partial \Phi_d}{\partial \dot{\varepsilon}} \dot{\varepsilon} \right)$ suggests that the rate of temperature change is driven by the energy dissipated in the material system.
@@ -345,7 +345,7 @@ Certainly! Let's delve into the thermal evolution equation and understand its co
    - Dissipation potential $\Phi_d$ models the energy lost due to irreversible processes such as plastic deformation, viscoelastic relaxation, and friction.
    - The energy released as a result of these processes is often dissipated as heat, raising the temperature of the system.
 
-### Connection to Traditional Thermodynamics
+## Connection to Traditional Thermodynamics
 
 3. **Traditional Framework**:
    - In reversible processes, changes in entropy relate to heat transfer by $dS = \delta Q / T$. Entropy connects energy changes to state variable temperature.
@@ -363,6 +363,6 @@ Certainly! Let's delve into the thermal evolution equation and understand its co
    - **Path Independence**: Both heat and dissipation relate to energy transfer processes, though dissipation specifically refers to irreversible paths where energy is lost or degrades the system's ability to do work.
    - **Entropy**: As temperature is conjugate to entropy, the path-independent dissipation generates heat incrementally irrespective of the exact sequence, reflecting the systemic inefficiencies.
 
-### Conclusion
+## Conclusion
 
 The incorporation of energy dissipation into the thermal evolution equation reflects the integral, path-independent link between entropy changes and dissipation. This linkage aligns with the second law of thermodynamics, where every irreversible act contributes to entropy, translating directly into system temperature changes through the produced heat. Therefore, the framework remains thermodynamically consistent, effectively bridging traditional thermodynamic relationships and modern material modeling under coupled mechanical and thermal considerations.
