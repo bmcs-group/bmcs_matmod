@@ -78,4 +78,4 @@ class GSM1D_EVPD(GSMBase):
     dot_epsEps = sp.Matrix.vstack(sp.Matrix([[dot_eps]]), F_engine.dot_Eps.as_explicit())
     dot_f_ = (F_engine.f_expr.subs(F_engine.subs_Sig_Eps).diff(epsEps).T * dot_epsEps)[0,0]
 
-    F_engine.phi_ext_expr = sp.Heaviside(dot_f_) * sp.Abs(dot_eps - dot_eps_p) * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)
+    F_engine.phi_ext_expr = sp.Heaviside(sig_ve * dot_eps) * sp.Abs(dot_eps - dot_eps_p) * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)
