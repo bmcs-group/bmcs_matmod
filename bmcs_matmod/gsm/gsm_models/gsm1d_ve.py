@@ -50,4 +50,5 @@ class GSM1D_VE(GSMBase):
     )
     dot_eps_ve = F_engine.dot_Eps[0, 0]
     sig_ve = F_engine.Sig[0, 0]
+    #sig_ = F_engine.sig_
     F_engine.h_k = [dot_eps_ve * eta_ve - sig_ve]

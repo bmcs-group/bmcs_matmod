@@ -97,12 +97,17 @@ class GSMMPDP(tr.HasTraits):
     """Dissipation potential
     """
 
-    Sig_signs = tr.Tuple
+    Sig_signs = tr.Array
     """Signs of the derivatives of the free energy potential with respect 
     to the internal variables
     """
 
     sig_sign = tr.Float(1)
+    """Sign relating the rate of free energy to the dissipation.
+    For Helmholtz free energy it is negative, for the Gibbs free energy it is positive
+    """
+
+    gamma_mech_sign = tr.Int(-1)
     """Sign relating the rate of free energy to the dissipation.
     For Helmholtz free energy it is negative, for the Gibbs free energy it is positive
     """
@@ -344,13 +349,12 @@ class GSMMPDP(tr.HasTraits):
     sig_ = tr.Property()
     @tr.cached_property
     def _get_sig_(self):
-        "For Gibbs for external strain the sign is swapped using the sig_sign parameter = -1"
-        return self.sig_sign * self.F_expr.diff(self.eps_vars[0])
+        return self.F_expr.diff(self.eps_vars[0])
 
     sig_a_ = tr.Property()
     @tr.cached_property
     def _get_sig_a_(self):
-        return self.sig_sign * self.F_expr.diff(self.eps_a)
+        return self.F_expr.diff(self.eps_a)
 
     subs_sig_eps = tr.Property()
     @tr.cached_property
@@ -583,10 +587,10 @@ class GSMMPDP(tr.HasTraits):
 
         f_ = self.f_expr
 
-        gamma_mech = ((self.Y * Sig).T * self.dot_Eps.as_explicit())[0]
+        gamma_mech = self.gamma_mech_sign * ((self.Y * Sig).T * self.dot_Eps.as_explicit())[0]
 
         # Full Lagrangian for the minimum principle of dissipation potential
-        L_ = -gamma_mech + dot_Lam_H_ + lam_phi 
+        L_ = -gamma_mech - dot_Lam_H_ - lam_phi 
 
         # Generalized forces and flux increments
         S = sp.Matrix([Sig, sp.Matrix(dot_Lam), sp.Matrix(lam)])

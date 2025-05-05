@@ -67,6 +67,7 @@ class GSM1D_EPD(GSMBase):
     )
 
     dot_eps = F_engine.dot_eps_a[0]
-    dot_eps_p = F_engine.dot_Eps[0, 0]
+    dot_eps_vp = F_engine.dot_Eps[0, 0]
 
-    F_engine.phi_ext_expr = sp.Abs(dot_eps - dot_eps_p) * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)
+    sig_ = F_engine.sig_
+    F_engine.phi_ext_expr = sp.Heaviside(sig_ * dot_eps) * sp.Abs(dot_eps-dot_eps_vp) * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)

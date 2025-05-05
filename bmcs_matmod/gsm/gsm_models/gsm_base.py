@@ -128,9 +128,9 @@ class GSMBase(HasTraits):
             m_params=F_gsm.m_params,
             Eps_vars=F_gsm.Eps_vars,
             Sig_vars=F_gsm.Sig_vars,
-            Sig_signs=F_gsm.Sig_signs,
+            gamma_mech_sign=(1),
+            Sig_signs=F_gsm.Sig_signs * (-1),
             F_expr=G_,
-            dF_sign=-1,
             f_expr=f_,
             phi_ext_expr=phi_,
             h_k=h_k_
