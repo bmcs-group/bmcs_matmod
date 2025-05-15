@@ -4,7 +4,7 @@ from scipy import interpolate
 import bmcs_utils.api as bu
 
 
-class TimeFunction(bu.InteractiveModel):
+class TimeFunction(Model):
     name = 'Time function'
     n_i = bu.Int(0, input=True, desc='number of data points between data points')
     '''Number of steps between two values

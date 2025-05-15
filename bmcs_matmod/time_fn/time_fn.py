@@ -10,7 +10,7 @@ import numpy as np
 # This implementation uses the symbolic machinery which is not necessary a simpler data point based implementation with `numpy.interp1d` would be better ... later
 
 
-class LoadFn(bu.InteractiveModel):
+class LoadFn(bu.Model):
 
     def __call__(self,t):
         return t
