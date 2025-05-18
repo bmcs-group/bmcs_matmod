@@ -1,0 +1,19 @@
+@startuml
+class SymbolRegistry
+class TimeFnBase {
+    +params
+    +t
+    +__call__()
+    +get_args()
+    +symb_expr
+    +symb_fn_lambdified
+}
+SymbolRegistry <|-- TimeFnBase
+TimeFnBase <|-- StepLoading
+TimeFnBase <|-- MonotonicAscending
+TimeFnBase <|-- TimeFnCyclicBase
+TimeFnCyclicBase <|-- TimeFnCycleSinus
+TimeFnCyclicBase <|-- TimeFnCycleLinear
+TimeFnCyclicBase <|-- TimeFnCycleWithRamps
+TimeFnBase <|-- PeriodicTimeFn
+@enduml

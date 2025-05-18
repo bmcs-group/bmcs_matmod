@@ -1,0 +1,38 @@
+@startuml
+class SymbolRegistry
+
+class TimeFnBase {
+    +params
+    +t
+    +__call__()
+    +get_args()
+    +symb_expr
+    +symb_fn_lambdified
+}
+
+class StepLoading
+class MonotonicAscending
+class TimeFnCyclicBase
+class TimeFnCycleSinus
+class TimeFnCycleLinear
+class TimeFnCycleWithRamps
+class PeriodicTimeFn
+class TimeFnStepping
+class TimeFnOverlay
+
+SymbolRegistry <|-- TimeFnBase
+TimeFnBase <|-- StepLoading
+TimeFnBase <|-- MonotonicAscending
+TimeFnBase <|-- TimeFnCyclicBase
+TimeFnCyclicBase <|-- TimeFnCycleSinus
+TimeFnCyclicBase <|-- TimeFnCycleLinear
+TimeFnCyclicBase <|-- TimeFnCycleWithRamps
+TimeFnBase <|-- PeriodicTimeFn
+TimeFnBase <|-- TimeFnStepping
+TimeFnBase <|-- TimeFnOverlay
+
+PeriodicTimeFn "1" o-- "1" TimeFnCyclicBase : time_fn_cycle
+TimeFnOverlay "1" o-- "1" TimeFnBase : fn1
+TimeFnOverlay "1" o-- "1" TimeFnBase : fn2
+
+@enduml
