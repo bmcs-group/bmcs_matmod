@@ -1,8 +1,8 @@
 import sympy as sp
-from .gsm_base import GSMBase
+from .gsm_def import GSMDef
 from .gsm_mpdp import GSMMPDP
 
-class GSM1D_EVPD(GSMBase):
+class GSM1D_EVPD(GSMDef):
     """Single variable one-dimensional potential that can be used to demonstrate the
     interaction between the individual dissipative mechanisms.
     """
@@ -80,4 +80,3 @@ class GSM1D_EVPD(GSMBase):
 
     sig = F_engine.sig_
     F_engine.phi_ext_expr = sp.Heaviside(sig * dot_eps) * sp.Abs(dot_eps-dot_eps_p) * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)
-    

@@ -1,8 +1,8 @@
 import sympy as sp
-from .gsm_base import GSMBase
+from .gsm_def import GSMDef
 from .gsm_mpdp import GSMMPDP
 
-class GSM1D_VED(GSMBase):
+class GSM1D_VED(GSMDef):
     """Single variable one-dimensional potential that can be used to demonstrate the
     interaction between the individual dissipative mechanisms.
     """

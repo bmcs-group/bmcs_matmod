@@ -12,7 +12,7 @@ from .gsm_mpdp import GSMMPDP
 """
 Framework for GSM-based material models.
 
-This file defines the GSMBase class, which outlines the symbolic attributes
+This file defines the GSMDef class, which outlines the symbolic attributes
 (eps_vars, T_var, Eps_vars, Sig_vars, Sig_signs, F_expr, f_expr, phi_ext_expr,
 g_expr_list) for thermodynamic potentials and constraints using Sympy. It also
 provides a property for transforming the Helmholtz free energy (F_expr)
@@ -30,7 +30,7 @@ def is_valid_variable_name(name):
         return False
     return True
 
-class GSMBase(HasTraits):
+class GSMDef(HasTraits):
     """
     Base class for setting up thermodynamic models within the GSM framework.
     """
@@ -39,7 +39,7 @@ class GSMBase(HasTraits):
     @classmethod
     def __init_subclass__(cls, **kwargs):
         """
-        This method is called when a subclass of GSMBase is created.
+        This method is called when a subclass of GSMDef is created.
         It initializes all class-level symbolic computations.
         """
         super().__init_subclass__(**kwargs)

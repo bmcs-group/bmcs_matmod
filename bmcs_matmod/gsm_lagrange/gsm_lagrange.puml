@@ -1,0 +1,117 @@
+@startuml GSM Lagrange Class Diagram
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 14
+skinparam classFontName Arial
+skinparam backgroundColor white
+skinparam classBackgroundColor LightBlue
+skinparam classBorderColor DarkBlue
+
+package "GSM Lagrange" {
+    abstract class GSMDef {
+        +param_codenames : dict
+        +F_engine : GSMMPDP
+        +G_engine : GSMMPDP
+        +get_F_sig(eps, *args)
+        +get_F_response(eps_ta, t_t, *args)
+        +get_F_Sig(eps, *args)
+        +get_G_eps(sig, *args)
+        +get_G_response(sig_ta, t_t, *args)
+        +get_G_Sig(sig, *args)
+        +print_potentials()
+        +latex_potentials()
+        +markdown()
+    }
+
+    class GSMMPDP {
+        +name : str
+        +eps_vars : Any
+        +sig_vars : Any
+        +Eps_vars : tuple
+        +Sig_vars : tuple
+        +m_params : tuple
+        +F_expr : Any
+        +f_expr : Any
+        +phi_ext_expr : Any
+        +get_sig(eps, Eps, *args)
+        +get_response(eps_ta, t_t, *args)
+        +get_Sig(eps, Eps, *args)
+    }
+
+    class GSMModel {
+        +gsm_def : type
+        +gsm_exec : GSMDef
+        +trait_model_params : dict
+        +__init__(gsm_def, **kwargs)
+        +get_F_response(eps_ta, t_t)
+        +get_G_response(sig_ta, t_t)
+    }
+
+    class MaterialParams {
+        +gsm_def : type
+        +param_values : dict
+        +__init__(gsm_def, **param_values)
+    }
+
+    class GSMaterial {
+        +name : str
+        +mat_params : List<MaterialParams>
+        +add_param(param : MaterialParams)
+        +get_param_for_model(gsm_def)
+    }
+
+    ' 1D Model Classes
+    class GSM1D_ED
+    class GSM1D_EP
+    class GSM1D_EPD
+    class GSM1D_EVP
+    class GSM1D_EVPD
+    class GSM1D_VE
+    class GSM1D_VED
+    class GSM1D_VEVP
+    class GSM1D_VEVPD
+
+    ' Relationships
+    GSMDef <|-- GSM1D_ED
+    GSMDef <|-- GSM1D_EP
+    GSMDef <|-- GSM1D_EPD
+    GSMDef <|-- GSM1D_EVP
+    GSMDef <|-- GSM1D_EVPD
+    GSMDef <|-- GSM1D_VE
+    GSMDef <|-- GSM1D_VED
+    GSMDef <|-- GSM1D_VEVP
+    GSMDef <|-- GSM1D_VEVPD
+
+    GSMDef "1" o-- "1" GSMMPDP : F_engine >
+    GSMDef "1" o-- "1" GSMMPDP : G_engine >
+    GSMModel "1" o-- "1" GSMDef : gsm_exec >
+    MaterialParams "1" o-- "1" GSMDef : gsm_def >
+    GSMaterial "1" o-- "*" MaterialParams : mat_params >
+
+    note right of GSMDef
+      Symbolic base class for GSM models.
+      Handles class-level symbolic derivation,
+      and provides both Helmholtz and Gibbs APIs.
+    end note
+
+    note right of GSMMPDP
+      Symbolic engine for potentials,
+      constraints, and numerical execution.
+    end note
+
+    note right of GSMModel
+      Executable GSM model with assigned parameters.
+      Bridges symbolic definition and simulation.
+    end note
+
+    note right of MaterialParams
+      Record of parameter values for a GSM model.
+    end note
+
+    note right of GSMaterial
+      Represents a real-world material,
+      aggregates parameter records for models.
+    end note
+}
+
+@enduml
