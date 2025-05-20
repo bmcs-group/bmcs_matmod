@@ -1,5 +1,8 @@
-
-from .gsm_base import GSMBase
+from .material_params import MaterialParams
+from .material import Material
+from .gsm_def import GSMDef
+from .gsm_mpdp import GSMMPDP
+from .gsm_model import GSMModel
 from .gsm1d_ed import GSM1D_ED
 from .gsm1d_ep import GSM1D_EP
 from .gsm1d_epd import GSM1D_EPD
