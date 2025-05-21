@@ -44,7 +44,8 @@ class GSMModel(bu.Model):
         traits_dict = {
             '__doc__': f"Executable material model based on {gsm_def.__name__}",
             'gsm_def': gsm_def,
-            'trait_model_params': trait_model_params
+            'trait_model_params': trait_model_params,
+            'param_names': list(trait_model_params.values())
         }
         for param_sym, trait_name in trait_model_params.items():
             traits_dict[trait_name] = tr.Float(1.0, desc=f"Material parameter {param_sym.name}")
@@ -90,3 +91,9 @@ class GSMModel(bu.Model):
     def __str__(self):
         params_str = ", ".join(f"{name}={getattr(self, name)}" for name in self.trait_model_params.values())
         return f"{self.__class__.__name__}({params_str})"
+
+    def set_params(self, **kw):
+        """Set parameters from keyword arguments, ignoring unknown keys."""
+        for name in getattr(self, 'param_names', []):
+            if name in kw:
+                setattr(self, name, kw[name])

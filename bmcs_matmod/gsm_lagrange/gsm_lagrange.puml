@@ -21,6 +21,7 @@ package "GSM Lagrange" {
         +print_potentials()
         +latex_potentials()
         +markdown()
+        +get_args(**kwargs)
     }
 
     class GSMEngine {
@@ -30,21 +31,39 @@ package "GSM Lagrange" {
         +Eps_vars : tuple
         +Sig_vars : tuple
         +m_params : tuple
+        +m_param_subs : dict
         +F_expr : Any
         +f_expr : Any
         +phi_ext_expr : Any
         +get_sig(eps, Eps, *args)
         +get_response(eps_ta, t_t, *args)
         +get_Sig(eps, Eps, *args)
+        +get_dDiss_dEps(...)
+        +get_dot_Eps_bounds(...)
+        +get_Sig_f_R_dR_n1(...)
+        +get_state_n1(...)
+        +save_to_disk()
+        +load_from_disk(name)
     }
 
     class GSMModel {
         +gsm_def : type
         +gsm_exec : GSMDef
         +trait_model_params : dict
+        +param_names : list
         +__init__(gsm_def, **kwargs)
+        +get_param_dict()
+        +get_args()
+        +get_F_sig(eps)
         +get_F_response(eps_ta, t_t)
+        +get_F_Sig(eps)
+        +get_G_eps(sig)
         +get_G_response(sig_ta, t_t)
+        +get_G_Sig(sig)
+        +print_potentials()
+        +markdown()
+        +get_param_values()
+        +set_params(**kw)
     }
 
     class MaterialParams {
@@ -58,6 +77,21 @@ package "GSM Lagrange" {
         +mat_params : List<MaterialParams>
         +add_param(param : MaterialParams)
         +get_param_for_model(gsm_def)
+    }
+
+    class ResponseData {
+        +t_t : np.ndarray
+        +ctrl_var : np.ndarray
+        +conj_var : np.ndarray
+        +Eps_t : np.ndarray
+        +Sig_t : np.ndarray
+        +Eps_vars : tuple
+        +Sig_vars : tuple
+        +iter_t : np.ndarray
+        +lam_t : np.ndarray
+        +get_internal_var(i)
+        +get_conj_var(i)
+        +to_dict()
     }
 
     ' 1D Model Classes
@@ -87,6 +121,8 @@ package "GSM Lagrange" {
     GSMModel "1" o-- "1" GSMDef : gsm_exec >
     MaterialParams "1" o-- "1" GSMDef : gsm_def >
     GSMaterial "1" o-- "*" MaterialParams : mat_params >
+    GSMModel "1" o-- "1" GSMDef : gsm_def >
+    ResponseData ..> GSMModel : used for results
 
     note right of GSMDef
       Symbolic base class for GSM models.
@@ -111,6 +147,11 @@ package "GSM Lagrange" {
     note right of GSMaterial
       Represents a real-world material,
       aggregates parameter records for models.
+    end note
+
+    note right of ResponseData
+      Flexible container for simulation response data
+      and metadata, enables postprocessing and storage.
     end note
 }
 
