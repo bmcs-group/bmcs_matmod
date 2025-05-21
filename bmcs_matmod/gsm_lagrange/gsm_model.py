@@ -6,7 +6,7 @@ from typing import Type, Dict, List, Union, Any, Tuple
 import inspect
 
 from .gsm_def import GSMDef
-from .gsm_mpdp import GSMMPDP
+from .gsm_engine import GSMEngine
 
 def derive_trait_model_params(gsm_def):
     """Utility to derive trait_model_params mapping from a GSMDef."""

@@ -23,7 +23,7 @@ numpy_dirac =[{'DiracDelta': get_dirac_delta }, 'numpy']
 # Directory to store the serialized symbolic instances
 CACHE_DIR = '_lambdified_cache'
 
-class GSMMPDP(tr.HasTraits):
+class GSMEngine(tr.HasTraits):
     """Generalized Standard Material
 
     The class definition consists of 

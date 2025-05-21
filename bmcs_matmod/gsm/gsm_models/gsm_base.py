@@ -7,7 +7,7 @@ from traits.api import \
 
 from IPython.display import display, Math, Markdown
 
-from .gsm_mpdp import GSMMPDP
+from .gsm_mpdp import GSMEngine
 
 """
 Framework for GSM-based material models.
@@ -61,7 +61,7 @@ class GSMBase(HasTraits):
 
     # Symbolic attributes (to be defined in subclasses)
 
-    F_engine = Instance(GSMMPDP)
+    F_engine = Instance(GSMEngine)
 
     eps_a_ = Property(depends_on='F_engine')
     @cached_property
@@ -104,7 +104,7 @@ class GSMBase(HasTraits):
         F_gsm = self.F_engine
         return (F_gsm.sig_a.T * F_gsm.eps_a)[0]
 
-    G_engine = Property(Instance(GSMMPDP), depends_on='F_engine')
+    G_engine = Property(Instance(GSMEngine), depends_on='F_engine')
     """
     Transform Helmholtz free energy (F_expr) into Gibbs free energy (G_expr)
     using the Legendre transform. Override in subclass if needed.
@@ -120,7 +120,7 @@ class GSMBase(HasTraits):
         phi_ = sp.simplify(F_gsm.phi_ext_expr.subs(subs_eps_sig_))
         h_k_ = [sp.simplify(h_.subs(subs_eps_sig_)) for h_ in F_gsm.h_k]
 
-        G_gsm = GSMMPDP(
+        G_gsm = GSMEngine(
             name=f'G_{F_gsm.name}',
             eps_vars=F_gsm.sig_vars,
             sig_vars=self.eps_a,

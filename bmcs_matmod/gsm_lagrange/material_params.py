@@ -1,5 +1,6 @@
 import traits.api as tr
 from .gsm_def import GSMDef
+from .gsm_engine import GSMEngine
 from .gsm_model import derive_trait_model_params
 
 class MaterialParams(tr.HasTraits):

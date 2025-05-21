@@ -1,4 +1,6 @@
 from .material_params import MaterialParams
+from .gsm_def import GSMDef
+from .gsm_engine import GSMEngine
 
 class Material:
     """Represents a real-world material, aggregates parameter records for models."""

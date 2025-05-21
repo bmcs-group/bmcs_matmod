@@ -1,126 +1,97 @@
-# Generalized Standard Material Framework
+# Generalized Standard Material (GSM) Lagrange Framework
 
-This package implements a symbolic-to-executable (symb-exec) framework for thermodynamically consistent material modeling. It enables the formulation of complex material models based on thermodynamic potentials and constraints, which are automatically transformed into efficient numerical implementations.
+This folder implements a symbolic-to-executable framework for thermodynamically consistent material modeling, based on the Generalized Standard Material (GSM) concept. The design enables clear separation between symbolic model definitions, parameter records, executable models, and real-world material collections.
 
-## Architectural Design
+## Key Concepts
 
-The framework follows a clear separation of concerns between symbolic model definitions and their executable numerical implementations:
+### 1. Symbolic Model Definition (`GSMDef`)
+- Abstract base class for all GSM models.
+- Encapsulates symbolic variables, thermodynamic potentials, constraints, and derivation logic.
+- Subclasses (e.g., `GSM1D_ED`, `GSM1D_EP`, etc.) define specific material models by specifying symbolic expressions for free energy, state variables, and constraints.
+- Provides both Helmholtz and Gibbs free energy formulations and their associated methods.
 
-### 1. Symbolic Layer (Class Level)
-- **Definition**: Class-level symbolic expressions and relationships
-- **Implementation**: Using `__init_subclass__` to perform symbolic calculations once at class definition time
-- **Advantages**: Clear, mathematical formulation; automatic derivation of constitutive equations
+### 2. Symbolic Engine (`GSMEngine`)
+- Handles symbolic manipulation and derivation of evolution equations, constraints, and potentials.
+- Supports automatic differentiation, lambdification, and time-stepping algorithms.
 
-### 2. Executable Layer (Instance Level)
-- **Definition**: Instance-specific parameter values and numerical implementations
-- **Implementation**: Lambdified functions for efficient computation
-- **Advantages**: High-performance numerical evaluation; caching of computational results
+### 3. Executable Model (`GSMModel`)
+- Bridges a symbolic model definition (`GSMDef`) with a set of parameter values.
+- Dynamically creates traits for all model parameters, enabling instance-level configuration.
+- Provides methods for numerical simulation (e.g., `get_F_response`, `get_G_response`).
 
-### 3. Bridging Components
-- **Definition**: Components that connect symbolic models with concrete parameters
-- **Implementation**: `GSMMaterialModel` class (forthcoming)
-- **Advantages**: Trait-based interface; automatic parameter mapping
+### 4. Material Parameter Record (`MaterialParams`)
+- Stores a set of parameter values for a specific symbolic model (`GSMDef`).
+- Enables parameter management, calibration, and database integration.
 
-## Core Components
+### 5. Real-World Material (`GSMaterial`)
+- Represents a physical material (e.g., a concrete mixture or steel grade).
+- Aggregates multiple `MaterialParams` records, each corresponding to a different GSM model definition.
+- Supports retrieval and management of parameter sets for different models.
 
-### GSMBase
+## Workflow
 
-A class that provides a front-end for both Helmholtz and Gibbs free energy formulations:
+1. **Define a Symbolic Model:**  
+   Subclass `GSMDef` and specify symbolic variables, potentials, and constraints.
+
+2. **Create Parameter Records:**  
+   Use `MaterialParams` to store parameter values for a given model.
+
+3. **Build Executable Models:**  
+   Instantiate `GSMModel` with a symbolic model and parameter values for simulation.
+
+4. **Aggregate Materials:**  
+   Use `GSMaterial` to collect parameter records for real-world materials.
+
+5. **Simulate and Analyze:**  
+   Use the executable model's methods to run simulations and analyze responses under various loading scenarios.
+
+## File Structure
+
+- `gsm_def.py`         : Symbolic model base class (`GSMDef`)
+- `gsm_mpdp.py`        : Symbolic engine for potentials and constraints (`GSMEngine`)
+- `gsm_model.py`       : Executable model class (`GSMModel`)
+- `material_params.py` : Material parameter record class (`MaterialParams`)
+- `material.py`        : Real-world material collection class (`GSMaterial`)
+- `gsm1d_*.py`         : Specific 1D GSM model definitions (e.g., elastic-damage, viscoelastic, etc.)
+- `gsm_lagrange.puml`  : UML class diagram of the framework
+
+## Design Highlights
+
+- **Symbolic-to-Executable Pipeline:**  
+  Symbolic models are defined once and automatically converted to efficient numerical code.
+
+- **Parameter Mapping:**  
+  Parameter codenames are derived automatically, requiring explicit mapping only for symbols with non-standard names.
+
+- **Extensibility:**  
+  New models are added by subclassing `GSMDef` and specifying symbolic expressions.
+
+- **Separation of Concerns:**  
+  Symbolic definitions, parameter records, executable models, and material collections are clearly separated for maintainability and clarity.
+
+- **Consistent Naming:**  
+  All classes and files follow a systematic naming convention to emphasize the GSM concept and maintain clarity.
+
+## Example Usage
 
 ```python
-class MyModel(GSMBase):
-    # Symbolic variables and parameters
-    eps = sp.Symbol('\\varepsilon', real=True)
-    E = sp.Symbol('E', positive=True)
-    
-    # Helmholtz free energy
-    F_expr = 0.5 * E * eps**2
-    
-    # Define engine
-    F_engine = GSMMPDP(...)
+from bmcs_matmod.gsm_lagrange.gsm1d_ed import GSM1D_ED
+from bmcs_matmod.gsm_lagrange.gsm_model import GSMModel
+
+# Create an executable model with parameters
+model = GSMModel(gsm_def=GSM1D_ED, E=20000, omega_0=0.01, omega_1=0.2, kappa_0=0.0)
+
+# Simulate a monotonic tension test
+import numpy as np
+strain = np.linspace(0, 0.006, 100)
+time = np.linspace(0, 1.0, 100)
+response = model.get_F_response(strain, time)
 ```
 
-Key features:
-- Class-level symbolic initialization via `__init_subclass__`
-- Consistent method naming for Helmholtz (`get_F_*`) and Gibbs (`get_G_*`) formulations
-- Automatic Legendre transform between Helmholtz and Gibbs potentials
+## UML Diagram
 
-### GSMMPDP
+See `gsm_lagrange.puml` for a class diagram of the framework.
 
-The symbolic engine responsible for:
+---
 
-- Managing thermodynamic potentials and state variables
-- Deriving evolution equations via the minimum principle of dissipation potential
-- Implementing time-stepping algorithms and return-mapping procedures
-
-## Workflow: From Symbolic to Executable
-
-1. **Define a Material Model**:
-   - Subclass `GSMBase`
-   - Define symbolic variables, parameters, and potentials
-   - Class-level symbolic computations happen automatically
-
-2. **Use the Material Model**:
-   - Create an instance with specific parameter values
-   - Call methods like `get_F_response` or `get_G_response`
-   - Analyze and visualize results
-
-The framework handles the complex transition from mathematical formulations to numerical computations, ensuring thermodynamic consistency throughout.
-
-## Implementation Approach
-
-### Symbolic Computations at Class Level
-
-The recent implementation uses Python's `__init_subclass__` hook to perform all symbolic derivations when a subclass of `GSMBase` is defined:
-
-```python
-@classmethod
-def __init_subclass__(cls, **kwargs):
-    super().__init_subclass__(**kwargs)
-    
-    if hasattr(cls, 'F_engine') and cls.F_engine is not None:
-        # Build parameter codenames
-        cls.param_codenames = cls._build_param_codenames()
-        
-        # Calculate symbolic expressions
-        cls._calculate_symbolic_expressions()
-        
-        # Initialize the Gibbs engine
-        cls._initialize_gibbs_engine()
-```
-
-This approach offers several advantages:
-- Symbolic computation happens once at class definition time
-- Clear separation between symbolic expressions and numerical computations
-- Improved performance as symbolic derivations aren't repeated for each instance
-
-### Consistent Method Naming
-
-The framework now uses consistent method naming for Helmholtz and Gibbs formulations:
-- `get_F_sig`, `get_F_response`, `get_F_Sig` for Helmholtz-based methods
-- `get_G_eps`, `get_G_response`, `get_G_Sig` for Gibbs-based methods
-
-Legacy methods (`get_sig`, `get_response`, `get_Sig`) are maintained for backward compatibility but will be deprecated in future versions.
-
-## Future Developments
-
-### GSMMaterialModel
-
-A forthcoming addition to the framework is the `GSMMaterialModel` class, which will:
-- Create trait-based interfaces for material parameters
-- Enable parameter studies and visualization
-- Simplify the bridge between symbolic models and concrete parameter values
-
-### Extended Visualization
-
-Future versions will include enhanced visualization capabilities:
-- Interactive exploration of material behavior
-- Comparison of different material models
-- Parameter sensitivity analysis
-
-### Wider Integration
-
-Integration with other components of the BMCS framework:
-- Time functions for loading scenarios
-- Structural models for component-level analysis
-- Finite element models for spatial discretization
+This structure supports robust, extensible, and maintainable development of advanced material models for computational mechanics.

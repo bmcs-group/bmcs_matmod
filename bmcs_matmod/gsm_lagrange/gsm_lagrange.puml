@@ -10,8 +10,8 @@ skinparam classBorderColor DarkBlue
 package "GSM Lagrange" {
     abstract class GSMDef {
         +param_codenames : dict
-        +F_engine : GSMMPDP
-        +G_engine : GSMMPDP
+        +F_engine : GSMEngine
+        +G_engine : GSMEngine
         +get_F_sig(eps, *args)
         +get_F_response(eps_ta, t_t, *args)
         +get_F_Sig(eps, *args)
@@ -23,7 +23,7 @@ package "GSM Lagrange" {
         +markdown()
     }
 
-    class GSMMPDP {
+    class GSMEngine {
         +name : str
         +eps_vars : Any
         +sig_vars : Any
@@ -82,8 +82,8 @@ package "GSM Lagrange" {
     GSMDef <|-- GSM1D_VEVP
     GSMDef <|-- GSM1D_VEVPD
 
-    GSMDef "1" o-- "1" GSMMPDP : F_engine >
-    GSMDef "1" o-- "1" GSMMPDP : G_engine >
+    GSMDef "1" o-- "1" GSMEngine : F_engine >
+    GSMDef "1" o-- "1" GSMEngine : G_engine >
     GSMModel "1" o-- "1" GSMDef : gsm_exec >
     MaterialParams "1" o-- "1" GSMDef : gsm_def >
     GSMaterial "1" o-- "*" MaterialParams : mat_params >
@@ -94,7 +94,7 @@ package "GSM Lagrange" {
       and provides both Helmholtz and Gibbs APIs.
     end note
 
-    note right of GSMMPDP
+    note right of GSMEngine
       Symbolic engine for potentials,
       constraints, and numerical execution.
     end note

@@ -1,6 +1,6 @@
 import sympy as sp
 from .gsm_def import GSMDef
-from .gsm_mpdp import GSMMPDP
+from .gsm_engine import GSMEngine
 
 class GSM1D_VE(GSMDef):
     """Single variable one-dimensional potential that can be used to demonstrate the
@@ -37,7 +37,7 @@ class GSM1D_VE(GSMDef):
 
     m_param_codenames = {eta_ve: 'eta_ve'}
 
-    F_engine = GSMMPDP(
+    F_engine = GSMEngine(
         name = 'gsm_F_1d_mpdp_ve',
         diff_along_rates = False,
         eps_vars = eps_a,

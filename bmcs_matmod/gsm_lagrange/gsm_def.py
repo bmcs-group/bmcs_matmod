@@ -7,7 +7,7 @@ from traits.api import \
 
 from IPython.display import display, Math, Markdown
 
-from .gsm_mpdp import GSMMPDP
+from .gsm_mpdp import GSMEngine
 
 """
 Framework for GSM-based material models.
@@ -126,7 +126,7 @@ class GSMDef(HasTraits):
         h_k_ = [sp.simplify(h_.subs(subs_eps_sig_)) for h_ in F_engine.h_k]
 
         # Create a class-level G_engine (will be shared by all instances)
-        cls.G_engine = GSMMPDP(
+        cls.G_engine = GSMEngine(
             name=f'G_{F_engine.name}',
             eps_vars=F_engine.sig_vars,
             sig_vars=cls.eps_a_,
