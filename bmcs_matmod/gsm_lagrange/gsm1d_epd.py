@@ -1,62 +1,53 @@
 import sympy as sp
 from .gsm_def import GSMDef
 from .gsm_engine import GSMEngine
+from .gsm_vars import Scalar, Vector  # <-- import Scalar and Vector
 
 class GSM1D_EPD(GSMDef):
-    """Single variable one-dimensional potential that can be used to demonstrate the
-    interaction between the individual dissipative mechanisms.
-    """
+    """1D Elastic-Plastic-Damage model."""
 
-    E = sp.Symbol(r'E', real=True, nonnegative=True)
-    K = sp.Symbol(r'K', real=True)
-    S = sp.Symbol(r'S', real=True, nonnegative=True)
-    c = sp.Symbol(r'c', real=True, nonnegative=True)
-    r = sp.Symbol(r'r', real=True, nonnegative=True)
-    f_c = sp.Symbol(r'f_\mathrm{c}')
+    # ## Material parameters
+    E = Scalar(r'E', real=True, nonnegative=True, codename='E')
+    S = Scalar(r'S', real=True, nonnegative=True, codename='S')
+    c = Scalar(r'c', real=True, nonnegative=True, codename='c')
+    r = Scalar(r'r', real=True, nonnegative=True, codename='r')
+    eps_0 = Scalar(r'\varepsilon_0', real=True, nonnegative=True, codename='eps_0')
 
-    mparams = (E, K, f_c, S, c, r)
-    m_param_codenames = {f_c: 'f_c'}
+    mparams = (E, S, c, r, eps_0)
 
     # ## External state variables
-
-    eps = sp.Symbol(r'\varepsilon', codename='eps_', real=True)
-    eps_a = sp.Matrix([eps])
-    sig = sp.Symbol(r'\sigma', codename='sig_', real=True)
-    sig_a = sp.Matrix([sig])
+    eps = Scalar(r'\varepsilon', real=True, codename='eps')
+    eps_a = Vector(r'\varepsilon_{a}', [eps], codename='eps_a')
+    sig = Scalar(r'\sigma', real=True, codename='sig')
+    sig_a = Vector(r'\sigma_{a}', [sig], codename='sig_a')
 
     # ## Internal state variables
+    omega = Scalar(r'\omega', real=True, codename='omega')
+    omega_a = Vector(r'\omega_{a}', [omega], codename='omega_a')
+    Y = Scalar(r'Y', real=True, codename='Y')
+    Y_a = Vector(r'Y_{a}', [Y], codename='Y_a')
 
-    eps_p = sp.Symbol(r'\varepsilon^\mathrm{p}', codename='eps_p_', real=True)
-    eps_p_a = sp.Matrix([eps_p])
-    sig_p = sp.Symbol(r'\sigma^\mathrm{p}', codename='sig_p_', real=True)
-    sig_p_a = sp.Matrix([sig_p])
-
-    omega = sp.Symbol(r'\omega', real=True)
-    omega_a = sp.Matrix([omega])
-    Y = sp.Symbol(r'Y', real=True)
-    Y_a = sp.Matrix([Y])
-
-    z = sp.Symbol(r'z', codename='z_', real=True, nonnegative=True)
-    z_a = sp.Matrix([z])
-    Z = sp.Symbol(r'Z', codename='Z_', real=True, nonnegative=True)
-    Z_a = sp.Matrix([Z])
+    eps_p = Scalar(r'\varepsilon^\mathrm{p}', real=True, codename='eps_p')
+    eps_p_a = Vector(r'\varepsilon^\mathrm{p}_{a}', [eps_p], codename='eps_p_a')
+    sig_p = Scalar(r'\sigma^\mathrm{p}', real=True, codename='sig_p')
+    sig_p_a = Vector(r'\sigma^\mathrm{p}_{a}', [sig_p], codename='sig_p_a')
 
     # ## Free energy potential
     eps_el = eps - eps_p
-    U_e_ = sp.Rational(1,2) * (1 - omega) * E * eps_el**2
-    U_p_ =  sp.Rational(1,2) * K * z**2
-    F_ = U_e_ + U_p_
+    F_ = sp.Rational(1,2) * (1 - omega) * E * eps_el**2
 
     # ## Flow potential
-    f_ = sp.sqrt((sig_p/(1-omega))**2) - (f_c + Z)
+    f_ = sp.Abs(sig_p) - (eps_0 + S)
+    phi_ext_ = (1 - omega)**c * (S/(r+1)) * (Y / S)**(r+1)
 
-    Eps_vars = (eps_p_a, omega_a, z_a)
-    Sig_vars = (sig_p_a, Y_a, Z_a)
-    Sig_signs =  (-1, -1, 1)
+    Eps_vars = (omega_a, eps_p_a)
+    Sig_vars = (Y_a, sig_p_a)
+    Sig_signs = (-1, -1)
 
     F_engine = GSMEngine(
-        name = 'gsm_F_1d_mpdp_epd_lih',
+        name = 'gsm_F_1d_mpdp_epd',
         eps_vars = eps_a,
+        T_var = None,  # T_var is not used here
         sig_vars = sig_a,
         m_params = mparams,
         Eps_vars = Eps_vars,
@@ -64,10 +55,5 @@ class GSM1D_EPD(GSMDef):
         Sig_signs = Sig_signs,
         F_expr = F_,
         f_expr = f_,
+        phi_ext_expr = phi_ext_
     )
-
-    dot_eps = F_engine.dot_eps_a[0]
-    dot_eps_vp = F_engine.dot_Eps[0, 0]
-
-    sig_ = F_engine.sig_
-    F_engine.phi_ext_expr = sp.Heaviside(sig_ * dot_eps) * sp.Abs(dot_eps-dot_eps_vp) * (1 - omega)**c * (S/(r+1)) * (Y/ S)**(r+1)

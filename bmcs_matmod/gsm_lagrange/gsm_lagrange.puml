@@ -72,7 +72,7 @@ package "GSM Lagrange" {
         +__init__(gsm_def, **param_values)
     }
 
-    class GSMaterial {
+    class Material {
         +name : str
         +mat_params : List<MaterialParams>
         +add_param(param : MaterialParams)
@@ -120,7 +120,7 @@ package "GSM Lagrange" {
     GSMDef "1" o-- "1" GSMEngine : G_engine >
     GSMModel "1" o-- "1" GSMDef : gsm_exec >
     MaterialParams "1" o-- "1" GSMDef : gsm_def >
-    GSMaterial "1" o-- "*" MaterialParams : mat_params >
+    Material "1" o-- "*" MaterialParams : mat_params >
     GSMModel "1" o-- "1" GSMDef : gsm_def >
     ResponseData ..> GSMModel : used for results
 
@@ -144,7 +144,7 @@ package "GSM Lagrange" {
       Record of parameter values for a GSM model.
     end note
 
-    note right of GSMaterial
+    note right of Material
       Represents a real-world material,
       aggregates parameter records for models.
     end note

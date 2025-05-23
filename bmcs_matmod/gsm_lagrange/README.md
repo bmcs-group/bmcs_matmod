@@ -23,7 +23,7 @@ This folder implements a symbolic-to-executable framework for thermodynamically 
 - Stores a set of parameter values for a specific symbolic model (`GSMDef`).
 - Enables parameter management, calibration, and database integration.
 
-### 5. Real-World Material (`GSMaterial`)
+### 5. Real-World Material (`Material`)
 - Represents a physical material (e.g., a concrete mixture or steel grade).
 - Aggregates multiple `MaterialParams` records, each corresponding to a different GSM model definition.
 - Supports retrieval and management of parameter sets for different models.
@@ -40,7 +40,7 @@ This folder implements a symbolic-to-executable framework for thermodynamically 
    Instantiate `GSMModel` with a symbolic model and parameter values for simulation.
 
 4. **Aggregate Materials:**  
-   Use `GSMaterial` to collect parameter records for real-world materials.
+   Use `Material` to collect parameter records for real-world materials.
 
 5. **Simulate and Analyze:**  
    Use the executable model's methods to run simulations and analyze responses under various loading scenarios.
@@ -51,7 +51,7 @@ This folder implements a symbolic-to-executable framework for thermodynamically 
 - `gsm_mpdp.py`        : Symbolic engine for potentials and constraints (`GSMEngine`)
 - `gsm_model.py`       : Executable model class (`GSMModel`)
 - `material_params.py` : Material parameter record class (`MaterialParams`)
-- `material.py`        : Real-world material collection class (`GSMaterial`)
+- `material.py`        : Real-world material collection class (`Material`)
 - `gsm1d_*.py`         : Specific 1D GSM model definitions (e.g., elastic-damage, viscoelastic, etc.)
 - `gsm_lagrange.puml`  : UML class diagram of the framework
 

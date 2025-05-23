@@ -1,0 +1,127 @@
+@startuml Time Function Class Hierarchy
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam classFontName Arial
+skinparam backgroundColor white
+skinparam classBackgroundColor LightBlue
+skinparam classBorderColor DarkBlue
+
+package "Symbol Management" {
+    class SymbolRegistry {
+        {static} _registry : dict
+        {static} get_symbol(name, **kwargs) : Symbol
+    }
+}
+
+package "Base Classes" {
+    abstract class TimeFnBase {
+        +vars : list
+        +params : list
+        +t : Float
+        +name : Str
+        +{abstract} symb_expr : Property
+        +symb_fn_lambdified : Property
+        
+        +__new__(cls, *args, **kwargs)
+        +__call__(t)
+        +get_args()
+        +collect_symb_params()
+        +plot(ax, t, **plot_kwargs)
+        +display_sym()
+    }
+    
+    abstract class TimeFnCyclicBase {
+        +symb_expr_at_zero_time : Property
+    }
+}
+
+package "Simple Functions" {
+    class TimeFnStepLoading {
+        +t_s : Float
+        +val : Float
+        +symb_expr : Property
+    }
+    
+    class TimeFnMonotonicAscending {
+        +rate : Float
+        +symb_expr : Property
+    }
+}
+
+package "Cyclic Functions" {
+    class TimeFnCycleSinus {
+        +symb_expr : Property
+    }
+    
+    class TimeFnCycleLinear {
+        +symb_expr : Property
+    }
+    
+    class TimeFnCycleWithRamps {
+        +urf : Float
+        +mrf : Float
+        +lrf : Float
+        +symb_expr : Property
+        +symb_expr_at_zero_time : Property
+    }
+}
+
+package "Composite Functions" {
+    class TimeFnPeriodic {
+        +time_fn_cycle : TimeFnCyclicBase
+        +mean_value : Float
+        +amplitude : Float
+        +period : Float
+        +dfn_dtime_at_zero_expr : Property
+        +t_start_cycling_expr : Property
+        +symb_expr : Property
+        +collect_symb_params()
+        +get_args()
+    }
+    
+    class TimeFnStepping {
+        +step_times : Array
+        +step_values : Array
+        +__call__(t)
+    }
+    
+    class TimeFnOverlay {
+        +fn1 : TimeFnBase
+        +fn2 : TimeFnBase
+        +symb_expr : Property
+        +collect_symb_params()
+        +get_args()
+        +__call__(t)
+    }
+}
+
+' Inheritance relationships
+SymbolRegistry <|-- TimeFnBase
+TimeFnBase <|-- TimeFnStepLoading
+TimeFnBase <|-- TimeFnMonotonicAscending
+TimeFnBase <|-- TimeFnCyclicBase
+TimeFnBase <|-- TimeFnPeriodic
+TimeFnBase <|-- TimeFnStepping
+TimeFnBase <|-- TimeFnOverlay
+
+TimeFnCyclicBase <|-- TimeFnCycleSinus
+TimeFnCyclicBase <|-- TimeFnCycleLinear
+TimeFnCyclicBase <|-- TimeFnCycleWithRamps
+
+' Composition relationships
+TimeFnPeriodic "1" o--> "1" TimeFnCyclicBase : time_fn_cycle
+TimeFnOverlay "1" o--> "1" TimeFnBase : fn1
+TimeFnOverlay "1" o--> "1" TimeFnBase : fn2
+
+' Implementation approaches
+note right of TimeFnStepLoading: Symbolic approach
+note right of TimeFnMonotonicAscending: Symbolic approach
+note right of TimeFnCycleSinus: Symbolic approach
+note right of TimeFnCycleLinear: Symbolic approach
+note right of TimeFnCycleWithRamps: Symbolic approach
+note right of TimeFnPeriodic: Symbolic approach
+note right of TimeFnStepping: Numerical approach
+note right of TimeFnOverlay: Hybrid approach
+
+@enduml

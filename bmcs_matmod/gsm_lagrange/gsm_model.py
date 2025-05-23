@@ -7,6 +7,7 @@ import inspect
 
 from .gsm_def import GSMDef
 from .gsm_engine import GSMEngine
+from .response_data import ResponseData
 
 def derive_trait_model_params(gsm_def):
     """Utility to derive trait_model_params mapping from a GSMDef."""
@@ -37,7 +38,7 @@ class GSMModel(bu.Model):
     def __new__(cls, gsm_def=None, **traits):
         if gsm_def is None:
             return super().__new__(cls)
-        model_class_name = f"{gsm_def.__name__}MatMod"
+        model_class_name = f"{gsm_def.__name__}_Model"
         if model_class_name in globals():
             return globals()[model_class_name].__new__(globals()[model_class_name])
         trait_model_params = derive_trait_model_params(gsm_def)
@@ -73,13 +74,15 @@ class GSMModel(bu.Model):
     def get_F_sig(self, eps):
         return self.gsm_exec.get_F_sig(eps, *self.get_args())
     def get_F_response(self, eps_ta, t_t):
-        return self.gsm_exec.get_F_response(eps_ta, t_t, *self.get_args())
+        resp = self.gsm_exec.get_F_response(eps_ta, t_t, *self.get_args())
+        return ResponseData.from_engine_response(self.gsm_def.F_engine, resp)
     def get_F_Sig(self, eps):
         return self.gsm_exec.get_F_Sig(eps, *self.get_args())
     def get_G_eps(self, sig):
         return self.gsm_exec.get_G_eps(sig, *self.get_args())
     def get_G_response(self, sig_ta, t_t):
-        return self.gsm_exec.get_G_response(sig_ta, t_t, *self.get_args())
+        resp = self.gsm_exec.get_G_response(sig_ta, t_t, *self.get_args())
+        return ResponseData.from_engine_response(self.gsm_def.G_engine, resp)
     def get_G_Sig(self, sig):
         return self.gsm_exec.get_G_Sig(sig, *self.get_args())
     def print_potentials(self):

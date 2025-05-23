@@ -1,53 +1,46 @@
 import sympy as sp
 from .gsm_def import GSMDef
 from .gsm_engine import GSMEngine
+from .gsm_vars import Scalar, Vector
 
 class GSM1D_VEVPD(GSMDef):
     """Single variable one-dimensional potential that can be used to demonstrate the
     interaction between the individual dissipative mechanisms.
     """
 
-    E = sp.Symbol(r'E', real=True, nonnegative=True)
-    K = sp.Symbol(r'K', real=True)
-    f_c = sp.Symbol(r'f_\mathrm{c}')
-    S = sp.Symbol(r'S', real=True, nonnegative=True)
-    c = sp.Symbol(r'c', real=True, nonnegative=True)
-    r = sp.Symbol(r'r', real=True, nonnegative=True)
-    eta_vp = sp.Symbol(r'\eta_\mathrm{vp}', real=True, nonnegative=True)
-    eta_ve = sp.Symbol(r'\eta_\mathrm{ve}', real=True, nonnegative=True)
+    E = Scalar(r'E', real=True, nonnegative=True)
+    K = Scalar(r'K', real=True)
+    f_c = Scalar(r'f_\mathrm{c}', codename='f_c')
+    S = Scalar(r'S', real=True, nonnegative=True)
+    c = Scalar(r'c', real=True, nonnegative=True)
+    r = Scalar(r'r', real=True, nonnegative=True)
+    eta_vp = Scalar(r'\eta_\mathrm{vp}', real=True, nonnegative=True, codename='eta_vp')
+    eta_ve = Scalar(r'\eta_\mathrm{ve}', real=True, nonnegative=True, codename='eta_ve')
 
-    mparams = (E, K, f_c, S, c, r, eta_vp, eta_ve)
-    m_param_codenames = {f_c: 'f_c', eta_vp: 'eta_vp', eta_ve: 'eta_ve'}
+    eps = Scalar(r'\varepsilon', real=True, codename='eps')
+    eps_a = Vector(r'\varepsilon_{a}', [eps], codename='eps_a')
+    sig = Scalar(r'\sigma', real=True, codename='sig')
+    sig_a = Vector(r'\sigma_{a}', [sig], codename='sig_a')
 
+    omega = Scalar(r'\omega', real=True, codename='omega')
+    omega_a = Vector(r'\omega_{a}', [omega], codename='omega_a')
+    Y = Scalar(r'Y', real=True)
+    Y_a = Vector(r'Y_{a}', [Y], codename='Y_a')
 
-    # ## External state variables
+    eps_p = Scalar(r'\varepsilon^\mathrm{vp}', real=True, codename='eps_p')
+    eps_p_a = Vector(r'\varepsilon^\mathrm{vp}_{a}', [eps_p], codename='eps_p_a')
+    sig_p = Scalar(r'\sigma^\mathrm{vp}', real=True, codename='sig_p')
+    sig_p_a = Vector(r'\sigma^\mathrm{vp}_{a}', [sig_p], codename='sig_p_a')
 
-    eps = sp.Symbol(r'\varepsilon', real=True)
-    eps_a = sp.Matrix([eps])
-    sig = sp.Symbol(r'\sigma', real=True)
-    sig_a = sp.Matrix([sig])
+    eps_v = Scalar(r'\varepsilon^\mathrm{ve}', real=True, codename='eps_v')
+    eps_v_a = Vector(r'\varepsilon^\mathrm{ve}_{a}', [eps_v], codename='eps_v_a')
+    sig_v = Scalar(r'\sigma^\mathrm{ve}', real=True, codename='sig_v')
+    sig_v_a = Vector(r'\sigma^\mathrm{ve}_{a}', [sig_v], codename='sig_v_a')
 
-    # ## Internal state variables
-
-    omega = sp.Symbol(r'\omega', real=True)
-    omega_a = sp.Matrix([omega])
-    Y = sp.Symbol(r'Y', real=True)
-    Y_a = sp.Matrix([Y])
-
-    eps_p = sp.Symbol(r'\varepsilon^\mathrm{vp}', real=True)
-    eps_p_a = sp.Matrix([eps_p])
-    sig_p = sp.Symbol(r'\sigma^\mathrm{vp}', real=True)
-    sig_p_a = sp.Matrix([sig_p])
-
-    eps_v = sp.Symbol(r'\varepsilon^\mathrm{ve}', real=True)
-    eps_v_a = sp.Matrix([eps_v])
-    sig_v = sp.Symbol(r'\sigma^\mathrm{ve}', real=True)
-    sig_v_a = sp.Matrix([sig_v])
-
-    z = sp.Symbol(r'z', real=True, nonnegative=True)
-    z_a = sp.Matrix([z])
-    Z = sp.Symbol(r'Z', real=True, nonnegative=True)
-    Z_a = sp.Matrix([Z])
+    z = Scalar(r'z', real=True, nonnegative=True)
+    z_a = Vector(r'z_{a}', [z])
+    Z = Scalar(r'Z', real=True, nonnegative=True)
+    Z_a = Vector(r'Z_{a}', [Z])
 
     # ## Free energy potential
     eps_el = eps - eps_v - eps_p
@@ -67,12 +60,12 @@ class GSM1D_VEVPD(GSMDef):
         diff_along_rates = False,
         eps_vars = eps_a,
         sig_vars = sig_a,
-        m_params = mparams,
+        m_params = (E, K, f_c, S, c, r, eta_vp, eta_ve),
         Eps_vars = Eps_vars,
         Sig_vars = Sig_vars,
         Sig_signs = Sig_signs,
-        F_expr = F_,
-        f_expr = f_,
+        F_expr = sp.Rational(1,2) * (1 - omega) * E * (eps - eps_v - eps_p)**2 + sp.Rational(1,2) * K * z**2,
+        f_expr = sp.sqrt(sig_p**2) - (f_c + Z),
     )
     dot_eps = F_engine.dot_eps_a[0, 0]
     dot_eps_vp = F_engine.dot_Eps[1, 0]

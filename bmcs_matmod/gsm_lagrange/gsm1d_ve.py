@@ -1,30 +1,31 @@
 import sympy as sp
 from .gsm_def import GSMDef
 from .gsm_engine import GSMEngine
+from .gsm_vars import Scalar, Vector
 
 class GSM1D_VE(GSMDef):
     """Single variable one-dimensional potential that can be used to demonstrate the
     interaction between the individual dissipative mechanisms.
     """
 
-    E = sp.Symbol(r'E', real=True, nonnegative=True)
-    eta_ve = sp.Symbol(r'\eta_\mathrm{ve}', real=True, nonnegative=True)
+    E = Scalar(r'E', real=True, nonnegative=True)
+    eta_ve = Scalar(r'\eta_\mathrm{ve}', real=True, nonnegative=True, codename='eta_ve')
 
     mparams = (E, eta_ve)
 
     # ## External state variables
 
-    eps = sp.Symbol(r'\varepsilon', real=True)
-    eps_a = sp.Matrix([eps])
-    sig = sp.Symbol(r'\sigma', real=True)
-    sig_a = sp.Matrix([sig])
+    eps = Scalar(r'\varepsilon', real=True, codename='eps')
+    eps_a = Vector(r'\varepsilon_{a}', [eps])
+    sig = Scalar(r'\sigma', real=True, codename='sig')
+    sig_a = Vector(r'\sigma_{a}', [sig])
 
     # ## Internal state variables
 
-    eps_v = sp.Symbol(r'\varepsilon^\mathrm{v}', real=True)
-    eps_v_a = sp.Matrix([eps_v])
-    sig_v = sp.Symbol(r'\sigma^\mathrm{v}', real=True)
-    sig_v_a = sp.Matrix([sig_v])
+    eps_v = Scalar(r'\varepsilon^\mathrm{v}', real=True, codename='eps_v')
+    eps_v_a = Vector(r'\varepsilon^\mathrm{v}_{a}', [eps_v])
+    sig_v = Scalar(r'\sigma', real=True, codename='sig_v')
+    sig_v_a = Vector(r'\sigma_{a}', [sig_v])
 
     # ## Free energy potential
     eps_el = eps - eps_v
@@ -34,8 +35,6 @@ class GSM1D_VE(GSMDef):
     Eps_vars = (eps_v_a,)
     Sig_vars = (sig_v_a,)
     Sig_signs =  (-1,)
-
-    m_param_codenames = {eta_ve: 'eta_ve'}
 
     F_engine = GSMEngine(
         name = 'gsm_F_1d_mpdp_ve',

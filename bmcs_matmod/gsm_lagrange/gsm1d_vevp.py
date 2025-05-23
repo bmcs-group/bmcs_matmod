@@ -1,46 +1,44 @@
 import sympy as sp
 from .gsm_def import GSMDef
 from .gsm_engine import GSMEngine
+from .gsm_vars import Scalar, Vector
 
 class GSM1D_VEVP(GSMDef):
     """Single variable one-dimensional potential that can be used to demonstrate the
     interaction between the individual dissipative mechanisms.
     """
 
-    E = sp.Symbol(r'E', real=True, nonnegative=True)
-    K = sp.Symbol(r'K', real=True)
-    f_c = sp.Symbol(r'f_\mathrm{c}')
-    eta_vp = sp.Symbol(r'\eta_\mathrm{vp}', real=True, nonnegative=True)
-    eta_ve = sp.Symbol(r'\eta_\mathrm{ve}', real=True, nonnegative=True)
-
+    E = Scalar(r'E', real=True, nonnegative=True)
+    K = Scalar(r'K', real=True)
+    f_c = Scalar(r'f_\mathrm{c}', codename='f_c')
+    eta_vp = Scalar(r'\eta_\mathrm{vp}', real=True, nonnegative=True, codename='eta_vp')
+    eta_ve = Scalar(r'\eta_\mathrm{ve}', real=True, nonnegative=True, codename='eta_ve')
 
     mparams = (E, K, f_c, eta_vp, eta_ve)
-    m_param_codenames = {f_c: 'f_c', eta_vp: 'eta_vp', eta_ve: 'eta_ve'}
-
 
     # ## External state variables
 
-    eps = sp.Symbol(r'\varepsilon', real=True)
-    eps_a = sp.Matrix([eps])
-    sig = sp.Symbol(r'\sigma', real=True)
-    sig_a = sp.Matrix([sig])
+    eps = Scalar(r'\varepsilon', real=True)
+    eps_a = Vector(r'\varepsilon_{a}', [eps], codename='eps_{a}')
+    sig = Scalar(r'\sigma', real=True)
+    sig_a = Vector(r'\sigma_{a}', [sig], codename='sig_{a}')
 
     # ## Internal state variables
 
-    eps_p = sp.Symbol(r'\varepsilon^\mathrm{vp}', real=True)
-    eps_p_a = sp.Matrix([eps_p])
-    sig_p = sp.Symbol(r'\sigma^\mathrm{vp}', real=True)
-    sig_p_a = sp.Matrix([sig_p])
+    eps_p = Scalar(r'\varepsilon^\mathrm{vp}', real=True, codename='eps_p')
+    eps_p_a = Vector(r'\varepsilon^\mathrm{vp}_{a}', [eps_p], codename='eps_p_{a}')
+    sig_p = Scalar(r'\sigma^\mathrm{vp}', real=True, codename='sig_p')
+    sig_p_a = Vector(r'\sigma^\mathrm{vp}_{a}', [sig_p], codename='sig_p_{a}')
 
-    eps_v = sp.Symbol(r'\varepsilon^\mathrm{ve}', real=True)
-    eps_v_a = sp.Matrix([eps_v])
-    sig_v = sp.Symbol(r'\sigma^\mathrm{ve}', real=True)
-    sig_v_a = sp.Matrix([sig_v])
+    eps_v = Scalar(r'\varepsilon^\mathrm{ve}', real=True, codename='eps_v')
+    eps_v_a = Vector(r'\varepsilon^\mathrm{ve}_{a}', [eps_v], codename='eps_v_{a}')
+    sig_v = Scalar(r'\sigma^\mathrm{ve}', real=True, codename='sig_v')
+    sig_v_a = Vector(r'\sigma^\mathrm{ve}_{a}', [sig_v], codename='sig_v_{a}')
 
-    z = sp.Symbol(r'z', real=True, nonnegative=True)
-    z_a = sp.Matrix([z])
-    Z = sp.Symbol(r'Z', real=True, nonnegative=True)
-    Z_a = sp.Matrix([Z])
+    z = Scalar(r'z', real=True, nonnegative=True)
+    z_a = Vector(r'z_{a}', [z], codename='z_{a}')
+    Z = Scalar(r'Z', real=True, nonnegative=True)
+    Z_a = Vector(r'Z_{a}', [Z], codename='Z_{a}')
 
     # ## Free energy potential
     eps_el = eps - eps_v - eps_p

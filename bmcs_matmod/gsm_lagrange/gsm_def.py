@@ -7,7 +7,7 @@ from traits.api import \
 
 from IPython.display import display, Math, Markdown
 
-from .gsm_mpdp import GSMEngine
+from .gsm_engine import GSMEngine
 
 """
 Framework for GSM-based material models.
@@ -30,12 +30,11 @@ def is_valid_variable_name(name):
         return False
     return True
 
-class GSMDef(HasTraits):
+class GSMDef:
     """
     Base class for setting up thermodynamic models within the GSM framework.
     """
 
-    # Class-level initialization that happens during class definition
     @classmethod
     def __init_subclass__(cls, **kwargs):
         """
@@ -46,41 +45,62 @@ class GSMDef(HasTraits):
         
         # Only proceed if this is a concrete subclass with a proper F_engine
         if hasattr(cls, 'F_engine') and cls.F_engine is not None:
-            # Build parameter codenames
-            cls.param_codenames = cls._build_param_codenames()
-            
-            # Calculate symbolic expressions
+            # Build codename mappings and collect missing codenames
+            cls.param_codenames, param_missing = cls._build_symbol_codenames('m_params')
+            cls.eps_codenames, eps_missing = cls._build_symbol_codenames('eps_vars')
+            cls.sig_codenames, sig_missing = cls._build_symbol_codenames('sig_vars')
+            cls.Eps_codenames, Eps_missing = cls._build_symbol_codenames('Eps_vars')
+            cls.Sig_codenames, Sig_missing = cls._build_symbol_codenames('Sig_vars')
+
+            missing = param_missing + eps_missing + sig_missing + Eps_missing + Sig_missing
+            if hasattr(cls, '_missing_symbol_reported'):
+                pass
+            elif missing:
+                msg = (
+                    f"\n[WARNING] The following symbols in '{cls.__name__}' are not valid Python variable names "
+                    f"and are missing a 'codename' attribute:\n"
+                )
+                for group, sym, name in missing:
+                    msg += f"  - {group}: {repr(sym)} (name: '{name}')\n"
+                msg += (
+                    "Please add a 'codename' attribute to these symbols in your variable definitions, e.g.:\n\n"
+                    "    sym.codename = 'your_python_name'\n"
+                )
+                print(msg)
+                cls._missing_symbol_reported = True
+
             cls._calculate_symbolic_expressions()
-            
-            # Initialize the Gibbs engine
             cls._initialize_gibbs_engine()
-    
+
     @classmethod
-    def _build_param_codenames(cls):
+    def _build_symbol_codenames(cls, attr_name):
         """
-        Build mapping from symbolic parameter names to valid Python variable names.
+        Build mapping from symbolic variable to codename.
+        If the symbol's name is a valid Python identifier, use it.
+        If not, use the .codename attribute if present.
+        If neither, collect for reporting.
+        Returns (symbol_codenames, missing_symbols)
         """
-        param_codenames = {}
-        # Get the F_engine class variable directly
+        symbol_codenames = {}
+        missing_symbols = []
         F_engine = cls.F_engine
-        
-        for sym in F_engine.m_params:
-            sym_name = sym.name
+        symbols = getattr(F_engine, attr_name, ())
+        for sym in symbols:
+            if hasattr(sym, 'shape') and sym.shape == (1, 1):
+                s = sym[0, 0]
+            else:
+                s = sym
+            sym_name = s.name
             if is_valid_variable_name(sym_name):
                 codename = sym_name
+            elif hasattr(s, 'codename'):
+                codename = s.codename
             else:
-                # Check if a codename is provided in m_param_codenames
-                m_param_codenames = getattr(cls, 'm_param_codenames', {})
-                if sym in m_param_codenames:
-                    codename = m_param_codenames[sym]
-                else:
-                    raise ValueError(
-                        f"Symbol '{sym}' has an invalid name '{sym_name}' "
-                        f"and no codename was provided in 'm_param_codenames'."
-                    )
-            param_codenames[sym] = codename
-        return param_codenames
-    
+                codename = None
+                missing_symbols.append((attr_name, s, sym_name))
+            symbol_codenames[s] = codename
+        return symbol_codenames, missing_symbols
+
     @classmethod
     def _calculate_symbolic_expressions(cls):
         """
@@ -143,20 +163,22 @@ class GSMDef(HasTraits):
         )
 
     name = Property(Str)
-    def _get_name(self):
-        return self.__class__.__name__
+    @classmethod
+    def _get_name(cls):
+        return cls.__name__
 
-    def print_potentials(self):
+    @classmethod
+    def print_potentials(cls):
         print('=============================================')
-        print(f'class {self.name}')
+        print(f'class {cls._get_name()}')
         print('=============================================')
         print(f'Helmholtz')
-        display(Math(r'F =' + sp.latex(sp.simplify(self.F_engine.F_expr))))
-        display(self.F_engine.subs_Sig_Eps)
+        display(Math(r'F =' + sp.latex(sp.simplify(cls.F_engine.F_expr))))
+        display(cls.F_engine.subs_Sig_Eps)
         print(f'Gibbs')
-        display(Math(r'G =' + sp.latex(sp.simplify(self.G_engine.F_expr))))
-        display(self.G_engine.subs_Sig_Eps)
-        (gamma_mech, L_, dL_dS_, dL_dS_A_, dR_dA_n1), (eps_n, delta_eps, Eps_n, delta_A, delta_t, Ox, Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI = self.G_engine.Sig_f_R_dR_n1
+        display(Math(r'G =' + sp.latex(sp.simplify(cls.G_engine.F_expr))))
+        display(cls.G_engine.subs_Sig_Eps)
+        (gamma_mech, L_, dL_dS_, dL_dS_A_, dR_dA_n1), (eps_n, delta_eps, Eps_n, delta_A, delta_t, Ox, Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI = cls.G_engine.Sig_f_R_dR_n1
         print(f'Mechanical dissipation')
         display(Math(r'\gamma_{\mathrm{mech}} = ' + sp.latex(sp.simplify(gamma_mech))))
         print(f'Lagrangian')
@@ -165,39 +187,40 @@ class GSMDef(HasTraits):
         display(Math(r'\frac{\partial L}{\partial S} =' + sp.latex(dL_dS_) + ' = 0'))
 
 
-    def latex_potentials(self):
+    @classmethod
+    def latex_potentials(cls):
         """
         Returns a KaTeX-friendly string with minimal LaTeX commands.
         """
-        (gamma_mech, L_, dL_dS_, _, _), _, _, _, _, _ = self.F_engine.Sig_f_R_dR_n1
+        (gamma_mech, L_, dL_dS_, _, _), _, _, _, _, _ = cls.F_engine.Sig_f_R_dR_n1
 
         latex_lines = []
-        latex_lines.append("## class " + self.name)
+        latex_lines.append("## class " + cls._get_name())
         latex_lines.append("### Helmholtz free energy")
-        latex_lines.append("$$F = " + sp.latex(sp.simplify(self.F_engine.F_expr)) + "$$")
-        latex_lines.append("$$" + sp.latex(self.F_engine.subs_Sig_Eps) + "$$")
+        latex_lines.append("$$F = " + sp.latex(sp.simplify(cls.F_engine.F_expr)) + "$$")
+        latex_lines.append("$$" + sp.latex(cls.F_engine.subs_Sig_Eps) + "$$")
         latex_lines.append("#### Mechanical dissipation")
         latex_lines.append("$$\\gamma_{\\mathrm{mech}} = " + sp.latex(sp.simplify(gamma_mech)) + "$$")
         latex_lines.append("#### Lagrangian")
         latex_lines.append("$$\mathcal{L} = " + sp.latex(L_) + "$$")
         latex_lines.append("#### Residuum")
         latex_lines.append("$$\\frac{\\partial \mathcal{L}}{\\partial \mathcal{S}} = " + sp.latex(dL_dS_) + " = 0$$")
-        if self.F_engine.dot_Eps_bounds_expr is not sp.S.Zero:
+        if cls.F_engine.dot_Eps_bounds_expr is not sp.S.Zero:
             latex_lines.append("#### Bounds of inelastic process")
-            latex_lines.append("$$" + sp.latex(self.F_engine.dot_Eps_bounds_expr) + " \leq 0$$")
+            latex_lines.append("$$" + sp.latex(cls.F_engine.dot_Eps_bounds_expr) + " \leq 0$$")
 
-        (gamma_mech, L_, dL_dS_, _, _), _, _, _, _, _ = self.G_engine.Sig_f_R_dR_n1
+        (gamma_mech, L_, dL_dS_, _, _), _, _, _, _, _ = cls.G_engine.Sig_f_R_dR_n1
         latex_lines.append("### Legendre transform")
 
         latex_lines.append("#### Strain substitutions in dissipative terms")
-        latex_lines.append("$$" + sp.latex(self.subs_eps_sig) + "$$")
-        latex_lines.append("$$" + sp.latex(self.subs_dot_eps_sig) + "$$")
+        latex_lines.append("$$" + sp.latex(cls.subs_eps_sig) + "$$")
+        latex_lines.append("$$" + sp.latex(cls.subs_dot_eps_sig) + "$$")
 
         latex_lines.append("### Gibbs free energy")
-        latex_lines.append("$$G = " + sp.latex(self.sig_x_eps_) + r"- \left[" + sp.latex(sp.simplify(self.F_engine.F_expr) )+ r"\right] $$")
+        latex_lines.append("$$G = " + sp.latex(cls.sig_x_eps_) + r"- \left[" + sp.latex(sp.simplify(cls.F_engine.F_expr) )+ r"\right] $$")
         latex_lines.append("#### Gibbs free energy after strain substitutions")
-        latex_lines.append("$$G = " + sp.latex(sp.simplify(self.G_engine.F_expr)) + "$$")
-        latex_lines.append("$$" + sp.latex(self.G_engine.subs_Sig_Eps) + "$$")
+        latex_lines.append("$$G = " + sp.latex(sp.simplify(cls.G_engine.F_expr)) + "$$")
+        latex_lines.append("$$" + sp.latex(cls.G_engine.subs_Sig_Eps) + "$$")
 
         latex_lines.append("#### Mechanical dissipation")
         latex_lines.append("$$\\gamma_{\\mathrm{mech}} = " + sp.latex(sp.simplify(gamma_mech)) + "$$")
@@ -205,35 +228,39 @@ class GSMDef(HasTraits):
         latex_lines.append("$$\mathcal{L} = " + sp.latex(L_) + "$$")
         latex_lines.append("#### Residuum")
         latex_lines.append("$$\\frac{\\partial \mathcal{L}}{\\partial \mathcal{S}} = " + sp.latex(dL_dS_) + " = 0$$")
-        if self.F_engine.dot_Eps_bounds_expr is not sp.S.Zero:
+        if cls.F_engine.dot_Eps_bounds_expr is not sp.S.Zero:
             latex_lines.append("#### Bounds of inelastic process")
-            latex_lines.append("$$" + sp.latex(self.F_engine.dot_Eps_bounds_expr) + " \leq 0$$")
+            latex_lines.append("$$" + sp.latex(cls.F_engine.dot_Eps_bounds_expr) + " \leq 0$$")
 
         return "\n".join(latex_lines)
 
-    def markdown(self):
+    @classmethod
+    def markdown(cls):
         """
         Returns a markdown string with minimal LaTeX commands.
         """
-        return Markdown(self.latex_potentials())
+        return Markdown(cls.latex_potentials())
 
-    def get_args(self, **kwargs):
+    @classmethod
+    def get_args(cls, **kwargs):
         """Convert keyword parameters to args."""
         # Ensure that all required parameters are provided
-        missing_params = [codename for codename in self.param_codenames.values() if codename not in kwargs]
+        missing_params = [codename for codename in cls.param_codenames.values() if codename not in kwargs]
         if missing_params:
             raise ValueError(f"Missing parameter values for: {missing_params}")
         
         # Extract arguments in the correct order
-        args = [kwargs[self.param_codenames[var]] for var in self.F_engine.m_params]
+        args = [kwargs[cls.param_codenames[var]] for var in cls.F_engine.m_params]
         return args
 
     # Helmholtz free energy based solver - with consistent naming
-    def get_F_sig(self, eps, *args):
+    @classmethod
+    def get_F_sig(cls, eps, *args):
         """Calculate the stress for the given strain."""
-        return self.F_engine.get_sig(eps, *args)
+        return cls.F_engine.get_sig(eps, *args)
 
-    def get_F_response(self, eps_ta, t_t, *args):
+    @classmethod
+    def get_F_response(cls, eps_ta, t_t, *args):
         """Calculate the stress and internal variables over time for the given strain history.
         
         Args:
@@ -241,42 +268,49 @@ class GSMDef(HasTraits):
             t_t: Array of time points
             *args: Material parameters
         """
-        return self.F_engine.get_response(eps_ta, t_t, *args)
+        return cls.F_engine.get_response(eps_ta, t_t, *args)
 
-    def get_F_Sig(self, eps, *args):
+    @classmethod
+    def get_F_Sig(cls, eps, *args):
         """Calculate the thermodynamic forces for the given strain."""
-        return self.F_engine.get_Sig(eps, *args)
+        return cls.F_engine.get_Sig(eps, *args)
     
     # For backward compatibility - these will be deprecated in future versions
-    def get_sig(self, eps, Eps=None, *args):
+    @classmethod
+    def get_sig(cls, eps, Eps=None, *args):
         """Backward compatibility function, will be deprecated. Use get_F_sig instead."""
-        return self.get_F_sig(eps, *args)
+        return cls.get_F_sig(eps, *args)
     
-    def get_response(self, eps_ta, t_t, *args):
+    @classmethod
+    def get_response(cls, eps_ta, t_t, *args):
         """Backward compatibility function, will be deprecated. Use get_F_response instead."""
-        return self.get_F_response(eps_ta, t_t, *args)
+        return cls.get_F_response(eps_ta, t_t, *args)
     
-    def get_Sig(self, eps, Eps=None, *args):
+    @classmethod
+    def get_Sig(cls, eps, Eps=None, *args):
         """Backward compatibility function, will be deprecated. Use get_F_Sig instead."""
-        return self.get_F_Sig(eps, *args)
+        return cls.get_F_Sig(eps, *args)
 
     ### Gibbs free energy based solver
     
-    def get_G_eps(self, sig, *args):
+    @classmethod
+    def get_G_eps(cls, sig, *args):
         """Calculate the strain for the given stress."""
-        return self.G_engine.get_sig(sig, *args)
+        return cls.G_engine.get_sig(sig, *args)
 
-    def get_G_response(self, sig_ta, t_t, *args):
+    @classmethod
+    def get_G_response(cls, sig_ta, t_t, *args):
         """Calculate the strain and internal variables over time for the given stress history.
         Args:
             sig_ta: Array of stresses over time
             t_t: Array of time points
             *args: Material parameters
         """
-        resp = self.G_engine.get_response(sig_ta, t_t, *args)
+        resp = cls.G_engine.get_response(sig_ta, t_t, *args)
         # Rearrange the response to match the expected format
         return (resp[0], resp[1], resp[2], resp[3], resp[4], resp[5], resp[6], resp[7])
 
-    def get_G_Sig(self, sig, *args):
+    @classmethod
+    def get_G_Sig(cls, sig, *args):
         """Calculate the thermodynamic forces for the given stress."""
-        return self.G_engine.get_Sig(sig, *args)
+        return cls.G_engine.get_Sig(sig, *args)
