@@ -23,9 +23,9 @@ class GSM1D_VE(GSMDef):
     # ## Internal state variables
 
     eps_v = Scalar(r'\varepsilon^\mathrm{v}', real=True, codename='eps_v')
-    eps_v_a = Vector(r'\varepsilon^\mathrm{v}_{a}', [eps_v])
+    eps_v_a = Vector(r'\varepsilon^\mathrm{v}_{a}', [eps_v], codename='eps_v_a')
     sig_v = Scalar(r'\sigma', real=True, codename='sig_v')
-    sig_v_a = Vector(r'\sigma_{a}', [sig_v])
+    sig_v_a = Vector(r'\sigma_{a}', [sig_v], codename='sig_v_a')
 
     # ## Free energy potential
     eps_el = eps - eps_v

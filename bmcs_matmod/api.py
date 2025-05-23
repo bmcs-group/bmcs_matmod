@@ -15,3 +15,7 @@ from .gsm_lagrange.gsm1d_ve import GSM1D_VE
 from .gsm_lagrange.gsm1d_ved import GSM1D_VED
 from .gsm_lagrange.gsm1d_vevp import GSM1D_VEVP
 from .gsm_lagrange.gsm1d_vevpd import GSM1D_VEVPD
+
+from .time_function.time_fn import TimeFnBase, TimeFnStepLoading, TimeFnMonotonicAscending, \
+    TimeFnCyclicBase, TimeFnCycleSinus, TimeFnCycleLinear, TimeFnCycleWithRamps, \
+    TimeFnPeriodic, TimeFnStepping, TimeFnOverlay

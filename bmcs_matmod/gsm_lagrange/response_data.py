@@ -11,6 +11,12 @@ class ResponseDataContainer:
         if name in self._data:
             return self._data[name]
         raise AttributeError(f"No attribute named {name}")
+    def keys(self):
+        return self._data.keys()
+    def items(self):
+        return self._data.items()
+    def values(self):
+        return self._data.values()
 
 class ResponseData(bu.Model):
     """
@@ -33,9 +39,9 @@ class ResponseData(bu.Model):
         Flattened internal variables history (shape: (n_steps, n_flat)).
     Sig_t_flat : np.ndarray
         Flattened conjugate variables to internal variables (shape: (n_steps, n_flat)).
-    Eps_vars : tuple
+    Eps_vars : tr.Tuple
         Tuple of internal variable symbols (from GSMEngine).
-    Sig_vars : tuple
+    Sig_vars : tr.Tuple
         Tuple of conjugate variable symbols (from GSMEngine).
     Eps_t : dict
         Dictionary mapping internal variable codenames to their time series.

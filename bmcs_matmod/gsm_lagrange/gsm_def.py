@@ -308,7 +308,7 @@ class GSMDef:
         """
         resp = cls.G_engine.get_response(sig_ta, t_t, *args)
         # Rearrange the response to match the expected format
-        return (resp[0], resp[1], resp[2], resp[3], resp[4], resp[5], resp[6], resp[7])
+        return (resp[0], resp[2], resp[1], resp[3], resp[4], resp[5], resp[6], resp[7])
 
     @classmethod
     def get_G_Sig(cls, sig, *args):
