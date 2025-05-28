@@ -1,0 +1,45 @@
+@startuml
+title Refined Activity Diagram: Interleaved Experimental & Modeling Strategy
+
+start
+
+partition "Experimental Campaign" {
+    :Incorporate New Binder System;
+    :Prepare Specimens;
+    :Run Compression Tests (CT) - Monotonic (LS1);
+    :Run Compression Tests (CT) - Fatigue (LS4);
+    :Acquire Experimental Data (Strength, Fatigue);
+}
+
+partition "Model Calibration" {
+    :Calibrate Discrete Model (DM) with CT Data;
+    :Calibrate Microplane Model (MS) with CT Data;
+}
+
+partition "Advanced Experimental Procedures" {
+    :Run Relaxation Test (Creep/Viscous Calibration);
+    :Run Visco-Elastic/Visco-Plastic Separation Test;
+    :Run Hysteretic Loop Test (Subcritical Loading);
+    :Acquire Advanced Experimental Data;
+}
+
+partition "Model Refinement" {
+    :Refine DM and MS with Advanced Data;
+}
+
+partition "Validation" {
+    :Run Sustained Loading Validation Tests;
+    :Run Fatigue Loading Validation Tests;
+    :Compare Model Predictions (Fatigue Creep, Lifetime) with Validation Data;
+}
+
+if (Further Refinement Needed?) then (yes)
+    :Iterate Calibration and Validation;
+    -[#green]-> back to :Calibrate Discrete Model (DM) with CT Data;
+else (no)
+    :Finalize Models and Document Results;
+endif
+
+stop
+
+@enduml

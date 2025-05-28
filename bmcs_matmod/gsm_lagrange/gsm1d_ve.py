@@ -27,6 +27,9 @@ class GSM1D_VE(GSMDef):
     sig_v = Scalar(r'\sigma', real=True, codename='sig_v')
     sig_v_a = Vector(r'\sigma_{a}', [sig_v], codename='sig_v_a')
 
+    eps_el_a = eps_a - eps_v_a
+    U_e_a = sp.Rational(1,2) * E * eps_el_a.T * eps_el_a
+
     # ## Free energy potential
     eps_el = eps - eps_v
     U_e_ = sp.Rational(1,2) * E * eps_el**2
@@ -47,7 +50,7 @@ class GSM1D_VE(GSMDef):
         Sig_signs = Sig_signs,
         F_expr = F_,
     )
-    dot_eps_ve = F_engine.dot_Eps[0, 0]
-    sig_ve = F_engine.Sig[0, 0]
+    dot_eps_ve_a = F_engine.dot_Eps[0, 0]
+    sig_ve_a = F_engine.Sig[0, 0]
     #sig_ = F_engine.sig_
     F_engine.h_k = [dot_eps_ve * eta_ve - sig_ve]

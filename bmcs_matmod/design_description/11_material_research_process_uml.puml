@@ -1,0 +1,39 @@
+@startuml
+title Material Research Process - High-Level UML Activity Diagram
+
+start
+
+:Define Research Objectives;
+:Design Experimental Campaign;
+partition "Experimental Campaign" {
+    :Develop Test Setups;
+    :Prepare Specimens;
+    :Conduct Compression Tests (CT);
+    :Conduct Punch-Through Shear Tests (PTST);
+    :Conduct Prestressed Beam Tests (PBT);
+    :Acquire Experimental Data;
+}
+
+partition "Model Development" {
+    :Develop Material Models (Interface Models I1, I2);
+    :Develop LDPM Discrete Models;
+    :Develop Smeared FEM Models;
+}
+
+:Calibrate Models with Experimental Data;
+
+partition "Simulation" {
+    :Run LDPM Simulations;
+    :Run FEM Simulations;
+    :Analyze Simulation Results;
+}
+
+:Validate Models with Additional Experiments;
+
+:Iterate Model Development and Experimental Campaign [if needed];
+
+:Collaborative Review and Documentation;
+
+stop
+
+@enduml

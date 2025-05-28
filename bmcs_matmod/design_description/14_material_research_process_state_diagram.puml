@@ -1,0 +1,58 @@
+@startuml
+title State Diagram: Material Research Process (Refined with Independent Calibration and Upscaling)
+
+[*] --> NewBinderIncorporated
+
+state NewBinderIncorporated {
+    [*] --> SpecimenPreparation
+    SpecimenPreparation --> CT_MonotonicTesting
+    CT_MonotonicTesting --> CT_FatigueTesting
+    CT_FatigueTesting --> ExperimentalDataAcquired
+}
+
+ExperimentalDataAcquired --> DM_Calibration
+ExperimentalDataAcquired --> MS_Calibration
+
+DM_Calibration --> DM_AdvancedTesting
+MS_Calibration --> MS_AdvancedTesting
+
+state DM_AdvancedTesting {
+    [*] --> DM_RelaxationTest
+    DM_RelaxationTest --> DM_ViscoSeparationTest
+    DM_ViscoSeparationTest --> DM_HystereticLoopTest
+    DM_HystereticLoopTest --> DM_AdvancedDataAcquired
+}
+state MS_AdvancedTesting {
+    [*] --> MS_RelaxationTest
+    MS_RelaxationTest --> MS_ViscoSeparationTest
+    MS_ViscoSeparationTest --> MS_HystereticLoopTest
+    MS_HystereticLoopTest --> MS_AdvancedDataAcquired
+}
+
+DM_AdvancedDataAcquired --> DM_Refinement
+MS_AdvancedDataAcquired --> MS_Refinement
+
+DM_Refinement --> DM_Validation
+MS_Refinement --> MS_Validation
+
+state DM_Validation {
+    [*] --> DM_SustainedLoadingValidation
+    DM_SustainedLoadingValidation --> DM_FatigueLoadingValidation
+    DM_FatigueLoadingValidation --> DM_ValidationComparison
+}
+state MS_Validation {
+    [*] --> MS_SustainedLoadingValidation
+    MS_SustainedLoadingValidation --> MS_FatigueLoadingValidation
+    MS_FatigueLoadingValidation --> MS_ValidationComparison
+}
+
+DM_ValidationComparison --> [*] : DM Model Finalized
+DM_ValidationComparison --> DM_Calibration : Further DM Refinement Needed
+
+MS_ValidationComparison --> [*] : MS Model Finalized
+MS_ValidationComparison --> MS_Calibration : Further MS Refinement Needed
+
+DM_Refinement --> Upscaling
+Upscaling --> MS_Calibration : Energetic Equivalence
+
+@enduml

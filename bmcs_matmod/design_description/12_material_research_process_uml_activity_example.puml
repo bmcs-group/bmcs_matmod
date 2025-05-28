@@ -1,0 +1,43 @@
+@startuml
+title Example UML Activity Diagram: Material Research Process
+
+start
+
+:Define Research Objectives;
+:Design Experimental Campaign;
+
+partition "Experimental Work" {
+    :Develop Test Setups;
+    :Prepare Specimens;
+    :Conduct Compression Tests (CT);
+    :Conduct Punch-Through Shear Tests (PTST);
+    :Conduct Prestressed Beam Tests (PBT);
+    :Acquire Experimental Data;
+}
+
+partition "Modeling" {
+    :Develop Material Models (I1, I2);
+    :Develop LDPM Models;
+    :Develop FEM Models;
+}
+
+:Calibrate Models with Experimental Data;
+
+partition "Simulation" {
+    :Run LDPM Simulations;
+    :Run FEM Simulations;
+    :Analyze Simulation Results;
+}
+
+:Validate Models with Additional Experiments;
+
+if (Further Improvement Needed?) then (yes)
+    :Iterate Model Development and Experimental Campaign;
+    -[#green]-> back to :Develop Material Models (I1, I2);
+else (no)
+    :Collaborative Review and Documentation;
+endif
+
+stop
+
+@enduml
