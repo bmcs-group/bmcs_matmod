@@ -10,7 +10,6 @@ import sys
 from shutil import rmtree
 
 from setuptools import find_packages, setup, Command
-from bmcs_matmod.version import __version__
 
 # Package meta-data.
 NAME = 'bmcs_matmod'
@@ -19,23 +18,6 @@ URL = 'https://github.com/bmcs-group/bmcs_matmod'
 EMAIL = 'rostislav.chudoba@rwt-aachen.de'
 AUTHOR = 'BMCS-Group'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = __version__
-
-# What packages are required for this module to be executed?
-REQUIRED = [
-#    'bmcs_utils'
-    # 'requests', 'maya', 'records',
-]
-
-# What packages are optional?
-EXTRAS = {
-    # 'fancy feature': ['django'],
-}
-
-# The rest you shouldn't have to touch too much :)
-# ------------------------------------------------
-# Except, perhaps the License and Trove Classifiers!
-# If you do change the License, remember to change the Trove Classifier for that!
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -47,13 +29,11 @@ try:
 except FileNotFoundError:
     long_description = DESCRIPTION
 
-# Load the package's __version__.py module as a dictionary.
+# Instead, read version from a file (e.g., bmcs_matmod/__version__.py)
 about = {}
-if not VERSION:
-    with open(os.path.join(here, NAME, '__version__.py')) as f:
-        exec(f.read(), about)
-else:
-    about['__version__'] = VERSION
+with open(os.path.join(here, 'bmcs_matmod', '__version__.py')) as f:
+    exec(f.read(), about)
+VERSION = about['__version__']
 
 
 class UploadCommand(Command):
@@ -88,6 +68,7 @@ class UploadCommand(Command):
 
         sys.exit()
 
+
 class ReleaseCommand(Command):
     """Support setup.py upload."""
 
@@ -117,6 +98,24 @@ class ReleaseCommand(Command):
         os.system('git push --tags')
 
         sys.exit()
+
+
+# Add these lines to define REQUIRED and EXTRAS before setup() is called:
+REQUIRED = [
+    # Add your runtime dependencies here, e.g.:
+    'bmcs_utils',
+    'numpy',
+    'sympy',
+    'traits',
+]
+
+EXTRAS = {
+    'dev': [
+        'pytest',
+        'pytest-cov',
+        'twine',
+    ],
+}
 
 
 # Recommend using pyproject.toml for builds

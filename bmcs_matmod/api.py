@@ -1,10 +1,11 @@
 # from .ms1 import MS1
 # from .ms1 import MS13D
 # from .msx import MSX
-from .gsm import GSMEngine
-from .gsm import GSMRM
-from .gsm import GSMNR
+# from .gsm import GSMRM
+# from .gsm import GSMNR
 
+from .gsm_lagrange.gsm_engine import GSMEngine
+from .gsm_lagrange.gsm_def import GSMDef
 from .gsm_lagrange.gsm_model import GSMModel
 from .gsm_lagrange.gsm1d_ed import GSM1D_ED
 from .gsm_lagrange.gsm1d_ep import GSM1D_EP

@@ -16,9 +16,9 @@ class GSM1D_VE(GSMDef):
     # ## External state variables
 
     eps = Scalar(r'\varepsilon', real=True, codename='eps')
-    eps_a = Vector(r'\varepsilon_{a}', [eps])
+    eps_a = Vector(r'\varepsilon_{a}', [eps], codename='eps_a')
     sig = Scalar(r'\sigma', real=True, codename='sig')
-    sig_a = Vector(r'\sigma_{a}', [sig])
+    sig_a = Vector(r'\sigma_{a}', [sig], codename='sig_a')
 
     # ## Internal state variables
 

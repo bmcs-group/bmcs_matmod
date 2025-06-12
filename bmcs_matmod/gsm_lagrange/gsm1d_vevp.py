@@ -26,19 +26,19 @@ class GSM1D_VEVP(GSMDef):
     # ## Internal state variables
 
     eps_p = Scalar(r'\varepsilon^\mathrm{vp}', real=True, codename='eps_p')
-    eps_p_a = Vector(r'\varepsilon^\mathrm{vp}_{a}', [eps_p], codename='eps_p_{a}')
+    eps_p_a = Vector(r'\varepsilon^\mathrm{vp}_{a}', [eps_p], codename='eps_p_a')
     sig_p = Scalar(r'\sigma^\mathrm{vp}', real=True, codename='sig_p')
-    sig_p_a = Vector(r'\sigma^\mathrm{vp}_{a}', [sig_p], codename='sig_p_{a}')
+    sig_p_a = Vector(r'\sigma^\mathrm{vp}_{a}', [sig_p], codename='sig_p_a')
 
     eps_v = Scalar(r'\varepsilon^\mathrm{ve}', real=True, codename='eps_v')
-    eps_v_a = Vector(r'\varepsilon^\mathrm{ve}_{a}', [eps_v], codename='eps_v_{a}')
+    eps_v_a = Vector(r'\varepsilon^\mathrm{ve}_{a}', [eps_v], codename='eps_v_a')
     sig_v = Scalar(r'\sigma^\mathrm{ve}', real=True, codename='sig_v')
-    sig_v_a = Vector(r'\sigma^\mathrm{ve}_{a}', [sig_v], codename='sig_v_{a}')
+    sig_v_a = Vector(r'\sigma^\mathrm{ve}_{a}', [sig_v], codename='sig_v_a')
 
     z = Scalar(r'z', real=True, nonnegative=True)
-    z_a = Vector(r'z_{a}', [z], codename='z_{a}')
+    z_a = Vector(r'z_{a}', [z], codename='z_a')
     Z = Scalar(r'Z', real=True, nonnegative=True)
-    Z_a = Vector(r'Z_{a}', [Z], codename='Z_{a}')
+    Z_a = Vector(r'Z_{a}', [Z], codename='Z_a')
 
     # ## Free energy potential
     eps_el = eps - eps_v - eps_p
