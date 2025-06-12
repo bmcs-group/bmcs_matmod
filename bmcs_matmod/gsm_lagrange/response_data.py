@@ -107,6 +107,7 @@ class ResponseData(bu.Model):
             n_flat = np.prod(var_shape) if var_shape else 1
             # Use codename attribute from var
             codename = getattr(var, 'codename', str(var))
+            print(f'Processing variable: {var}, codename = {codename}, shape = {var_shape}, n_flat = {n_flat}')
             Eps_t_dict[codename] = Eps_t_flat_local[:, col:col + n_flat].reshape((Eps_t_flat_local.shape[0],) + tuple(var_shape))
             col += n_flat
 

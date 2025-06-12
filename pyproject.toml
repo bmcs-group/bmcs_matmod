@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bmcs_matmod"
+version = "0.1.0"
+description = "Suite of utilities for material model development."
+readme = "README.md"
+authors = [
+    { name = "BMCS-Group", email = "rostislav.chudoba@rwt-aachen.de" }
+]
+license = { file = "LICENSE" }
+requires-python = ">=3.6"
+dependencies = [
+    # Add your runtime dependencies here, e.g.:
+    # "bmcs_utils",
+    # "numpy",
+    # "sympy",
+    # "traits",
+]
+
+[project.urls]
+Homepage = "https://github.com/bmcs-group/bmcs_matmod"
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests*"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "twine",
+]
+
+[project.scripts]
+# Example CLI entry point (uncomment and adapt as needed)
+# bmcs-matmod = "bmcs_matmod.cli:main"

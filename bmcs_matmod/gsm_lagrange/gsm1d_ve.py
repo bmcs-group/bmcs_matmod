@@ -53,4 +53,4 @@ class GSM1D_VE(GSMDef):
     dot_eps_ve_a = F_engine.dot_Eps[0, 0]
     sig_ve_a = F_engine.Sig[0, 0]
     #sig_ = F_engine.sig_
-    F_engine.h_k = [dot_eps_ve * eta_ve - sig_ve]
+    F_engine.h_k = [dot_eps_ve_a * eta_ve - sig_ve_a]

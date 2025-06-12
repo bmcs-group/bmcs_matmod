@@ -42,11 +42,11 @@ class GSM1D_VEVPD(GSMDef):
     Z = Scalar(r'Z', real=True, nonnegative=True)
     Z_a = Vector(r'Z_{a}', [Z])
 
-    # ## Free energy potential
-    eps_el = eps - eps_v - eps_p
-    U_e_ = sp.Rational(1,2) * (1 - omega) * E * eps_el**2
-    U_p_ =  sp.Rational(1,2) * K * z**2
-    F_ = U_e_ + U_p_
+    # # ## Free energy potential
+    # eps_el = eps - eps_v - eps_p
+    # U_e_ = sp.Rational(1,2) * (1 - omega) * E * eps_el**2
+    # U_p_ =  sp.Rational(1,2) * K * z**2
+    # F_ = U_e_ + U_p_
 
     # ## Flow potential
     f_ = sp.sqrt(sig_p**2) - (f_c + Z)
