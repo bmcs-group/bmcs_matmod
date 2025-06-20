@@ -2,25 +2,25 @@ import traits.api as tr
 import bmcs_utils.api as bu
 import sympy as sp
 import numpy as np
-from typing import Type, Dict, List, Union, Any, Tuple
+from typing import Type, Dict, List, Union, Any, Tuple, Optional, cast
 import inspect
 
 from .gsm_def import GSMDef
 from .gsm_engine import GSMEngine
 from .response_data import ResponseData
 
-def derive_trait_model_params(gsm_def):
+def derive_trait_model_params(gsm_def: Type[GSMDef]) -> Dict[sp.Symbol, str]:
     """Utility to derive trait_model_params mapping from a GSMDef."""
-    # ...extract logic from old GSMMaterialModel.__new__...
+    # ...existing code...
     temp_instance = gsm_def()
-    param_symbols = temp_instance.F_engine.m_params
-    trait_model_params = {}
+    param_symbols = temp_instance.F_engine.m_params  # type: ignore
+    trait_model_params: Dict[sp.Symbol, str] = {}
     for param_sym in param_symbols:
         param_name = param_sym.name
         trait_name = param_name
         if '\\' in param_name or '{' in param_name or '}' in param_name:
-            if hasattr(temp_instance, 'param_codenames') and param_sym in temp_instance.param_codenames:
-                trait_name = temp_instance.param_codenames[param_sym]
+            if hasattr(temp_instance, 'param_codenames') and param_sym in temp_instance.param_codenames:  # type: ignore
+                trait_name = temp_instance.param_codenames[param_sym]  # type: ignore
             else:
                 trait_name = param_name.replace('\\', '').replace('{', '').replace('}', '')
         trait_model_params[param_sym] = trait_name
@@ -33,16 +33,17 @@ class GSMModel(bu.Model):
     """
     gsm_def = tr.Type(GSMDef)
     gsm_exec = tr.Property(tr.Instance(GSMDef), depends_on='gsm_def,+params')
-    trait_model_params = tr.Dict
+    trait_model_params = tr.Dict()
 
-    def __new__(cls, gsm_def=None, **traits):
+    def __new__(cls, gsm_def: Optional[Type[GSMDef]] = None, **traits: Any) -> 'GSMModel':
         if gsm_def is None:
             return super().__new__(cls)
         model_class_name = f"{gsm_def.__name__}_Model"
         if model_class_name in globals():
-            return globals()[model_class_name].__new__(globals()[model_class_name])
+            return cast('GSMModel', globals()[model_class_name].__new__(globals()[model_class_name]))
+        
         trait_model_params = derive_trait_model_params(gsm_def)
-        traits_dict = {
+        traits_dict: Dict[str, Any] = {
             '__doc__': f"Executable material model based on {gsm_def.__name__}",
             'gsm_def': gsm_def,
             'trait_model_params': trait_model_params,
@@ -50,29 +51,28 @@ class GSMModel(bu.Model):
         }
         for param_sym, trait_name in trait_model_params.items():
             traits_dict[trait_name] = tr.Float(1.0, desc=f"Material parameter {param_sym.name}")
+        
         model_class = type(model_class_name, (cls,), traits_dict)
         globals()[model_class_name] = model_class
-        instance = model_class.__new__(model_class)
+        instance = cast('GSMModel', model_class.__new__(model_class))
         return instance
 
-    def __init__(self, gsm_def=None, **traits):
+    def __init__(self, gsm_def: Optional[Type[GSMDef]] = None, **traits: Any) -> None:
         if gsm_def is not None:
             traits['gsm_def'] = gsm_def
         super().__init__(**traits)
 
     @tr.cached_property
-    def _get_gsm_exec(self):
+    def _get_gsm_exec(self) -> GSMDef:
         return self.gsm_def()
 
-    def get_param_dict(self):
+    def get_param_dict(self) -> Dict[str, float]:
         return {trait_name: getattr(self, trait_name) for trait_name in self.trait_model_params.values()}
 
-    def get_args(self):
+    def get_args(self) -> List[float]:
         return self.gsm_exec.get_args(**self.get_param_dict())
 
-    # ...delegate methods as before, but use gsm_exec instead of model_instance...
-    def get_F_sig(self, eps):
-        return self.gsm_exec.get_F_sig(eps, *self.get_args())
+    # ...existing code...
     def get_F_response(self, eps_ta, t_t):
         resp = self.gsm_exec.get_F_response(eps_ta, t_t, *self.get_args())
         return ResponseData.from_engine_response(self.gsm_def.F_engine, resp)

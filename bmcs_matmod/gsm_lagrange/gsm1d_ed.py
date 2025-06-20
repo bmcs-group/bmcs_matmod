@@ -8,34 +8,34 @@ class GSM1D_ED(GSMDef):
     interaction between the individual dissipative mechanisms.
     """
     # Material parameters
-    E = Scalar(r'E', codename='E', real=True, nonnegative=True)
-    S = Scalar(r'S', codename='S', real=True, nonnegative=True)
-    c = Scalar(r'c', codename='c', real=True, nonnegative=True)
-    r = Scalar(r'r', codename='r', real=True, nonnegative=True)
-    eps_0 = Scalar(r'\varepsilon_0', codename='eps_0', real=True, nonnegative=True)
+    E: sp.Symbol = Scalar(r'E', codename='E', real=True, nonnegative=True)
+    S: sp.Symbol = Scalar(r'S', codename='S', real=True, nonnegative=True)
+    c: sp.Symbol = Scalar(r'c', codename='c', real=True, nonnegative=True)
+    r: sp.Symbol = Scalar(r'r', codename='r', real=True, nonnegative=True)
+    eps_0: sp.Symbol = Scalar(r'\varepsilon_0', codename='eps_0', real=True, nonnegative=True)
 
     # ## External state variables
-    eps = Scalar(r'\varepsilon', codename='eps', real=True)
-    eps_a = Vector(r'{\varepsilon}_{a}', [eps], codename='eps_a')
-    sig = Scalar(r'\sigma', codename='sig', real=True)
-    sig_a = Vector(r'{\sigma}_{a}', [sig], codename='sig_a')
+    eps: sp.Symbol = Scalar(r'\varepsilon', codename='eps', real=True)
+    eps_a: sp.Matrix = Vector(r'{\varepsilon}_{a}', [eps], codename='eps_a')
+    sig: sp.Symbol = Scalar(r'\sigma', codename='sig', real=True)
+    sig_a: sp.Matrix = Vector(r'{\sigma}_{a}', [sig], codename='sig_a')
 
     # ## Internal state variables
-    z = Scalar(r'z', codename='z', real=True, nonnegative=True)
-    z_a = Vector(r'{z}_{a}', [z], codename='z_a')
-    Z = Scalar(r'Z', codename='Z', real=True, nonnegative=True)
-    Z_a = Vector(r'{Z}_{a}', [Z], codename='Z_a')
-    omega = Scalar(r'\omega', codename='omega', real=True)
-    omega_a = Vector(r'{\omega}_{a}', [omega], codename='omega_a')
-    Y = Scalar(r'Y', codename='Y', real=True)
-    Y_a = Vector(r'{Y}_{a}', [Y], codename='Y_a')
+    z: sp.Symbol = Scalar(r'z', codename='z', real=True, nonnegative=True)
+    z_a: sp.Matrix = Vector(r'{z}_{a}', [z], codename='z_a')
+    Z: sp.Symbol = Scalar(r'Z', codename='Z', real=True, nonnegative=True)
+    Z_a: sp.Matrix = Vector(r'{Z}_{a}', [Z], codename='Z_a')
+    omega: sp.Symbol = Scalar(r'\omega', codename='omega', real=True)
+    omega_a: sp.Matrix = Vector(r'{\omega}_{a}', [omega], codename='omega_a')
+    Y: sp.Symbol = Scalar(r'Y', codename='Y', real=True)
+    Y_a: sp.Matrix = Vector(r'{Y}_{a}', [Y], codename='Y_a')
 
     # ## Free energy potential
     eps_el = eps
     U_e_ = sp.Rational(1,2) * (1 - omega) * E * eps_el**2 + sp.Rational(1,2) * z**2
     F_ = U_e_
 
-    F_engine = GSMEngine(
+    F_engine: GSMEngine = GSMEngine(
         name = 'gsm_F_1d_mpdp_ed',
         eps_vars = eps_a,
         T_var = sp.Symbol('T', real=True),

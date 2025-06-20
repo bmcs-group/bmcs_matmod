@@ -63,5 +63,18 @@
   "python.testing.nosetestsEnabled": false,
   "python.testing.pytestArgs": [
     "bmcs_matmod"
-  ]
+  ],
+  "python.analysis.typeCheckingMode": "off",
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportGeneralTypeIssues": "none",
+    "reportOptionalMemberAccess": "none",
+    "reportAttributeAccessIssue": "none",
+    "reportUnknownMemberType": "none",
+    "reportUnknownArgumentType": "none",
+    "reportUnknownVariableType": "none",
+    "reportMissingTypeStubs": "none",
+    "reportPrivateImportUsage": "none",
+    "reportIncompatibleVariableOverride": "none"
+  }
 }

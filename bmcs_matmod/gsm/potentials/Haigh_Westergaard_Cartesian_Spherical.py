@@ -45,14 +45,14 @@ if __name__ == '__main__':
     xi, theta = np.mgrid[-0.5:1:10j, 0:2 * np.pi:30j]
     rho = np.sqrt(1 - xi ** 2)
 
-    print theta / np.pi
+    print(theta / np.pi)
 
-    print len(xi)
+    print(len(xi))
 
     x, y, z = haigh_westergaard_to_cartesian(xi, rho, theta)
     r, theta, phi = cartesian_to_spherical(x, y, z)
-    print theta
-    print theta.flatten()
+    print(theta)
+    print(theta.flatten())
     x, y, z = spherical_to_cartesian(r, theta, phi)
     mlab.figure(1, fgcolor=(0, 0, 0), bgcolor=(1, 1, 1))
 #     x, y, z = spherical_to_cartesian(r, theta, phi)

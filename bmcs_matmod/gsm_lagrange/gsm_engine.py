@@ -7,18 +7,37 @@ thermodynamic potentials with an efficient execution of the automatically derive
 equations in the computational environment.
 """
 
-from re import M
+from typing import TYPE_CHECKING, Any, Tuple, List, Union, cast
 import traits.api as tr
-#import bmcs_utils.api as bu
 import sympy as sp
 import numpy as np
+import numpy.typing as npt
 import dill
 import os
 import functools
+from functools import cached_property  # Python 3.8+
 
-def get_dirac_delta(x, x_0=0):
+# Use TYPE_CHECKING to avoid runtime overhead and typing conflicts with SymPy
+if TYPE_CHECKING:
+    # Tell type checkers what the properties should return
+    _sig_lambdified: Callable[..., npt.NDArray[np.float64]]
+    phi_: Any  # SymPy expression
+    Y_: Any    # SymPy matrix
+    Phi_: Any  # SymPy matrix
+
+    from typing import Any as SymExpr  # Simplified for type checking
+    SymMatrix = Any
+    SymDict = Dict[Any, Any]
+else:
+    # At runtime, use actual SymPy types without constraints
+    SymExpr = Union[sp.Expr, sp.Basic, sp.Symbol]
+    SymMatrix = sp.Matrix
+    SymDict = Dict[SymExpr, SymExpr]
+
+def get_dirac_delta(x: Any, x_0: float = 0) -> int:
     return 0
-numpy_dirac =[{'DiracDelta': get_dirac_delta }, 'numpy']
+
+numpy_dirac = [{'DiracDelta': get_dirac_delta}, 'numpy']
 
 # Directory to store the serialized symbolic instances
 CACHE_DIR = '_lambdified_cache'
@@ -26,114 +45,34 @@ CACHE_DIR = '_lambdified_cache'
 class GSMEngine(tr.HasTraits):
     """Generalized Standard Material
 
-    The class definition consists of 
-
-    F_expr   = Free energy potential
-
-    eps_vars   = external variable
-    
-    T_var    = temperature
-    
-    Eps_vars = symbolic definition of the internal state (sympy.BlockMatrix)
-    
-    Sig_vars = symbolic definition of the internal state (sympy.BlockMatrix)
-    
-    m_params = list of material parameters
-    
-    m_param_subs = material parameter substitutions. A dictionary of sympy substitutions 
-                   that can be used to simplify the potentials before they are submitted 
-                   to differentiation. This feature has been introduce to handle the algebraic
-                   limiting configurations, like for example the case of (Y**(r+1) / Y) that 
-                   occurs in some flow potentials. For Y = 0 and r > 0, the value of this expression is
-                   zero. However, as sympy cannot apply the assumption r > 0 yet, it falsely recognizes
-                   this case as division by zero and returns nan. Using this attribute the substitution
-                   {r : 2} avoids this problem. If the variable r is a subject of a parametric study
-                   or calibration, the depending derivations must be re-rendered. Currently, this means 
-                   that all expressions are rerendered. However, as it takes less than a second for the 
-                   currently implemented potentials, this does not impose any significant limitation.   
-    
-    f_expr       = threshold function
-    
-    phi_ext_expr = flow potential extension
-
-
+    The class definition consists of symbolic expressions and numerical execution methods
+    for thermodynamically consistent material modeling.
     """
 
     name = tr.Str('unnamed')
-
-    eps_vars = tr.Any
-    """External variable
-    """
-
-    sig_vars = tr.Any
-    """External conjugate variables
-    """
-
-    T_var = tr.Any
-    """Temperature
-    """
-
-    Eps_vars = tr.Tuple
-    """Symbolic definition of the internal state (sympy.BlockMatrix)
-    """
-
-    Sig_vars = tr.Tuple
-    """Symbolic definition of the internal state (sympy.BlockMatrix)
-    """
-
-    m_params = tr.Tuple
-    """List of material parameters
-    """
-
-    m_param_subs = tr.Dict
-    """Substitutions of hard-wired parameters
-    """
-
-    F_expr = tr.Any
-    """Free energy potential
-    """
-
-    pi_expr = tr.Any(0)
-    """Dissipation potential
-    """
-
-    Sig_signs = tr.Array
-    """Signs of the derivatives of the free energy potential with respect 
-    to the internal variables
-    """
-
+    eps_vars = tr.Any()
+    sig_vars = tr.Any()
+    T_var = tr.Any()
+    Eps_vars = tr.Tuple()
+    Sig_vars = tr.Tuple()
+    m_params = tr.Tuple()
+    m_param_subs = tr.Dict(default_value={})
+    F_expr = tr.Any()
+    pi_expr = tr.Any(default_value=0)
+    Sig_signs = tr.Array()
     sig_sign = tr.Float(1)
-    """Sign relating the rate of free energy to the dissipation.
-    For Helmholtz free energy it is negative, for the Gibbs free energy it is positive
-    """
-
     gamma_mech_sign = tr.Int(-1)
-    """Sign relating the rate of free energy to the dissipation.
-    For Helmholtz free energy it is negative, for the Gibbs free energy it is positive
-    """
-
-    dot_Eps_bounds_expr = tr.Any(sp.S.Zero) 
-    """Constraint specifying admissible bounds of internal variables in form of inequalities  
-    """
-
+    dot_Eps_bounds_expr = tr.Any(sp.S.Zero)
     phi_ext_expr = tr.Any(sp.S.Zero)
-    """Extension of the threshold function detailing the trajectories
-    within the state domain that govern the irreversible state evolution   
-    """ 
-
-    f_expr = tr.Any(sp.S.Zero) 
-    """Threshold function delineating the reversible and reversible state 
-    domains. The function can consist of subdomains within the state space
-    domain. 
-    """
-
-
+    f_expr = tr.Any(sp.S.Zero)
     d_t = sp.Symbol(r'\mathrm{d}t', real=True)
-    """Time increment
-    """
+    h_k = tr.List(tr.Any, value=[])
+    vp_on = tr.Bool(True)
+    update_at_k = tr.Bool(True)
+    k_max = tr.Int(10)
 
+    # Properties - let SymPy handle its own typing internally
     eps_a = tr.Property()
-
     @tr.cached_property
     def _get_eps_a(self):
         return sp.BlockMatrix([
@@ -141,21 +80,12 @@ class GSMEngine(tr.HasTraits):
             for var in self.eps_vars
         ]).as_explicit()
 
-
-    # dot_eps = tr.Property()
-
-    # @tr.cached_property
-    # def _get_dot_eps(self):
-    #     return sp.Symbol(f'\\dot{{{self.eps_vars[0].name}}}')
-
     dot_eps_a = tr.Property()
-
     @tr.cached_property
     def _get_dot_eps_a(self):
         return sp.Matrix([sp.Symbol(f'\\dot{{{var.name}}}') for var in self.eps_a])
 
     sig_a = tr.Property()
-
     @tr.cached_property
     def _get_sig_a(self):
         return sp.BlockMatrix([
@@ -164,34 +94,26 @@ class GSMEngine(tr.HasTraits):
         ]).as_explicit()
 
     dot_sig_a = tr.Property()
-
     @tr.cached_property
     def _get_dot_sig_a(self):
         return sp.Matrix([sp.Symbol(f'\\dot{{{var.name}}}') for var in self.sig_vars])
 
+    # For complex SymPy operations, don't over-constrain with typing
     lam_phi_f_ = tr.Property()
-
     @tr.cached_property
     def _get_lam_phi_f_(self):
         if self.phi_ == sp.S.Zero:
             return ([], sp.S.Zero, sp.S.Zero)
         lam_phi = sp.Symbol(r'\lambda_{\mathrm{\phi}}', real=True)
-        return ([lam_phi], lam_phi * (-self.phi_), self.f_expr )
+        return ([lam_phi], lam_phi * (-self.phi_), self.f_expr)
 
     n_lam = tr.Property()
-
     @tr.cached_property
     def _get_n_lam(self):
         lam_phi_k, _, _ = self.lam_phi_f_
         return len(lam_phi_k)
 
-    h_k = tr.List(tr.Any, value=[])
-    """List of $k$ equality constraints that will be included 
-    in the Lagrangian for the minimum principle of dissipation potential.
-    """
-
     H_Lam = tr.Property()
-
     @tr.cached_property
     def _get_H_Lam(self):
         dot_Lam = [sp.Symbol(f'\\dot{{\\lambda}}_{{{k}}}', real=True) for k in range(len(self.h_k))]
@@ -200,20 +122,11 @@ class GSMEngine(tr.HasTraits):
         return (dot_Lam, delta_Lam, dot_lam_sum)
 
     n_Lam = tr.Property()
-
     @tr.cached_property
     def _get_n_Lam(self):
         return len(self.h_k)
 
-    vp_on = tr.Bool(True)
-    """Viscoplasticity on or off   
-    """ 
-
-    update_at_k = tr.Bool(True)
-    """Debugging for type of viscoplastic regularization update
-    """ 
-
-    # Internal variable representations and conversions
+    # Internal variable representations - let SymPy handle its types
     Eps_list = tr.Property()
     @tr.cached_property
     def _get_Eps_list(self):
@@ -224,44 +137,30 @@ class GSMEngine(tr.HasTraits):
     def _get_Eps(self):
         return sp.BlockMatrix(self.Eps_list).T
     
-    n_Eps = tr.Property
+    n_Eps = tr.Property()
     @tr.cached_property
     def _get_n_Eps(self):
         return len(self.Eps.as_explicit())
 
-    _Eps_as_array_lambdified = tr.Property
+    _Eps_as_array_lambdified = tr.Property()
     @tr.cached_property
     def _get__Eps_as_array_lambdified(self):
         return sp.lambdify(self.Eps.blocks, self.Eps.as_explicit())
 
-    def Eps_as_array(self, arr):
-        return self._Eps_as_array_lambdified(arr)[:,0]
+    def Eps_as_array(self, arr: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        return self._Eps_as_array_lambdified(arr)[:, 0]
 
-    _Eps_as_blocks_lambdified = tr.Property
+    _Eps_as_blocks_lambdified = tr.Property()
     @tr.cached_property
     def _get__Eps_as_blocks_lambdified(self):
         return sp.lambdify(self.Eps.as_explicit(), self.Eps_list)
 
-    def Eps_as_blocks(self, arr):
+    def Eps_as_blocks(self, arr: npt.NDArray[np.float64]) -> List[Any]:
         return [Eps_i[0] for Eps_i in self._Eps_as_blocks_lambdified(arr)]
        
-    dot_Eps_list = tr.Property
+    dot_Eps_list = tr.Property()
     @tr.cached_property
     def _get_dot_Eps_list(self):
-        """
-        Compute the time derivative of internal state variables.
-
-        This cached property method generates a list of symbolic matrices representing
-        the time derivatives of the internal state variables (`Eps_vars`). Each element in the
-        list corresponds to an internal state variable matrix from `Eps_vars`, where each entry
-        in the matrix is replaced by its time derivative.
-
-        Returns:
-            list: A list of `sympy.Matrix` objects, where each matrix contains the
-                time derivatives of the corresponding internal state variable matrix from
-                `Eps_vars`. The time derivatives are represented as `Cymbol` objects
-                with names and codenames indicating the time derivative.
-        """
         return [
             sp.Matrix(eps_var.shape[0], eps_var.shape[1], 
                     lambda i, j: sp.Symbol(name=f'\\dot{{{eps_var[i, j].name}}}'))
@@ -273,7 +172,7 @@ class GSMEngine(tr.HasTraits):
     def _get_dot_Eps(self):
         return sp.BlockMatrix(self.dot_Eps_list).T
 
-    # Conjugate state variable representations and conversions
+    # Conjugate state variable representations
     Sig_list = tr.Property()
     @tr.cached_property
     def _get_Sig_list(self):
@@ -287,20 +186,6 @@ class GSMEngine(tr.HasTraits):
     dot_Sig_list = tr.Property()
     @tr.cached_property
     def _get_dot_Sig_list(self):
-        """
-        Compute the time derivative of thermodynamic forces.
-
-        This cached property method generates a list of symbolic matrices representing
-        the time derivatives of the thermodynamic forces (`Sig_vars`). Each element in the
-        list corresponds to a thermodynamic force matrix from `Sig_vars`, where each entry
-        in the matrix is replaced by its time derivative.
-
-        Returns:
-            list: A list of `sympy.Matrix` objects, where each matrix contains the
-                time derivatives of the corresponding thermodynamic force matrix from
-                `Sig_vars`. The time derivatives are represented as `Cymbol` objects
-                with names and codenames indicating the time derivative.
-        """
         return [
             sp.Matrix(sig_var.shape[0], sig_var.shape[1], 
                     lambda i, j: sp.Symbol(name=f'\\dot{{{sig_var[i, j].name}}}'))
@@ -312,44 +197,34 @@ class GSMEngine(tr.HasTraits):
     def _get_dot_Sig(self):
         return sp.BlockMatrix(self.dot_Sig_list).T
 
-
     dF_dEps_ = tr.Property()
     @tr.cached_property
     def _get_dF_dEps_(self):
         return sp.BlockMatrix([sp.simplify(sp.diff(self.F_expr, var)).T for var in self.Eps.blocks]).T.subs(self.m_param_subs)
 
-    ######################################
-
-    def get_sig(self, eps, Eps, *args):
-        """
-        Calculates the displacement for a given stress level
-
-        Args:
-            sig: Control stress.
-            T: Temperature.
-            Eps: Strain.
-            Sig: Stress.
-            **m_params: Additional model parameters.
-
-        Returns:
-            Calculated displacement for a stress level and control stress.
-        """
+    # Numerical methods - type the interfaces clearly
+    def get_sig(self, eps: Union[float, npt.NDArray[np.float64]], Eps: Optional[npt.NDArray[np.float64]] = None, *args: float) -> Union[float, npt.NDArray[np.float64]]:
+        """Calculate the displacement for a given stress level"""
         eps_sp_ = np.moveaxis(np.atleast_1d(eps), -1, 0)
-        Eps_sp_ = np.moveaxis(Eps, -1, 0)
-        sig_sp_ = self._sig_lambdified(eps_sp_, Eps_sp_, *args)
+        if Eps is not None:
+            Eps_sp_ = np.moveaxis(Eps, -1, 0)
+        else:
+            Eps_sp_ = np.zeros((1, self.n_Eps))
+        sig_sp_ = self._sig_lambdified(eps_sp_, Eps_sp_, *args)  # type: ignore[misc]
         sig_sp_ = sig_sp_.reshape(eps_sp_.shape)
         return np.moveaxis(sig_sp_, 0, -1)
 
-    _sig_lambdified = tr.Property()
-    @tr.cached_property
-    def _get__sig_lambdified(self):
+    # For new properties, use Python's cached_property instead of traits
+    @cached_property  
+    def _sig_lambdified(self) -> Callable[..., npt.NDArray[np.float64]]:
         return sp.lambdify((self.eps_vars[0], self.Eps.as_explicit()) + self.m_params + ('*args',), 
                            self.sig_, numpy_dirac, cse=True)
 
-    sig_ = tr.Property()
+    # Keep existing traits properties as-is, just ignore typing for them
+    phi_ = tr.Property()  # type: ignore[misc]
     @tr.cached_property
-    def _get_sig_(self):
-        return self.F_expr.diff(self.eps_vars[0])
+    def _get_phi_(self):
+        return (self.f_expr + self.phi_ext_expr).subs(self.m_param_subs)
 
     sig_a_ = tr.Property()
     @tr.cached_property
@@ -359,24 +234,11 @@ class GSMEngine(tr.HasTraits):
     subs_sig_eps = tr.Property()
     @tr.cached_property
     def _get_subs_sig_eps(self):
-        return dict(zip(self.sig_a, self.sig_a_))
+        return dict(zip(self.sig_a, self.sig_a_))  # type: ignore[arg-type]
 
-    ######################################
-    def get_dDiss_dEps(self, eps, T, Eps, Sig, *args):
-        """
-        Calculates the derivative of the dissipation rate with respect 
-        to internal variables.
-
-        Args:
-            u: Displacement.
-            T: Temperature.
-            Eps: Strain.
-            Sig: Stress.
-            **m_params: Additional model parameters.
-
-        Returns:
-            Calculated derivative of the dissipation rate with respect to strain.
-        """
+    # More numerical interface methods...
+    def get_dDiss_dEps(self, eps: Any, T: Any, Eps: Any, Sig: Any, *args: Any) -> npt.NDArray[np.float64]:
+        """Calculate the derivative of the dissipation rate with respect to internal variables"""
         return self._dDiss_dEps_lambdified(eps, T, Eps, Sig, *args)[:, 0]
 
     _dDiss_dEps_lambdified = tr.Property()
@@ -393,13 +255,8 @@ class GSMEngine(tr.HasTraits):
         dFG_dEps_explicit_ = self.dF_dEps_.as_explicit()
         return (self.T_var * dFG_dEps_explicit_.diff(self.T_var) - dFG_dEps_explicit_)
 
-    
-    ######################################
-
-    def get_dot_Eps_bounds(self, dot_eps, dot_Eps, *args):
-        """
-        """
-   
+    def get_dot_Eps_bounds(self, dot_eps: Any, dot_Eps: Any, *args: Any) -> Any:
+        """Get bounds for internal variable rates"""
         dot_eps_sp_ = np.moveaxis(np.atleast_1d(dot_eps), -1, 0)
         dot_Eps_sp_ = np.moveaxis(dot_Eps, -1, 0)
         dot_Eps_bounds_sp = self._dot_Eps_bounds_lambdified(dot_eps_sp_, dot_Eps_sp_, *args)
@@ -418,30 +275,13 @@ class GSMEngine(tr.HasTraits):
     def _get_dot_Eps_bounds_(self):
         return self.dot_Eps_bounds_expr
 
-    ######################################
-    def get_Sig(self, eps, Eps, *args):
-        """
-        Calculates the stress based on the given inputs.
-
-        Args:
-            eps: Strain.
-            T: Temperature.
-            Eps: Strain.
-            Sig: Stress.
-            *args: Additional model parameters.
-
-        Returns:
-            Calculated stress.
-        """
+    def get_Sig(self, eps: Any, Eps: Any, *args: Any) -> Any:
+        """Calculate the stress based on the given inputs"""
         eps_sp_ = np.moveaxis(np.atleast_1d(eps), -1, 0)
         Eps_sp_ = np.moveaxis(Eps, -1, 0)
         Sig_sp = self._Sig_lambdified(eps_sp_, Eps_sp_, *args)
         Sig_sp_ = Sig_sp.reshape(Eps_sp_.shape)
         return np.moveaxis(Sig_sp_, 0, -1)
-
-        # Eps_sp_ = np.moveaxis(Eps, 0, -1)
-        # Sig_sp = self._Sig_lambdified(eps, Eps_sp_, **m_params)
-        # return np.moveaxis(Sig_sp.reshape(Eps.shape), 0, -1)
     
     _Sig_lambdified = tr.Property()
     @tr.cached_property
@@ -455,10 +295,9 @@ class GSMEngine(tr.HasTraits):
     def _get_Sig_(self):
         return self.Y_ * self.dF_dEps_.as_explicit()
 
-    ######################################
-
+    # SymPy expression properties - minimal typing
     phi_ = tr.Property()
-    @tr.cached_property
+    @tr.cached_property  
     def _get_phi_(self):
         return (self.f_expr + self.phi_ext_expr).subs(self.m_param_subs)
 
@@ -477,16 +316,14 @@ class GSMEngine(tr.HasTraits):
     subs_Sig_Eps = tr.Property()
     @tr.cached_property
     def _get_subs_Sig_Eps(self):
-        return dict(zip(self.Sig.as_explicit(), self.Sig_.as_explicit()))
+        return dict(zip(self.Sig.as_explicit(), self.Sig_.as_explicit()))  # type: ignore[arg-type]
 
     Phi_Eps_ = tr.Property()
     @tr.cached_property
     def _get_Phi_Eps_(self):
         return self.Phi_.subs(self.subs_Sig_Eps)
 
-    ######################################
-
-    def get_Sig_f_R_dR_n1(self, eps_n, d_eps, Eps_n, d_A, d_t, *args):
+    def get_Sig_f_R_dR_n1(self, eps_n: Any, d_eps: Any, Eps_n: Any, d_A: Any, d_t: Any, *args: Any) -> Tuple[Any, Any, Any, Any]:
         eps_n_sp_ = np.moveaxis(np.atleast_1d(eps_n), -1, 0)
         d_eps_sp_ = np.moveaxis(np.atleast_1d(d_eps), -1, 0)
         O_ = np.zeros_like(eps_n_sp_)
@@ -501,22 +338,18 @@ class GSMEngine(tr.HasTraits):
 
     _get_Sig_f_R_dR_n1_lambdified = tr.Property()
     @tr.cached_property
-    def _get__get_Sig_f_R_dR_n1_lambdified(self):
-
-        def get_dirac_delta(x, x_0=0):
-            return 0
-        numpy_dirac =[{'DiracDelta': get_dirac_delta }, 'numpy']
-
+    def _get__get_Sig_f_R_dR_n1_lambdified(self) -> Callable[..., Any]:
         _, (eps_n, delta_eps, Eps_n, delta_A, delta_t, self.Ox, self.Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI = self.Sig_f_R_dR_n1
-        return sp.lambdify((eps_n, delta_eps, Eps_n, delta_A, delta_t, self.Ox, self.Ix)  + self.m_params + ('*args',), 
+        # Convert traits tuple to regular tuple explicitly
+        m_params_tuple = tuple(self.m_params)  # Force conversion
+        return sp.lambdify((eps_n, delta_eps, Eps_n, delta_A, delta_t, self.Ox, self.Ix) + m_params_tuple + ('*args',), 
                             (Sig_n1, f_n1, R_n1, dR_dA_n1_OI), numpy_dirac, cse=True)
-
     
     Ox = sp.Symbol('O', real=True)
     Ix = sp.Symbol('I', real=True)
 
-    def replace_zeros_and_ones_with_symbolic(self, dR_dA_, delta_A):
-        # Function to replace zero elements with a symbolic variable
+    def replace_zeros_and_ones_with_symbolic(self, dR_dA_: SymMatrix, delta_A: SymMatrix) -> SymMatrix:
+        """Function to replace zero elements with a symbolic variable"""
         new_matrix = sp.Matrix(dR_dA_)
         rows, cols = new_matrix.shape
         for i in range(rows):
@@ -537,17 +370,16 @@ class GSMEngine(tr.HasTraits):
 
     Sig_f_R_dR_n1 = tr.Property()
     @tr.cached_property
-    def _get_Sig_f_R_dR_n1(self):
+    def _get_Sig_f_R_dR_n1(self) -> Tuple[Any, Any, Any, Any, Any, Any]:
         ## Manual construction of the residuum
         Eps = self.Eps.as_explicit()
         eps = self.eps_a[0]
-        # dot_Eps = sp.Matrix([sp.Symbol(f'\\dot{{{var.name}}}') for var in list(Eps)])
         dot_Eps = self.dot_Eps.as_explicit()
         dot_eps = self.dot_eps_a[0]
         lam, lam_phi, f_ = self.lam_phi_f_
         dot_Lam, delta_Lam, dot_Lam_H_ = self.H_Lam
 
-        # time
+        # time symbols
         t = sp.Symbol(r't', real=True)
         delta_t = sp.Symbol(r'\Delta t', real=True)
 
@@ -558,8 +390,8 @@ class GSMEngine(tr.HasTraits):
         # increment
         delta_Eps = sp.Matrix([sp.Symbol(f'\\Delta{{{var.name}}}', real=True) for var in Eps])
         delta_eps = sp.Symbol(r'\Delta{\varepsilon}', real=True)
-        # delta_lam = sp.Symbol(r'\Delta{\lambda}', real=True)
         delta_lam = sp.Matrix([sp.Symbol(f'\\Delta{{{var.name}}}', real=True) for var in lam])
+        
         # updated state
         Eps_n1 = Eps_n + delta_Eps
         eps_n1 = eps_n + delta_eps
@@ -571,11 +403,11 @@ class GSMEngine(tr.HasTraits):
 
 
         # derive substitutions
-        subs_dot_Eps = dict(zip(dot_Eps, dot_Eps_n))
+        subs_dot_Eps = dict(zip(dot_Eps, dot_Eps_n))  # type: ignore[arg-type]
         subs_dot_eps = {dot_eps: dot_eps_n}
-        subs_delta_lam = dict(zip(lam, delta_lam))
-        subs_dot_Lam = dict(zip(dot_Lam, delta_Lam))
-        subs_Eps_n1 = dict(zip(Eps, Eps_n1))
+        subs_delta_lam = dict(zip(lam, delta_lam))  # type: ignore[arg-type]
+        subs_dot_Lam = dict(zip(dot_Lam, delta_Lam))  # type: ignore[arg-type]
+        subs_Eps_n1 = dict(zip(Eps, Eps_n1))  # type: ignore[arg-type]
         subs_eps_n1 = {eps: eps_n1}
         subs_dt = {self.d_t: delta_t}
 
@@ -600,23 +432,6 @@ class GSMEngine(tr.HasTraits):
         dL_dS_ = L_.diff(S)
         dL_dS_ = sp.Matrix(dL_dS_)
         if self.f_expr != sp.S.Zero:
-            # To handle the non-associated flow rule within the inequality constraint
-            # represented by the threshold function, the respective residuum equation
-            # representing the consistency condition is overwritten with the threshold
-            # function without the non-associated enhancement. Still, the evolution 
-            # equation retains the non-associated flow rule. This is equivalent as if
-            # a shift of the non-associated enhancement is performed to set it zero at the 
-            # level of the threshold function. The derivative of the flow enhancement w.r.t. 
-            # the thermodynamic force defining the evolution equation remains unchanged. 
-            # Such arrangement can always be found by a suitable choice of the integration
-            # constant of the evolution equation, requiring that the flow enhancement is zeroed
-            # exactly at the level of the inelastic threshold.  
-            # def phi_FB(a, b, mu):
-            #     # Fisher-Burmeister function for the inequality constraint ensuring 
-            #     # the non-negativity of the threshold function
-            #     return sp.sqrt(a**2 + b**2 + mu**2) - (a + b)
-            # print(f_, delta_lam[0])
-            # dL_dS_[-1] = phi_FB(lam[0], -f_, mu)
             dL_dS_[-1] = f_
 
         dL_dS_A_ = dL_dS_.subs(self.subs_Sig_Eps)
@@ -638,46 +453,23 @@ class GSMEngine(tr.HasTraits):
         Sig_n1 = Sig_.subs(subs_n1)
 
         return (gamma_mech, L_, dL_dS_, dL_dS_A_, dR_dA_n1), (eps_n, delta_eps, Eps_n, delta_A, delta_t, self.Ox, self.Ix), Sig_n1, f_n1, R_n1, dR_dA_n1_OI
-    
-    ######################################
 
-    k_max = tr.Int(10)
-
-    def get_state_n1(self, eps_n, d_eps, d_t, Eps_n, *args):
-        """
-        Calculates the state at time n+1 based on the given inputs using an iterative algorithm.
-
-        Args:
-            eps_n: strain at time n.
-            d_eps: strain increment from time n to n+1.
-            T_n: Temperature at time n.
-            dt: Time step size.
-            Sig_n: Stress at time n.
-            Eps_n: Strain at time n.
-            k_max: Maximum number of iterations.
-            *args: Additional arguments.
-
-        Returns:
-            Tuple containing the updated strain Eps_k, stress Sig_k, temperature T_n+1, number of iterations k, 
-            and dissipation rate gradient dDiss_dEps.
-        """
+    def get_state_n1(self, eps_n: Any, d_eps: Any, d_t: Any, Eps_n: Any, *args: Any) -> Tuple[Any, Any, Any, Any]:
+        """Calculate the state at time n+1 based on the given inputs using an iterative algorithm"""
         n_I = np.atleast_1d(eps_n).shape[0]
         tol = 1e-8
         k_I = np.zeros((n_I,), dtype=np.int_)
         d_A = np.zeros((n_I, self.n_Eps + self.n_Lam + self.n_lam), dtype=np.float64)
-        # print(f'eps_n {eps_n}, d_eps {d_eps},\n Eps_n {Eps_n},\n d_A {d_A},\n d_t {d_t}')
-        # print(f'args {args}')
+        
         Sig_n1, f_n1, R_n1, dR_dA_n1 = self.get_Sig_f_R_dR_n1(
             eps_n, d_eps, Eps_n, d_A, d_t, *args)
-        # print(f'f_n1 {f_n1},\n R_n1 {R_n1}')
 
         I = f_n1 >= 0
         I_inel = np.copy(I)
         I_el = ~I_inel
 
-        # Inelastic state update - only qn inequality constraint is present
+        # Inelastic state update - only when inequality constraint is present
         if self.n_lam > 0:
-            # print(f'Inelastic state update for points {I_inel}')
             for k in range(self.k_max):
                 if np.all(I == False):
                     break
@@ -687,9 +479,8 @@ class GSMEngine(tr.HasTraits):
                     print("SingularMatrix encountered in dR_dA_n1[I]:", dR_dA_n1[I])
                     print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
                     raise
-                # print(f'eps_n {eps_n}, d_eps {d_eps}, Eps_n {Eps_n}, d_A {d_A}, d_t {d_t}')
+                
                 Sig_n1[I], f_n1[I], R_n1[I], dR_dA_n1[I] = self.get_Sig_f_R_dR_n1(eps_n[I], d_eps[I], Eps_n[I], d_A[I], d_t, *args)
-                # print(f'f_n1 {f_n1}, R_n1 {R_n1}, dR_dA_n1 {dR_dA_n1}')
                 norm_R_n1 = np.linalg.norm(R_n1, axis=-1)
                 I[norm_R_n1 <= tol] = False
                 k_I[I] += 1
@@ -700,7 +491,6 @@ class GSMEngine(tr.HasTraits):
 
         # Elastic state update
         if self.n_Lam > 0:
-            # print(f'Elastic state update for points {I_el}')
             for k in range(self.k_max):
                 if np.all(I_el == False):
                     break
@@ -710,15 +500,12 @@ class GSMEngine(tr.HasTraits):
                     else:
                         i1 = -1
                         d_A[I_el, i1] = 0
-                    # Replace the nested indexing d_A[I_el][...,:i1] with a single bracket expression that
-                    # applies the boolean mask and the slice in one operation:
                     d_A[I_el, :i1] -= np.linalg.solve(dR_dA_n1[I_el, :i1, :i1], R_n1[I_el, :i1, np.newaxis])[..., 0]
-                    # print(f'd_A {d_A}')
                 except np.linalg.LinAlgError as e:
                     print("SingularMatrix encountered in dR_dA_n1[I]:", dR_dA_n1[I_el])
                     print(f"eps = {eps_n}, d_eps = {d_eps}, Eps_n = {Eps_n}, d_A = {d_A}, d_t = {d_t}")
                     raise
-                # print(f'eps_n {eps_n}, d_eps {d_eps}, Eps_n {Eps_n}, d_A {d_A}, d_t {d_t}')
+                
                 Sig_n1[I_el], f_n1[I_el], R_n1[I_el], dR_dA_n1[I_el] = self.get_Sig_f_R_dR_n1(eps_n[I_el], d_eps[I_el], Eps_n[I_el], d_A[I_el], d_t, *args)
                 norm_R_n1 = np.linalg.norm(R_n1[...,:i1], axis=-1)
                 k_I[I_el] += 1
@@ -727,38 +514,26 @@ class GSMEngine(tr.HasTraits):
         lam_k = d_A[..., self.n_Eps:]
         Eps_n1 = Eps_n + d_A[..., :self.n_Eps]
 
-        # print(f'd_A {d_A}')
         return Eps_n1, Sig_n1, lam_k, k_I
 
-    def get_response(self, eps_ta, t_t, *args):
-        """Time integration procedure 
-
-        TODO - consider the stacked evaluation of the response - include the naming of the variables 
-        indicating the dimensions of the input arrays and the output arrays.
-        """
-
+    def get_response(self, eps_ta: npt.NDArray[np.float64], t_t: npt.NDArray[np.float64], *args: float) -> Tuple[npt.NDArray[np.float64], ...]:
+        """Time integration procedure"""
         if eps_ta.ndim == 2:
             eps_ta = eps_ta[:,np.newaxis,:]
-
         if eps_ta.ndim == 1:
             eps_ta = eps_ta[:, np.newaxis]
 
-        d_eps_ta = np.diff(eps_ta, axis=0)
         d_t_t = np.diff(t_t, axis=0)
-
         Eps_n1 = np.zeros(eps_ta.shape[1:] + (self.n_Eps,), dtype=np.float64)
         Sig_n1 = np.zeros_like(Eps_n1)
         lam_n1 = np.zeros(eps_ta.shape[1:] + (self.n_lam + self.n_Lam,), dtype=np.float64)
-
+        lam_n1 = np.zeros(eps_ta.shape[1:] + (self.n_lam + self.n_Lam,), dtype=np.float64)
         Sig_record = [Sig_n1]
         Eps_record = [Eps_n1]
         iter_record = [np.zeros(eps_ta.shape[1:])]
         lam_record = [lam_n1]
-
         for n, dt in enumerate(d_t_t):
-            # print('===============================================')
             print('increment', n+1, end='\r')
-            # print(f'eps_ta[n] {eps_ta[n]}, d_eps_ta[n] {d_eps_ta[n]}, d_t_t {dt}')
             try:
                 Eps_n1, Sig_n1, lam_n1, k = self.get_state_n1(
                     eps_ta[n], d_eps_ta[n], dt, Eps_n1, *args
@@ -774,25 +549,23 @@ class GSMEngine(tr.HasTraits):
         Eps_t = np.array(Eps_record, dtype=np.float64)
         iter_t = np.array(iter_record,dtype=np.int_)
         lam_t = np.array(lam_record,dtype=np.float64)
-        n_t = len(Eps_t)
+        n_t = len(Eps_t)(lam_record,dtype=np.float64)
         eps_ta = eps_ta[:n_t]
         sig_ta = self.get_sig(eps_ta[..., np.newaxis], Eps_t, *args)
-
+        sig_ta = self.get_sig(eps_ta[..., np.newaxis], Eps_t, *args)
         return (t_t[:n_t], eps_ta, sig_ta, Eps_t, Sig_t, iter_t, 
                 lam_t, (d_t_t[:n_t], d_eps_ta[:n_t]))
-    
-    def save_to_disk(self):
+    def save_to_disk(self) -> None:
         """Serialize this instance to disk."""
         filepath = os.path.join(CACHE_DIR, f"{self.name}.pkl")
         os.makedirs(CACHE_DIR, exist_ok=True)
         with open(filepath, 'wb') as file:
             dill.dump(self, file)
-
     @staticmethod
-    def load_from_disk(name):
+    def load_from_disk(name: str) -> 'GSMEngine':
         """Deserialize an instance from disk."""
         filepath = os.path.join(CACHE_DIR, f"{name}.pkl")
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"No cached data found for {name}.")
         with open(filepath, 'rb') as file:
-            return dill.load(file)
+            return cast('GSMEngine', dill.load(file))

@@ -1,0 +1,13 @@
+{
+  "tolerance": 1e-6,
+  "max_iterations": 200,
+  "step_size_control": true,
+  "min_step_size": 1e-8,
+  "max_step_size": 0.1,
+  "output_frequency": 1,
+  "save_internal_variables": true,
+  "save_stiffness_matrix": false,
+  "use_parallel": false,
+  "debug_output": false,
+  "convergence_history": true
+}

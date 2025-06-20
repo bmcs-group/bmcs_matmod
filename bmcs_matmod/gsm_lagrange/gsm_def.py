@@ -1,9 +1,17 @@
 import traits.api as tr
 import sympy as sp
+import keyword
+from typing import Dict, Tuple, Any, Optional, Type, Union, List, ClassVar
+
+# Type aliases for SymPy objects
+SymExpr = Union[sp.Expr, sp.Basic, sp.Symbol]
+SymMatrix = sp.Matrix
+SymDict = Dict[SymExpr, SymExpr]
+
 sp.init_printing()
 from traits.api import \
     HasTraits, Property, cached_property, \
-    Instance, Dict, Str
+    Instance, Dict as TraitsDict, Str
 
 from IPython.display import display, Math, Markdown
 
@@ -19,9 +27,6 @@ provides a property for transforming the Helmholtz free energy (F_expr)
 into the Gibbs free energy (G_expr) via a Legendre transform.
 """
 
-import sympy as sp
-import keyword
-
 def is_valid_variable_name(name):
     """Check if the given name is a valid Python variable name."""
     if not name.isidentifier():
@@ -34,6 +39,21 @@ class GSMDef:
     """
     Base class for setting up thermodynamic models within the GSM framework.
     """
+    
+    # Add proper type annotations including SymPy types
+    param_codenames: ClassVar[Dict[sp.Symbol, str]]
+    eps_codenames: ClassVar[Dict[sp.Symbol, str]] 
+    sig_codenames: ClassVar[Dict[sp.Symbol, str]]
+    Eps_codenames: ClassVar[Dict[sp.Symbol, str]]
+    Sig_codenames: ClassVar[Dict[sp.Symbol, str]]
+    F_engine: ClassVar[GSMEngine]
+    G_engine: ClassVar[GSMEngine]
+    subs_eps_sig: ClassVar[SymDict]
+    subs_dot_eps_sig: ClassVar[SymDict]
+    eps_a_: ClassVar[SymMatrix]
+    dot_eps_a_: ClassVar[SymMatrix]
+    sig_x_eps_: ClassVar[SymExpr]
+    _missing_symbol_reported: ClassVar[bool] = False
 
     @classmethod
     def __init_subclass__(cls, **kwargs):
@@ -73,7 +93,7 @@ class GSMDef:
             cls._initialize_gibbs_engine()
 
     @classmethod
-    def _build_symbol_codenames(cls, attr_name):
+    def _build_symbol_codenames(cls, attr_name: str) -> Tuple[Dict[sp.Symbol, str], List[Tuple[str, sp.Symbol, str]]]:
         """
         Build mapping from symbolic variable to codename.
         If the symbol's name is a valid Python identifier, use it.
@@ -102,7 +122,7 @@ class GSMDef:
         return symbol_codenames, missing_symbols
 
     @classmethod
-    def _calculate_symbolic_expressions(cls):
+    def _calculate_symbolic_expressions(cls) -> None:
         """
         Calculate all symbolic expressions needed for the model at class level.
         """
@@ -118,7 +138,7 @@ class GSMDef:
         ])
         
         # Calculate subs_eps_sig
-        cls.subs_eps_sig = dict(zip(F_engine.eps_a, cls.eps_a_))
+        cls.subs_eps_sig = dict(zip(F_engine.eps_a, cls.eps_a_))  # type: ignore[arg-type]
         
         # Calculate dot_eps_a_
         sigEps = sp.Matrix.vstack(F_engine.sig_a, F_engine.Eps.as_explicit())
@@ -126,13 +146,13 @@ class GSMDef:
         cls.dot_eps_a_ = sp.simplify(cls.eps_a_.jacobian(sigEps) * dot_sigEps)
         
         # Calculate subs_dot_eps_sig
-        cls.subs_dot_eps_sig = dict(zip(F_engine.dot_eps_a, cls.dot_eps_a_))
+        cls.subs_dot_eps_sig = dict(zip(F_engine.dot_eps_a, cls.dot_eps_a_))  # type: ignore[arg-type]
         
         # Calculate sig_x_eps_
         cls.sig_x_eps_ = (F_engine.sig_a.T * F_engine.eps_a)[0]
     
     @classmethod
-    def _initialize_gibbs_engine(cls):
+    def _initialize_gibbs_engine(cls) -> None:
         """
         Initialize the Gibbs free energy engine at class level.
         """
@@ -164,7 +184,7 @@ class GSMDef:
 
     name = Property(Str)
     @classmethod
-    def _get_name(cls):
+    def _get_name(cls) -> str:
         return cls.__name__
 
     @classmethod
@@ -242,7 +262,7 @@ class GSMDef:
         return Markdown(cls.latex_potentials())
 
     @classmethod
-    def get_args(cls, **kwargs):
+    def get_args(cls, **kwargs: float) -> List[float]:
         """Convert keyword parameters to args."""
         # Ensure that all required parameters are provided
         missing_params = [codename for codename in cls.param_codenames.values() if codename not in kwargs]

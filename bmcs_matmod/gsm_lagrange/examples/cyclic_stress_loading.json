@@ -1,0 +1,10 @@
+{
+  "time_array": [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0],
+  "stress_history": [0.0, 10.0, 20.0, 30.0, 40.0, 30.0, 20.0, 10.0, 0.0, -10.0, -20.0, -10.0, 0.0],
+  "loading_type": "cyclic",
+  "loading_rate": 40.0,
+  "max_amplitude": 40.0,
+  "frequency": 0.33,
+  "temperature": 20.0,
+  "description": "Cyclic stress loading ±40 MPa for stress-controlled simulation"
+}

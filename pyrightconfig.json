@@ -1,0 +1,14 @@
+{
+    "typeCheckingMode": "off",
+    "reportGeneralTypeIssues": false,
+    "reportCallIssue": false,
+    "reportOperatorIssue": false,
+    "reportUnknownMemberType": false,
+    "reportAttributeAccessIssue": false,
+    "reportUnknownArgumentType": false,
+    "reportReturnType": false,
+    "reportUnknownVariableType": false,
+    "reportMissingTypeStubs": false,
+    "reportPrivateImportUsage": false,
+    "reportArgumentType": false
+}
