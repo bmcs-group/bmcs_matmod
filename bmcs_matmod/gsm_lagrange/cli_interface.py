@@ -20,6 +20,7 @@ from .gsm_def import GSMDef
 from .gsm_model import GSMModel
 from .data_structures import MaterialParameterData, LoadingData, SimulationConfig, SimulationResults
 from .parameter_loader import ParameterLoader
+from .model_registry import get_registry, ModelInfo
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -29,90 +30,28 @@ class GSMModelCLI:
     """Command Line Interface for GSM Models"""
     
     def __init__(self):
-        self.available_models = self._discover_models()
+        self.registry = get_registry()
         self.parameter_loader = ParameterLoader()
     
-    def _discover_models(self) -> Dict[str, Type[GSMDef]]:
-        """Discover available GSM model classes"""
-        models = {}
-        
-        # Import actual GSM models from the current package
-        try:
-            import importlib
-            import inspect
-            from pathlib import Path
-            
-            # Get the current package directory
-            current_dir = Path(__file__).parent
-            
-            # Look for GSM model files (gsm1d_*.py pattern)
-            model_files = list(current_dir.glob('gsm1d_*.py'))
-            
-            for model_file in model_files:
-                module_name = model_file.stem
-                try:
-                    # Import the module dynamically
-                    module = importlib.import_module(f'.{module_name}', package=__package__)
-                    
-                    # Find GSMDef subclasses in the module
-                    for name, obj in inspect.getmembers(module, inspect.isclass):
-                        if (issubclass(obj, GSMDef) and 
-                            obj is not GSMDef and 
-                            hasattr(obj, 'F_engine')):
-                            models[name.lower()] = obj
-                            logger.debug(f"Discovered GSM model: {name}")
-                            
-                except ImportError as e:
-                    logger.warning(f"Could not import {module_name}: {e}")
-                except Exception as e:
-                    logger.warning(f"Error processing {module_name}: {e}")
-            
-            # Also try to import from specific known modules for backward compatibility
-            known_models = [
-                ('gsm1d_ed', 'GSM1D_ED'),
-                ('gsm1d_ve', 'GSM1D_VE'), 
-                ('gsm1d_ep', 'GSM1D_EP'),
-                ('gsm1d_vevp', 'GSM1D_VEVP'),
-                ('gsm1d_ved', 'GSM1D_VED'),
-                ('gsm1d_evpd', 'GSM1D_EVPD'),
-                ('gsm1d_vevpd', 'GSM1D_VEVPD')
-            ]
-            
-            for module_name, class_name in known_models:
-                try:
-                    module = importlib.import_module(f'.{module_name}', package=__package__)
-                    model_class = getattr(module, class_name, None)
-                    if model_class and issubclass(model_class, GSMDef):
-                        key = class_name.lower()
-                        if key not in models:  # Don't override already discovered models
-                            models[key] = model_class
-                            logger.debug(f"Imported known model: {class_name}")
-                except ImportError as e:
-                    logger.debug(f"Could not import {module_name}.{class_name}: {e}")
-                except Exception as e:
-                    logger.debug(f"Error importing {module_name}.{class_name}: {e}")
-            
-            if not models:
-                logger.warning("No GSM models found, creating placeholder models")
-                models = self._create_placeholder_models()
-                
-        except Exception as e:
-            logger.error(f"Error discovering models: {e}")
-            models = self._create_placeholder_models()
-        
-        return models
+    def list_available_models(self) -> str:
+        """List all available GSM models"""
+        return self.registry.format_model_table()
     
-    def _create_placeholder_models(self) -> Dict[str, Type[GSMDef]]:
-        """Create placeholder models for testing when real models are not available"""
-        class PlaceholderGSM(GSMDef):
-            """Placeholder GSM model for CLI testing"""
-            pass
-        
-        return {
-            'placeholder_elastic': PlaceholderGSM,
-            'placeholder_damage': PlaceholderGSM,
-            'placeholder_plastic': PlaceholderGSM
-        }
+    def get_model_class(self, model_key: str) -> Type[GSMDef]:
+        """Get model class by key"""
+        model_cls = self.registry.get_model(model_key)
+        if model_cls is None:
+            available = ", ".join(self.registry.get_available_keys())
+            raise ValueError(f"Model '{model_key}' not found. Available models: {available}")
+        return model_cls
+    
+    def get_model_info(self, model_key: str) -> ModelInfo:
+        """Get model information by key"""
+        model_info = self.registry.get_model_info(model_key) 
+        if model_info is None:
+            available = ", ".join(self.registry.get_available_keys())
+            raise ValueError(f"Model '{model_key}' not found. Available models: {available}")
+        return model_info
     
     def create_parser(self) -> argparse.ArgumentParser:
         """Create argument parser for CLI"""
@@ -138,9 +77,21 @@ Examples:
         # Model selection
         parser.add_argument(
             '--model', 
-            choices=list(self.available_models.keys()),
-            required=True,
-            help='GSM model to execute'
+            choices=self.registry.get_available_keys(),
+            help='GSM model to execute. Use --list-models to see all available models.'
+        )
+        
+        # List models option
+        parser.add_argument(
+            '--list-models',
+            action='store_true',
+            help='List all available GSM models and exit'
+        )
+        
+        # List by mechanism
+        parser.add_argument(
+            '--list-by-mechanism',
+            help='List models by mechanism type (e.g., ED, VED, VEVPD)'
         )
         
         # Formulation (Helmholtz or Gibbs)
@@ -152,7 +103,7 @@ Examples:
         )
         
         # Parameter sources
-        param_group = parser.add_mutually_exclusive_group(required=True)
+        param_group = parser.add_mutually_exclusive_group()
         param_group.add_argument(
             '--params',
             help='Parameter source: JSON file path, database URI, or network URL'
@@ -165,7 +116,6 @@ Examples:
         # Loading specification
         parser.add_argument(
             '--loading',
-            required=True,
             help='Loading specification: JSON file path or inline JSON string'
         )
         
@@ -345,13 +295,44 @@ Examples:
         parser = self.create_parser()
         args = parser.parse_args()
         
+        # Handle list operations first
+        if args.list_models:
+            print("Available GSM Models:")
+            print("=" * 60)
+            print(self.list_available_models())
+            return
+        
+        if args.list_by_mechanism:
+            models = self.registry.list_by_mechanism(args.list_by_mechanism)
+            if models:
+                print(f"GSM Models with mechanism '{args.list_by_mechanism}':")
+                print("=" * 60)
+                for model in models:
+                    print(f"{model.name} - {model.description}")
+            else:
+                print(f"No models found with mechanism '{args.list_by_mechanism}'")
+                print("Available mechanisms:", ", ".join(self.registry.get_available_mechanisms()))
+            return
+        
         # Set logging level
         if args.verbose:
             logging.getLogger().setLevel(logging.DEBUG)
         
+        # Check required arguments for simulation
+        if not args.list_models and not args.list_by_mechanism:
+            if not args.model:
+                parser.error("--model is required for simulation")
+            if not args.params and not args.params_inline:
+                parser.error("Either --params or --params-inline is required for simulation")
+            if not args.loading:
+                parser.error("--loading is required for simulation")
+        
         try:
             # Get model class
-            model_class = self.available_models[args.model]
+            model_class = self.get_model_class(args.model)
+            model_info = self.get_model_info(args.model)
+            
+            logger.info(f"Using GSM model: {model_info.name} ({model_info.description})")
             
             # Load parameters
             if args.params_inline:

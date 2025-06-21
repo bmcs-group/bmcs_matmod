@@ -7,7 +7,7 @@ thermodynamic potentials with an efficient execution of the automatically derive
 equations in the computational environment.
 """
 
-from typing import TYPE_CHECKING, Any, Tuple, List, Union, cast
+from typing import TYPE_CHECKING, Any, Tuple, List, Union, cast, Dict, Optional, Callable
 import traits.api as tr
 import sympy as sp
 import numpy as np
@@ -56,7 +56,7 @@ class GSMEngine(tr.HasTraits):
     Eps_vars = tr.Tuple()
     Sig_vars = tr.Tuple()
     m_params = tr.Tuple()
-    m_param_subs = tr.Dict(default_value={})
+    m_param_subs = tr.Dict({})
     F_expr = tr.Any()
     pi_expr = tr.Any(default_value=0)
     Sig_signs = tr.Array()
