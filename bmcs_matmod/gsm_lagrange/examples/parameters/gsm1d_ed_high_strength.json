@@ -1,0 +1,21 @@
+{
+  "parameters": {
+    "E": 45000.0,
+    "S": 2.5,
+    "c": 3.5,
+    "r": 0.3,
+    "eps_0": 0.0005
+  },
+  "metadata": {
+    "description": "High-strength elastic-damage parameters",
+    "units": {
+      "E": "MPa",
+      "S": "MPa",
+      "c": "MPa",
+      "r": "-",
+      "eps_0": "-"
+    },
+    "source": "High-strength concrete characterization",
+    "date_created": "2025-06-21"
+  }
+}

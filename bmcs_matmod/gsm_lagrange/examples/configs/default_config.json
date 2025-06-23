@@ -1,0 +1,11 @@
+{
+  "tolerance": 1e-6,
+  "max_iterations": 100,
+  "output_level": "detailed",
+  "convergence_criteria": "displacement",
+  "solver_type": "newton_raphson",
+  "metadata": {
+    "description": "Default simulation configuration with detailed output",
+    "date_created": "2025-06-21"
+  }
+}

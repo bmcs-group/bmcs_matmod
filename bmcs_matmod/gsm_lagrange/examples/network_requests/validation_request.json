@@ -1,0 +1,17 @@
+{
+  "model": "GSM1D_ED",
+  "formulation": "F",
+  "parameters": {
+    "E": 30000.0,
+    "S": 1.0,
+    "c": 2.0,
+    "r": 0.5,
+    "eps_0": 0.001
+  },
+  "loading": {
+    "time_array": [0.0, 0.5, 1.0],
+    "strain_history": [0.0, 0.005, 0.01],
+    "loading_type": "strain_controlled"
+  },
+  "validate_only": true
+}

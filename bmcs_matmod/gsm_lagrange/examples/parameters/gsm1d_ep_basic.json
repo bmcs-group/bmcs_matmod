@@ -1,0 +1,21 @@
+{
+  "parameters": {
+    "E": 35000.0,
+    "S": 1.5,
+    "K": 25000.0,
+    "G": 14000.0,
+    "eta_vp": 100.0
+  },
+  "metadata": {
+    "description": "Elastic-plastic parameters with viscoplasticity",
+    "units": {
+      "E": "MPa",
+      "S": "MPa",
+      "K": "MPa",
+      "G": "MPa",
+      "eta_vp": "MPa·s"
+    },
+    "source": "Example viscoplastic parameters",
+    "date_created": "2025-06-21"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "time_array": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+  "strain_history": [0.0, 0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01],
+  "loading_type": "strain_controlled",
+  "metadata": {
+    "description": "Monotonic tension loading to 1% strain",
+    "max_strain": 0.01,
+    "duration": 1.0,
+    "loading_rate": "0.01 s^-1",
+    "date_created": "2025-06-21"
+  }
+}

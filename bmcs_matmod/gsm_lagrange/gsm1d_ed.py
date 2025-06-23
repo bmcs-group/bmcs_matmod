@@ -32,9 +32,8 @@ class GSM1D_ED(GSMDef):
 
     # ## Free energy potential
     eps_el = eps
-    U_e_ = sp.Rational(1,2) * (1 - omega) * E * eps_el**2 + sp.Rational(1,2) * z**2
-    F_ = U_e_
-
+    F_ = sp.Rational(1,2) * (1 - omega) * E * eps_el**2 + sp.Rational(1,2) * z**2
+    
     F_engine: GSMEngine = GSMEngine(
         name = 'gsm_F_1d_mpdp_ed',
         eps_vars = eps_a,

@@ -1,0 +1,12 @@
+{
+  "time_array": [0.0, 0.25, 0.5, 0.75, 1.0],
+  "stress_history": [0.0, 10.0, 20.0, 30.0, 40.0],
+  "loading_type": "stress_controlled",
+  "metadata": {
+    "description": "Stress-controlled loading to 40 MPa",
+    "max_stress": 40.0,
+    "duration": 1.0,
+    "loading_rate": "40 MPa/s",
+    "date_created": "2025-06-21"
+  }
+}

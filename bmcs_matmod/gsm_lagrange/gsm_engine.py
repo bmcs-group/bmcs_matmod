@@ -203,22 +203,22 @@ class GSMEngine(tr.HasTraits):
         return sp.BlockMatrix([sp.simplify(sp.diff(self.F_expr, var)).T for var in self.Eps.blocks]).T.subs(self.m_param_subs)
 
     # Numerical methods - type the interfaces clearly
-    def get_sig(self, eps: Union[float, npt.NDArray[np.float64]], Eps: Optional[npt.NDArray[np.float64]] = None, *args: float) -> Union[float, npt.NDArray[np.float64]]:
+    def get_sig_a(self, eps: Union[float, npt.NDArray[np.float64]], Eps: Optional[npt.NDArray[np.float64]] = None, *args: float) -> Union[float, npt.NDArray[np.float64]]:
         """Calculate the displacement for a given stress level"""
         eps_sp_ = np.moveaxis(np.atleast_1d(eps), -1, 0)
         if Eps is not None:
             Eps_sp_ = np.moveaxis(Eps, -1, 0)
         else:
             Eps_sp_ = np.zeros((1, self.n_Eps))
-        sig_sp_ = self._sig_lambdified(eps_sp_, Eps_sp_, *args)  # type: ignore[misc]
+        sig_sp_ = self._sig_a_lambdified(eps_sp_, Eps_sp_, *args)  # type: ignore[misc]
         sig_sp_ = sig_sp_.reshape(eps_sp_.shape)
         return np.moveaxis(sig_sp_, 0, -1)
 
     # For new properties, use Python's cached_property instead of traits
     @cached_property  
-    def _sig_lambdified(self) -> Callable[..., npt.NDArray[np.float64]]:
+    def _sig_a_lambdified(self) -> Callable[..., npt.NDArray[np.float64]]:
         return sp.lambdify((self.eps_vars[0], self.Eps.as_explicit()) + self.m_params + ('*args',), 
-                           self.sig_, numpy_dirac, cse=True)
+                           self.sig_a_, numpy_dirac, cse=True)
 
     # Keep existing traits properties as-is, just ignore typing for them
     phi_ = tr.Property()  # type: ignore[misc]
@@ -434,7 +434,7 @@ class GSMEngine(tr.HasTraits):
         if self.f_expr != sp.S.Zero:
             dL_dS_[-1] = f_
 
-        dL_dS_A_ = dL_dS_.subs(self.subs_Sig_Eps)
+        dL_dS_A_ = dL_dS_.subs(self.subs_Sig_Eps).subs(self.subs_sig_eps)
         R_n1 = dL_dS_A_.subs(subs_n1)
 
         # Jacobian of the residuum
@@ -523,6 +523,7 @@ class GSMEngine(tr.HasTraits):
         if eps_ta.ndim == 1:
             eps_ta = eps_ta[:, np.newaxis]
 
+        d_eps_ta = np.diff(eps_ta, axis=0)
         d_t_t = np.diff(t_t, axis=0)
         Eps_n1 = np.zeros(eps_ta.shape[1:] + (self.n_Eps,), dtype=np.float64)
         Sig_n1 = np.zeros_like(Eps_n1)
@@ -549,18 +550,18 @@ class GSMEngine(tr.HasTraits):
         Eps_t = np.array(Eps_record, dtype=np.float64)
         iter_t = np.array(iter_record,dtype=np.int_)
         lam_t = np.array(lam_record,dtype=np.float64)
-        n_t = len(Eps_t)(lam_record,dtype=np.float64)
+        n_t = len(Eps_t)
         eps_ta = eps_ta[:n_t]
-        sig_ta = self.get_sig(eps_ta[..., np.newaxis], Eps_t, *args)
-        sig_ta = self.get_sig(eps_ta[..., np.newaxis], Eps_t, *args)
-        return (t_t[:n_t], eps_ta, sig_ta, Eps_t, Sig_t, iter_t, 
-                lam_t, (d_t_t[:n_t], d_eps_ta[:n_t]))
+        sig_ta = self.get_sig_a(eps_ta[..., np.newaxis], Eps_t, *args)
+        return (t_t[:n_t], eps_ta, sig_ta, Eps_t, Sig_t, iter_t, lam_t, (d_t_t[:n_t], d_eps_ta[:n_t]))
+
     def save_to_disk(self) -> None:
         """Serialize this instance to disk."""
         filepath = os.path.join(CACHE_DIR, f"{self.name}.pkl")
         os.makedirs(CACHE_DIR, exist_ok=True)
         with open(filepath, 'wb') as file:
             dill.dump(self, file)
+
     @staticmethod
     def load_from_disk(name: str) -> 'GSMEngine':
         """Deserialize an instance from disk."""
