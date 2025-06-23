@@ -1,0 +1,6 @@
+{
+  "model": "GSM1D_ED",
+  "max_stress": 450.5,
+  "max_strain": 0.01,
+  "elastic_modulus": 30000.0
+}

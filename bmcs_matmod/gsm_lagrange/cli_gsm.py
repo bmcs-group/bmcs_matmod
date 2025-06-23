@@ -31,14 +31,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Import dependencies
-from gsm_def_registry import (
+from .gsm_def_registry import (
     get_available_gsm_defs, check_gsm_def_exists, 
     get_gsm_def_module_path, get_mechanism_description,
     get_gsm_def_class
 )
-from data_structures import MaterialParameterData, LoadingData, SimulationConfig, SimulationResults
-from parameter_loader import ParameterLoader
-from response_data import ResponseData
+from .data_structures import MaterialParameterData, LoadingData, SimulationConfig, SimulationResults
+from .parameter_loader import ParameterLoader
+from .response_data import ResponseData
 
 
 class GSMParameterSpec:
@@ -1059,6 +1059,12 @@ def main():
     """Entry point for command line execution"""
     cli = GSMDefCLI()
     cli.main()
+
+
+def start_network_server(port: int = 8888):
+    """Entry point for network server execution"""
+    cli = GSMDefCLI()
+    cli.start_network_server(port)
 
 
 if __name__ == "__main__":

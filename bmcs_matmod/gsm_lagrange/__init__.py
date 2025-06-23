@@ -22,12 +22,15 @@ from .gsm1d_vevpd import GSM1D_VEVPD
 
 # CLI interface components
 try:
-    from .cli_interface import GSMModelCLI
     from .data_structures import MaterialParameterData, LoadingData, SimulationConfig, SimulationResults
     from .parameter_loader import ParameterLoader
+    from .response_data import ResponseData
+    from .gsm_def_registry import get_available_gsm_defs, check_gsm_def_exists
     CLI_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     CLI_AVAILABLE = False
+    import logging
+    logging.getLogger(__name__).debug(f"CLI components not available: {e}")
 
 __all__ = [
     'MaterialParams', 'Material', 'GSMDef', 'GSMEngine', 'GSMModel',
@@ -37,12 +40,14 @@ __all__ = [
 
 if CLI_AVAILABLE:
     __all__.extend([
-        'GSMModelCLI',
         'MaterialParameterData',
         'LoadingData', 
         'SimulationConfig',
         'SimulationResults',
-        'ParameterLoader'
+        'ParameterLoader',
+        'ResponseData',
+        'get_available_gsm_defs',
+        'check_gsm_def_exists'
     ])
 
 __version__ = '0.1.0'

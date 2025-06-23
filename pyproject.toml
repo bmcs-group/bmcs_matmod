@@ -13,11 +13,14 @@ authors = [
 license = { file = "LICENSE" }
 requires-python = ">=3.6"
 dependencies = [
-    # Add your runtime dependencies here, e.g.:
-    # "bmcs_utils",
-    # "numpy",
-    # "sympy",
-    # "traits",
+    "numpy",
+    "sympy",
+    "traits",
+    "matplotlib",
+    "scipy",
+    # Network and serialization support
+    "requests",
+    "jsonschema",
 ]
 
 [project.urls]
@@ -33,10 +36,31 @@ dev = [
     "pytest-cov",
     "twine",
 ]
+aiida = [
+    "aiida-core>=2.6.0",
+    "aiida-shell",
+]
 
 [project.scripts]
-# Example CLI entry point (uncomment and adapt as needed)
-# bmcs-matmod = "bmcs_matmod.cli:main"
+# CLI entry points for GSM material modeling
+gsm-cli = "bmcs_matmod.gsm_lagrange.cli_gsm:main"
+gsm-server = "bmcs_matmod.gsm_lagrange.cli_gsm:start_network_server"
+
+# AiiDA entry points for workchain integration
+[project.entry-points."aiida.calculations"]
+"gsm.simulation" = "bmcs_matmod.aiida_plugins.calculations:GSMSimulationCalculation"
+
+[project.entry-points."aiida.parsers"]
+"gsm.parser" = "bmcs_matmod.aiida_plugins.parsers:GSMParser"
+
+[project.entry-points."aiida.workflows"]
+"gsm.monotonic" = "bmcs_matmod.aiida_plugins.workchains:GSMMonotonicWorkChain"
+"gsm.fatigue" = "bmcs_matmod.aiida_plugins.workchains:GSMFatigueWorkChain"
+"gsm.sn_curve" = "bmcs_matmod.aiida_plugins.workchains:GSMSNCurveWorkChain"
+
+[project.entry-points."aiida.data"]
+"gsm.material" = "bmcs_matmod.aiida_plugins.data:GSMMaterialData"
+"gsm.loading" = "bmcs_matmod.aiida_plugins.data:GSMLoadingData"
 
 [tool.pylance]
 typeCheckingMode = "basic"
