@@ -1,0 +1,34 @@
+{
+  "parameters": {
+    "E": 45000.0,
+    "S": 2.5,
+    "c": 3.5,
+    "r": 0.3,
+    "eps_0": 0.0005
+  },
+  "source": "Generated from GSM1D_ED model definition",
+  "material_name": "High-Strength Concrete HSC60",
+  "model_type": "GSM1D_ED",
+  "calibration_date": "2025-06-24",
+  "units": {
+    "E": "MPa",
+    "S": "MPa",
+    "c": "-",
+    "r": "-",
+    "eps_0": "-"
+  },
+  "description": "High-strength elastic-damage parameters using GSM1D_ED model",
+  "parameter_bounds": {
+    "E": [1000.0, 100000.0],
+    "S": [0.1, 10.0],
+    "c": [0.1, 5.0],
+    "r": [0.1, 2.0],
+    "eps_0": [0.0001, 0.01]
+  },
+  "validation_data": {
+    "R_squared": 0.95,
+    "experimental_source": "Lab Test Series - High-Strength Concrete",
+    "calibration_method": "least_squares",
+    "validation_notes": "Parameters calibrated for high-strength concrete under tensile loading"
+  }
+}
