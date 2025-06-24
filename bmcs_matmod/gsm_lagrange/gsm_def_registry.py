@@ -246,6 +246,70 @@ def get_gsm_def_class(def_key: str, debug: bool = False) -> Type:
     return registry.get_def_class(def_key)
 
 
+# ==============================================================================
+# BACKWARD COMPATIBILITY API FUNCTIONS FOR CLI
+# ==============================================================================
+
+# Global registry instance for backward compatibility
+_global_registry = None
+
+def _get_global_registry():
+    """Get the global registry instance, creating it if needed"""
+    global _global_registry
+    if _global_registry is None:
+        _global_registry = LazyGSMDefRegistry(debug=False)
+    return _global_registry
+
+def get_available_gsm_defs(debug: bool = False) -> Tuple[List[str], Dict[str, str]]:
+    """
+    Backward compatibility function for CLI.
+    Returns: (list_of_def_names, dict_mapping_key_to_def_name)
+    """
+    registry = _get_global_registry()
+    def_names = registry.get_def_names()
+    access_keys = registry.get_access_keys()
+    
+    # Create mapping from access key to definition name
+    registry_dict = {}
+    for key in access_keys:
+        def_name = registry._access_keys.get(key)
+        if def_name:
+            registry_dict[key] = def_name
+    
+    return def_names, registry_dict
+
+def check_gsm_def_exists(key: str) -> bool:
+    """Check if a GSM definition exists (backward compatibility)"""
+    registry = _get_global_registry()
+    return registry.has_def(key)
+
+def get_gsm_def_module_path(key: str) -> Optional[str]:
+    """Get module path for a GSM definition (backward compatibility)"""
+    registry = _get_global_registry()
+    return registry.get_module_path(key)
+
+def get_mechanism_description(mechanism: str) -> str:
+    """Get description for a mechanism (placeholder for backward compatibility)"""
+    # This was not implemented in the original, provide basic description
+    descriptions = {
+        'ED': 'Elastic Damage',
+        'EP': 'Elastic Plastic', 
+        'EPD': 'Elastic Plastic Damage',
+        'EVP': 'Elastic Viscoplastic',
+        'EVPD': 'Elastic Viscoplastic Damage',
+        'VE': 'Viscoelastic',
+        'VED': 'Viscoelastic Damage',
+        'VEVP': 'Viscoelastic Viscoplastic',
+        'VEVPD': 'Viscoelastic Viscoplastic Damage'
+    }
+    return descriptions.get(mechanism.upper(), f"GSM mechanism: {mechanism}")
+
+def get_gsm_def_class(key: str) -> Type:
+    """Get the actual GSMDef class (backward compatibility)"""
+    registry = _get_global_registry()
+    return registry.get_def_class(key)
+
+
 # Display and utility functions
 
 def print_gsm_defs(debug: bool = True) -> None:

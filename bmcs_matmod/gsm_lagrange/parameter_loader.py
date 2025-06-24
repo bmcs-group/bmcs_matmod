@@ -15,7 +15,10 @@ from typing import Dict, List, Any, Optional, Union, Tuple
 import logging
 import numpy as np
 
-from data_structures import MaterialParameterData, LoadingData, SimulationConfig
+try:
+    from .data_structures import MaterialParameterData, LoadingData, SimulationConfig
+except ImportError:
+    from data_structures import MaterialParameterData, LoadingData, SimulationConfig
 
 logger = logging.getLogger(__name__)
 

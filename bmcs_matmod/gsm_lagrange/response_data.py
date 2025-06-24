@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.typing as npt
 import traits.api as tr
-import bmcs_utils.api as bu
+# import bmcs_utils.api as bu  # Temporarily commented out due to import issues
 from typing import Dict, Any, List, Union, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ class ResponseDataContainer:
     def values(self) -> Any:
         return self._data.values()
 
-class ResponseData(bu.Model):
+class ResponseData(tr.HasTraits):  # Changed from bu.Model to tr.HasTraits to avoid import issues
     """
     Flexible container for simulation response data and metadata from GSMModel.
 

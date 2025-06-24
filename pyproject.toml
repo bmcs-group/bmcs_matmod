@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Suite of utilities for material model development."
 readme = "README.md"
 authors = [
-    { name = "BMCS-Group", email = "rostislav.chudoba@rwt-aachen.de" }
+    { name = "BMCS-Group", email = "rostislav.chudoba@rwth-aachen.de" }
 ]
 license = { file = "LICENSE" }
 requires-python = ">=3.6"

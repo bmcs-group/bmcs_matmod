@@ -31,14 +31,29 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Import dependencies
-from .gsm_def_registry import (
-    get_available_gsm_defs, check_gsm_def_exists, 
-    get_gsm_def_module_path, get_mechanism_description,
-    get_gsm_def_class
-)
-from .data_structures import MaterialParameterData, LoadingData, SimulationConfig, SimulationResults
-from .parameter_loader import ParameterLoader
-from .response_data import ResponseData
+try:
+    # Try relative imports first (when run as module)
+    from .gsm_def_registry import (
+        get_available_gsm_defs, check_gsm_def_exists, 
+        get_gsm_def_module_path, get_mechanism_description,
+        get_gsm_def_class
+    )
+    from .data_structures import MaterialParameterData, LoadingData, SimulationConfig, SimulationResults
+    from .parameter_loader import ParameterLoader
+except ImportError:
+    # Fall back to absolute imports (when run directly)
+    from gsm_def_registry import (
+        get_available_gsm_defs, check_gsm_def_exists, 
+        get_gsm_def_module_path, get_mechanism_description,
+        get_gsm_def_class
+    )
+    from data_structures import MaterialParameterData, LoadingData, SimulationConfig, SimulationResults
+    from parameter_loader import ParameterLoader
+
+try:
+    from .response_data import ResponseData
+except ImportError:
+    from response_data import ResponseData
 
 
 class GSMParameterSpec:

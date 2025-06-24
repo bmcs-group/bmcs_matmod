@@ -77,10 +77,10 @@ class GSMMonotonicWorkChain(WorkChain):
         # Inputs
         spec.input('gsm_code', valid_type=orm.Code, help='GSM CLI code')
         spec.input('gsm_model', valid_type=orm.Str, help='GSM model identifier')
-        spec.input('formulation', valid_type=orm.Str, default=orm.Str('F'), help='Model formulation')
+        spec.input('formulation', valid_type=orm.Str, default=lambda: orm.Str('F'), help='Model formulation')
         spec.input('material_parameters', valid_type=orm.Dict, help='Material parameters')
         spec.input('max_strain', valid_type=orm.Float, help='Maximum strain level')
-        spec.input('num_steps', valid_type=orm.Int, default=orm.Int(100), help='Number of loading steps')
+        spec.input('num_steps', valid_type=orm.Int, default=lambda: orm.Int(100), help='Number of loading steps')
         
         # Outputs
         spec.output('monotonic_results', valid_type=orm.Dict, help='Monotonic simulation results')
@@ -156,9 +156,9 @@ class GSMFatigueWorkChain(WorkChain):
         spec.input('formulation', valid_type=orm.Str, help='Model formulation')
         spec.input('material_parameters', valid_type=orm.Dict, help='Material parameters')
         spec.input('stress_amplitude', valid_type=orm.Float, help='Fatigue stress amplitude')
-        spec.input('stress_mean', valid_type=orm.Float, default=orm.Float(0.0), help='Mean stress')
-        spec.input('max_cycles', valid_type=orm.Int, default=orm.Int(10000), help='Maximum cycles')
-        spec.input('failure_strain', valid_type=orm.Float, default=orm.Float(0.1), 
+        spec.input('stress_mean', valid_type=orm.Float, default=lambda: orm.Float(0.0), help='Mean stress')
+        spec.input('max_cycles', valid_type=orm.Int, default=lambda: orm.Int(10000), help='Maximum cycles')
+        spec.input('failure_strain', valid_type=orm.Float, default=lambda: orm.Float(0.1), 
                   help='Failure strain criterion')
         
         # Outputs
@@ -267,8 +267,8 @@ class GSMSNCurveWorkChain(WorkChain):
         spec.input('formulation', valid_type=orm.Str, help='Model formulation')
         spec.input('material_parameters', valid_type=orm.Dict, help='Material parameters')
         spec.input('stress_levels', valid_type=orm.List, help='List of stress amplitudes to test')
-        spec.input('max_cycles', valid_type=orm.Int, default=orm.Int(10000), help='Maximum cycles')
-        spec.input('failure_strain', valid_type=orm.Float, default=orm.Float(0.1), 
+        spec.input('max_cycles', valid_type=orm.Int, default=lambda: orm.Int(10000), help='Maximum cycles')
+        spec.input('failure_strain', valid_type=orm.Float, default=lambda: orm.Float(0.1), 
                   help='Failure strain criterion')
         
         # Outputs
