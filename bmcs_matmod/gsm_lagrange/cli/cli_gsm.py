@@ -15,6 +15,15 @@ import json
 import numpy as np
 from pathlib import Path
 
+# Try to import ResponseDataNode for enhanced output
+try:
+    from ..aiida_plugin.response_data_node import ResponseDataNode, create_response_data_node
+    RESPONSE_DATA_NODE_AVAILABLE = True
+except ImportError:
+    ResponseDataNode = None
+    create_response_data_node = None
+    RESPONSE_DATA_NODE_AVAILABLE = False
+
 def add_project_to_path():
     """Add project root to Python path for imports"""
     script_dir = Path(__file__).parent.absolute()
@@ -119,26 +128,28 @@ def execute_simulation(model_name, params_data=None, loading_data=None):
         # Execute simulation
         rd = material.get_F_response(strain_history, time_array)
         
-        # Extract results
-        eps = rd.eps_t[:, 0]
-        sig = rd.sig_t[:, 0, 0]
-        
-        # Get internal variables
-        internal_vars = {}
-        for var_name, var_data in rd.Eps_t.__dict__.items():
-            if isinstance(var_data, np.ndarray) and var_data.ndim >= 2:
-                internal_vars[var_name] = var_data[:, 0, 0].tolist()
+        # Create ResponseDataNode for enhanced output capabilities
+        if RESPONSE_DATA_NODE_AVAILABLE:
+            rd_node = create_response_data_node(rd, store=False)
+            results = rd_node.get_simple_results()
+        else:
+            # Fallback to basic results
+            results = {
+                "n_steps": len(rd.t_t),
+                "time": rd.t_t.tolist(),
+                "strain": rd.eps_t[:, 0].tolist() if rd.eps_t.ndim > 1 else rd.eps_t.tolist(),
+                "stress": rd.sig_t[:, 0, 0].tolist() if rd.sig_t.ndim > 2 else rd.sig_t.tolist(),
+                "internal_variables": {name: data.tolist() if hasattr(data, 'tolist') else data 
+                                     for name, data in rd.Eps_t.items()},
+                "thermodynamic_forces": {name: data.tolist() if hasattr(data, 'tolist') else data 
+                                       for name, data in rd.Sig_t.items()}
+            }
         
         return {
             "model": model_name,
             "parameters": dict(params_data) if params_data else {},
             "loading": dict(loading_data) if loading_data else {"default": True},
-            "results": {
-                "strain": eps.tolist(),
-                "stress": sig.tolist(),
-                "internal_variables": internal_vars,
-                "n_steps": len(eps)
-            },
+            "results": results,
             "status": "success"
         }
         
@@ -202,9 +213,32 @@ Options:
   --exec MODEL                Execute GSM simulation for specified model
   --params-inline JSON        Inline parameters as JSON string
   --loading-inline JSON       Inline loading as JSON string
-  --json-output               Output results in JSON format
+  --json-output               Output results in JSON format (summary)
+  --detailed-json             Output detailed results with all variables in JSON format
   --help, -h                  Show this help message
   --version                   Show version information
+
+Architecture:
+  Streamlined Two-Level Design:
+  1. ResponseData: Active simulation data during computation
+  2. ResponseDataNode: Persistent AiiDA storage with full serialization
+  
+  Benefits:
+  - No redundancy (CLIResponseData removed)
+  - Unified interface for active and persistent data
+  - Direct AiiDA integration for workflows
+  - Efficient binary storage + JSON serialization
+
+Output Formats:
+  Default:        Human-readable text summary
+  --json-output:  Compact JSON with key metrics (efficient for APIs)
+  --detailed-json: Full JSON with all time series data (large output)
+  
+Data Transfer Efficiency:
+  - JSON formats: Text-based, human-readable, 3-10x larger than binary
+  - AiiDA ResponseDataNode: Binary .npy storage + metadata (most efficient)
+  - For web APIs/CLIs: Use JSON formats (better compatibility)
+  - For workflows: Use ResponseDataNode directly (optimal)
 
 Examples:
   # List available models
@@ -223,8 +257,17 @@ Examples:
   python cli_gsm.py --exec GSM1D_ED --params-inline '{"E": 25000}' \\
     --loading-inline '{"time_array": [0,0.5,1], "strain_history": [0,0.005,0.015]}'
   
-  # JSON output for data processing
+  # Compact JSON output for data processing/APIs
   python cli_gsm.py --exec GSM1D_EP --params-inline '{"E": 20000}' --json-output
+  
+  # Detailed JSON output with all internal variables (large files)
+  python cli_gsm.py --exec GSM1D_ED --params-inline '{"E": 30000}' --detailed-json
+
+Performance Notes:
+  - Default simulations: 1000 steps, strain up to 0.13
+  - Large simulations may take time; consider reducing n_steps for testing
+  - JSON output size scales with number of time steps and internal variables
+  - ResponseDataNode provides optimal storage efficiency for large datasets
 
 Available Models:
   GSM1D_ED    - 1D Elastic-Damage model
@@ -250,6 +293,7 @@ def main():
         return
     
     json_output = "--json-output" in sys.argv
+    detailed_json = "--detailed-json" in sys.argv
     
     # List models
     if "--list-models" in sys.argv:
@@ -338,7 +382,75 @@ def main():
         # Execute simulation
         result = execute_simulation(model_name, params_data, loading_data)
         
-        if json_output:
+        # Handle different output formats
+        if detailed_json:
+            # Get the ResponseDataNode from the result and output full JSON
+            if result["status"] == "success":
+                # Re-execute to get the ResponseDataNode object for detailed output
+                add_project_to_path()
+                from bmcs_matmod.gsm_lagrange.core.gsm_model import GSMModel
+                model_class = get_model_class(model_name)
+                material = GSMModel(model_class)
+                
+                if params_data:
+                    material.set_params(**params_data)
+                else:
+                    # Apply same defaults as in execute_simulation
+                    if model_name.upper() == "GSM1D_ED":
+                        material.set_params(E=20000.0, S=1, c=1, eps_0=0.0)
+                    elif model_name.upper() == "GSM1D_EP":
+                        material.set_params(E=20000.0, c=1, eps_0=0.0)
+                    # ... other model defaults would go here but let's keep it simple for now
+                    else:
+                        material.set_params(E=20000.0, eps_0=0.0)
+                
+                if loading_data:
+                    time_array = np.array(loading_data.get("time_array", [0, 1.0]))
+                    strain_history = np.array(loading_data.get("strain_history", [0, 0.01]))
+                else:
+                    n_steps = 1000
+                    strain_max = 0.13
+                    strain_history = np.linspace(0, strain_max, n_steps)
+                    time_array = np.linspace(0, 1.0, n_steps)
+                
+                rd = material.get_F_response(strain_history, time_array)
+                
+                # Create ResponseDataNode for detailed output
+                if RESPONSE_DATA_NODE_AVAILABLE:
+                    rd_node = create_response_data_node(rd, store=False)
+                    results_data = rd_node.to_json_dict()
+                else:
+                    # Fallback to basic JSON structure
+                    results_data = {
+                        "status": "success",
+                        "simulation_info": {
+                            "n_steps": len(rd.t_t),
+                            "time_range": [float(rd.t_t[0]), float(rd.t_t[-1])],
+                            "eps_range": [float(np.min(rd.eps_t)), float(np.max(rd.eps_t))],
+                            "sig_range": [float(np.min(rd.sig_t)), float(np.max(rd.sig_t))]
+                        },
+                        "time_series": {
+                            "time": rd.t_t.tolist(),
+                            "strain": rd.eps_t[:, 0].tolist() if rd.eps_t.ndim > 1 else rd.eps_t.tolist(),
+                            "stress": rd.sig_t[:, 0, 0].tolist() if rd.sig_t.ndim > 2 else rd.sig_t.tolist()
+                        },
+                        "internal_variables": {name: data.tolist() if hasattr(data, 'tolist') else data 
+                                             for name, data in rd.Eps_t.items()},
+                        "thermodynamic_forces": {name: data.tolist() if hasattr(data, 'tolist') else data 
+                                               for name, data in rd.Sig_t.items()}
+                    }
+                
+                detailed_result = {
+                    "model": model_name,
+                    "parameters": dict(params_data) if params_data else {},
+                    "loading": dict(loading_data) if loading_data else {"default": True},
+                    "results": results_data,
+                    "status": "success"
+                }
+                print(json.dumps(detailed_result, indent=2))
+            else:
+                print(json.dumps(result, indent=2))
+        elif json_output:
             print(json.dumps(result, indent=2))
         else:
             if result["status"] == "success":

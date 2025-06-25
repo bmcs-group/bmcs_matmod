@@ -34,9 +34,9 @@ dev = [
     "twine",
 ]
 
-[project.scripts]
-# Example CLI entry point (uncomment and adapt as needed)
-# bmcs-matmod = "bmcs_matmod.cli:main"
+[project.entry-points."aiida.data"]
+# AiiDA DataNode for GSM simulation results
+"bmcs_matmod.gsm_lagrange.response_data" = "bmcs_matmod.gsm_lagrange.aiida_plugin.response_data_node:ResponseDataNode"
 
 [tool.pylance]
 typeCheckingMode = "basic"

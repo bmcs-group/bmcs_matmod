@@ -3,6 +3,7 @@ import numpy.typing as npt
 import traits.api as tr
 import bmcs_utils.api as bu
 from typing import Dict, Any, List, Union, Optional, TYPE_CHECKING
+from .response_data_viz import ResponseDataVisualizationMixin
 
 if TYPE_CHECKING:
     from .gsm_engine import GSMEngine
@@ -28,7 +29,7 @@ class ResponseDataContainer:
     def values(self) -> Any:
         return self._data.values()
 
-class ResponseData(bu.Model):
+class ResponseData(bu.Model, ResponseDataVisualizationMixin):
     """
     Flexible container for simulation response data and metadata from GSMModel.
 
