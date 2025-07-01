@@ -29,6 +29,9 @@ class ResponseDataContainer:
     def values(self) -> Any:
         return self._data.values()
 
+    def __len__(self) -> int:
+        return len(self._data)
+
 class ResponseData(bu.Model, ResponseDataVisualizationMixin):
     """
     Flexible container for simulation response data and metadata from GSMModel.
@@ -46,6 +49,8 @@ class ResponseData(bu.Model, ResponseDataVisualizationMixin):
     Sig_t_flat = tr.Array()
     Eps_vars = tr.Tuple()
     Sig_vars = tr.Tuple()
+    Eps_codenames = tr.Tuple()
+    Sig_codenames = tr.Tuple()
     Eps_t = tr.Any()
     Sig_t = tr.Any()
     iter_t = tr.Array()
@@ -75,6 +80,9 @@ class ResponseData(bu.Model, ResponseDataVisualizationMixin):
         # Get variable metadata from the GSMEngine
         Eps_vars = engine.Eps_vars
         Sig_vars = engine.Sig_vars
+    
+        Eps_codenames = [getattr(var, 'codename', str(var)) for var in Eps_vars]
+        Sig_codenames = [getattr(var, 'codename', str(var)) for var in Sig_vars]
         
         # Try to get codenames from the parent GSMDef class if available
         gsm_def = getattr(engine, 'gsm_def', None)
@@ -114,6 +122,8 @@ class ResponseData(bu.Model, ResponseDataVisualizationMixin):
             Sig_t_flat=Sig_t_flat_local,
             Eps_vars=Eps_vars,
             Sig_vars=Sig_vars,
+            Eps_codenames=Eps_codenames,
+            Sig_codenames=Sig_codenames,
             Eps_t=ResponseDataContainer(Eps_t_dict),
             Sig_t=ResponseDataContainer(Sig_t_dict),
             iter_t=iter_t,
@@ -182,6 +192,8 @@ class ResponseData(bu.Model, ResponseDataVisualizationMixin):
             Sig_t_flat=self.Sig_t_flat,
             Eps_vars=self.Eps_vars,
             Sig_vars=self.Sig_vars,
+            Eps_codenames=self.Eps_codenames,
+            Sig_codenames=self.Sig_codenames,
             Eps_t=self.Eps_t,
             Sig_t=self.Sig_t,
             iter_t=self.iter_t,
@@ -203,6 +215,8 @@ class ResponseData(bu.Model, ResponseDataVisualizationMixin):
             f"Sig_t_flat.shape={self.Sig_t_flat.shape}, "
             f"Eps_vars={self.Eps_vars}, "
             f"Sig_vars={self.Sig_vars}, "
+            f"Eps_codenames={self.Eps_codenames}, "
+            f"Sig_codenames={self.Sig_codenames}, "
             f"Eps_t keys={list(self.Eps_t.keys())}, "
             f"Sig_t keys={list(self.Sig_t.keys())})"
         )
@@ -217,6 +231,8 @@ class ResponseData(bu.Model, ResponseDataVisualizationMixin):
             f"Sig_t_flat.shape={self.Sig_t_flat.shape}, "
             f"Eps_vars={self.Eps_vars}, "
             f"Sig_vars={self.Sig_vars}, "
+            f"Eps_codenames={self.Eps_codenames}, "
+            f"Sig_codenames={self.Sig_codenames}, "
             f"Eps_t keys={list(self.Eps_t.keys())}, "
             f"Sig_t keys={list(self.Sig_t.keys())})"
         )

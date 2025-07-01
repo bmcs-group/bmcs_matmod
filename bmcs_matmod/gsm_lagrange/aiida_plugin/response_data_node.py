@@ -122,6 +122,8 @@ class ResponseDataNode(ArrayData, ResponseDataVisualizationMixin):
         node.base.attributes.set('variable_info', {
             'Eps_vars': [getattr(var, 'codename', str(var)) for var in response_data.Eps_vars],
             'Sig_vars': [getattr(var, 'codename', str(var)) for var in response_data.Sig_vars],
+            'Eps_codenames': response_data.Eps_codenames,
+            'Sig_codenames': response_data.Sig_codenames,
             'Eps_var_shapes': [getattr(var, 'shape', ()) for var in response_data.Eps_vars],
             'Sig_var_shapes': [getattr(var, 'shape', ()) for var in response_data.Sig_vars],
             'Eps_var_names': [str(var) for var in response_data.Eps_vars],
@@ -204,6 +206,8 @@ class ResponseDataNode(ArrayData, ResponseDataVisualizationMixin):
             Sig_t_flat=Sig_t_flat,
             Eps_vars=Eps_vars,
             Sig_vars=Sig_vars,
+            Eps_codenames=var_info['Eps_codenames'],
+            Sig_codenames=var_info['Sig_codenames'],
             Eps_t=ResponseDataContainer(Eps_t_dict),
             Sig_t=ResponseDataContainer(Sig_t_dict),
             iter_t=iter_t,
@@ -437,28 +441,6 @@ class ResponseDataNode(ArrayData, ResponseDataVisualizationMixin):
                         result["final_internal_variables"][var_name] = final_val.tolist()
         
         return result
-    
-    def get_simple_results(self):
-        """
-        Get simplified results for backwards compatibility.
-        
-        Returns
-        -------
-        dict
-            Simplified results dictionary
-        """
-        return {
-            "n_steps": len(self.t_t),
-            "time": self.t_t.tolist(),
-            "strain": self.eps_t[:, 0].tolist() if self.eps_t.ndim > 1 else self.eps_t.tolist(),
-            "stress": self.sig_t[:, 0, 0].tolist() if self.sig_t.ndim > 2 else self.sig_t.tolist(),
-            "internal_variables": {name: data.tolist() if hasattr(data, 'tolist') else data 
-                                 for name, data in self.Eps_t.items()},
-            "thermodynamic_forces": {name: data.tolist() if hasattr(data, 'tolist') else data 
-                                   for name, data in self.Sig_t.items()},
-            "uuid": str(self.uuid),
-            "is_stored": self.is_stored
-        }
     
     def format_for_output(self, output_format='json', detailed=False):
         """
