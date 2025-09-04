@@ -10,6 +10,48 @@ The GSM framework uses a systematic coupling between:
 
 ## Standard Variable Categories
 
+### 0. Thermal Variables
+
+**Temperature**: `T`
+- **Symbol**: `T`
+- **LaTeX**: `T`
+- **Codename**: `T`
+- **Physical meaning**: Absolute temperature (intensive variable)
+- **Units**: Temperature units (e.g., K, °C)
+- **Nature**: Intensive thermodynamic variable
+
+**Entropy**: `S`
+- **Symbol**: `S`
+- **LaTeX**: `S`
+- **Codename**: `S`
+- **Physical meaning**: System entropy (extensive variable)
+- **Units**: Energy per temperature units (e.g., J/K)
+- **Nature**: Extensive thermodynamic variable
+
+**Conjugate Pair**: `(T, S)` form a thermodynamic conjugate pair where:
+- `T`: Controls thermal state (intensive)
+- `S`: Responds to thermal changes (extensive)
+- **Work term**: `T·S` (thermal work)
+
+### 0.1. External Mechanical Variables
+
+**External Strain**: `eps` (external strain)
+- **Symbol**: `ε`
+- **LaTeX**: `\varepsilon`
+- **Codename**: `eps`
+- **Physical meaning**: Applied mechanical deformation (extensive variable)
+- **Nature**: Control variable in Helmholtz formulation
+
+**External Stress**: `sig` (external stress)
+- **Symbol**: `σ`
+- **LaTeX**: `\sigma`
+- **Codename**: `sig`
+- **Physical meaning**: Applied mechanical load (intensive variable)
+- **Nature**: Control variable in Gibbs formulation
+
+**Conjugate Pair**: `(sig, eps)` form a mechanical conjugate pair where:
+- **Work term**: `σ·ε` (mechanical work)
+
 ### 1. Plasticity Variables
 
 **Internal Variable**: `eps_p` (plastic strain)

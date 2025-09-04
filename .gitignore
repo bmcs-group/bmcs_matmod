@@ -43,4 +43,5 @@ package-lock.json
 geckodriver.log
 *.iml
 **/_lambdified_cache/
+**/.gsm_grid_cache/
 
