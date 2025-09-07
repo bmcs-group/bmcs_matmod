@@ -10,7 +10,7 @@ each button shows its own function when clicked.
 import ipywidgets as widgets
 import sympy as sp
 from IPython.display import display, clear_output, Math
-from .gsm_thermodyn_box2 import GSMThermodynBox2
+from .gsm_thermodyn_box import GSMThermodynBox
 from .gsm_state_fn import StateFunction
 
 
@@ -23,7 +23,7 @@ class TestWidget:
     each button shows its own function.
     """
     
-    def __init__(self, gsm_box: GSMThermodynBox2, title: str = "Test Widget - State Function Buttons"):
+    def __init__(self, gsm_box: GSMThermodynBox, title: str = "Test Widget - State Function Buttons"):
         """Initialize the test widget with GSMThermodynBox2 support."""
         self.gsm_box = gsm_box
         self.title = title
@@ -161,7 +161,7 @@ class TestWidget:
             self._show_state_function('F')
 
 
-def create_test_widget(gsm_box: GSMThermodynBox2, 
+def create_test_widget(gsm_box: GSMThermodynBox, 
                       title: str = "Test Widget - State Function Buttons") -> TestWidget:
     """Create and return a test widget instance."""
     return TestWidget(gsm_box, title)
