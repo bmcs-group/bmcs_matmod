@@ -1,9 +1,9 @@
 """
-GSM Symbolic Box Widget 3 - Interactive IPywidgets Implementation
+GSM Thermodynamic Box 2 Widget - Interactive IPywidgets Implementation
 
 This module provides an interactive ipywidgets-based visualization for the thermodynamic
 square with clickable buttons in a 3x3 grid layout. This approach focuses on didactic
-value for teaching thermodynamics.
+value for teaching thermodynamics using the interface-based GSMThermodynBox2.
 
 Key Features:
 - 3x3 grid of clickable ipywidget buttons
@@ -12,6 +12,7 @@ Key Features:
 - Educational focus: step-by-step exploration of thermodynamic relationships
 - Uses IPython.display for high-quality mathematical rendering
 - Visual indication: Initial state function button has darker background color
+- Interface-based: Works with GSMThermodynBox2 and GSMStateFnIfc implementations
 
 3x3 Grid Layout:
     ε   | F  | T
@@ -31,24 +32,27 @@ import ipywidgets as widgets
 from IPython.display import display, Math, clear_output
 import sympy as sp
 from typing import Dict, Optional
-from gsm_symb_box import GSMSymbBox, StateFunction
+from .gsm_thermodyn_box2 import GSMThermodynBox2
+from .gsm_state_fn import StateFunction
 
 
-class GSMSymbBoxWidget3:
+class GSMThermodynBox2Widget:
     """
     Interactive 3x3 grid widget for thermodynamic square visualization using ipywidgets.
     
     This widget creates a 3x3 grid of clickable buttons representing variables and state
     functions. Clicking a button displays the corresponding mathematical expression below
     the grid using IPython's high-quality LaTeX rendering.
+    
+    Works with GSMThermodynBox2 which uses interface-based state function implementations.
     """
     
-    def __init__(self, gsm_box: GSMSymbBox, title: str = "Interactive Thermodynamic Square"):
+    def __init__(self, gsm_box: GSMThermodynBox2, title: str = "Interactive Thermodynamic Square"):
         """
         Initialize the interactive 3x3 grid widget.
         
         Args:
-            gsm_box: GSMSymbBox instance containing real state functions
+            gsm_box: GSMThermodynBox2 instance containing interface-based state functions
             title: Title for the widget
         """
         self.gsm_box = gsm_box
@@ -181,46 +185,38 @@ class GSMSymbBoxWidget3:
         self._update_button_styles(label)
         self.last_clicked_button = label
         
-        # Clear output area
-        self.output_area.clear_output(wait=True)
-        
-        # Show appropriate content
-        if label == 'Info':
-            self._show_info()
-        elif label in ['F', 'G', 'U', 'H']:
-            self._show_state_function(label)
-        elif label in ['ε', 'T', '-S', '-σ']:
-            self._show_variable(label)
-        else:
-            with self.output_area:
+        with self.output_area:
+            clear_output(wait=True)
+            
+            if label == 'Info':
+                self._show_info()
+            elif label in ['F', 'G', 'U', 'H']:
+                self._show_state_function(label)
+            elif label in ['ε', 'T', '-S', '-σ']:
+                self._show_variable(label)
+            else:
                 display(Math(f"\\text{{Unknown: }} {label}"))
     
     def _show_state_function(self, func_name: str):
         """Display a state function expression."""
+
+        print('XXXXXXXXXXXXXXXXXXXX')
         try:
-            if func_name == 'F':
-                expr = self.gsm_box.F
-                description = "Helmholtz Free Energy"
-            elif func_name == 'G':
-                expr = self.gsm_box.G
-                description = "Gibbs Free Energy"
-            elif func_name == 'U':
-                expr = self.gsm_box.U
-                description = "Internal Energy"
-            elif func_name == 'H':
-                expr = self.gsm_box.H
-                description = "Enthalpy"
+            # Direct access - let the property handle everything
+            state_fn_instance = getattr(self.gsm_box, func_name)
             
-            # Display the expression using IPython's high-quality rendering
-            # Make sure all display calls are within the output context
+            # Display the expression
+            expr = state_fn_instance.fn_expr
             latex_expr = sp.latex(expr)
-            with self.output_area:
-                display(Math(f"{func_name} = {latex_expr}"))
-                display(widgets.HTML(f"<p style='text-align: center; font-style: italic;'>{description}</p>"))
+            display(Math(f"{func_name} = {latex_expr}"))
+            
+            # # Add description
+            # descriptions = {'F': 'Helmholtz Free Energy', 'G': 'Gibbs Free Energy', 
+            #               'U': 'Internal Energy', 'H': 'Enthalpy'}
+            # display(widgets.HTML(f"<p style='text-align: center; font-style: italic;'>{descriptions[func_name]}</p>"))
             
         except Exception as e:
-            with self.output_area:
-                display(widgets.HTML(f"<p style='color: red;'>Error displaying {func_name}: {str(e)}</p>"))
+            display(widgets.HTML(f"<p style='color: red;'>Error displaying {func_name}: {str(e)}</p>"))
     
     def _show_variable(self, var_name: str):
         """Display information about a variable."""
@@ -233,10 +229,9 @@ class GSMSymbBoxWidget3:
         
         if var_name in var_info:
             symbol, name, description = var_info[var_name]
-            with self.output_area:
-                display(Math(f"\\text{{Variable: }} {symbol}"))
-                display(widgets.HTML(f"<p style='text-align: center;'><strong>{name}</strong></p>"))
-                display(widgets.HTML(f"<p style='text-align: center; font-style: italic;'>{description}</p>"))
+            display(Math(f"\\text{{Variable: }} {symbol}"))
+            display(widgets.HTML(f"<p style='text-align: center;'><strong>{name}</strong></p>"))
+            display(widgets.HTML(f"<p style='text-align: center; font-style: italic;'>{description}</p>"))
     
     def _show_info(self):
         """Display general information about the thermodynamic square."""
@@ -256,40 +251,52 @@ class GSMSymbBoxWidget3:
         <p><em>Click any button to explore the mathematical expressions!</em></p>
         </div>
         """
-        with self.output_area:
-            display(widgets.HTML(info_text))
+        display(widgets.HTML(info_text))
     
     def show(self):
         """Display the interactive widget."""
         display(self.container)
         
-        # Show initial info using the existing method
-        self._show_info()
+        # Display the initial state function by default instead of info
+        initial_state_name = self.gsm_box.current_state_fn.value
+        
+        # Update visual styles first (without triggering click handler)
+        self._update_button_styles(initial_state_name)
+        self.last_clicked_button = initial_state_name
+        
+        # Then display the initial content directly without going through _on_button_click
+        with self.output_area:
+            clear_output(wait=True)
+            self._show_state_function(initial_state_name)
     
     def get_expressions_summary(self) -> Dict:
         """Get a summary of all expressions in the GSM box."""
-        return {
-            'F': str(self.gsm_box.F),
-            'G': str(self.gsm_box.G), 
-            'U': str(self.gsm_box.U),
-            'H': str(self.gsm_box.H),
-            'current_state': self.gsm_box.current_state_fn.value
-        }
+        summary = {'current_state': self.gsm_box.current_state_fn.value}
+        
+        # Get expressions from available state function instances
+        for func_name, attr in [('F', 'F'), ('G', 'G'), ('U', 'U'), ('H', 'H')]:
+            state_fn_instance = getattr(self.gsm_box, attr)
+            if state_fn_instance is not None:
+                summary[func_name] = str(state_fn_instance.fn_expr)
+            else:
+                summary[func_name] = 'Not computed'
+                
+        return summary
 
 
-def create_interactive_widget(gsm_box: GSMSymbBox, 
-                            title: str = "Interactive Thermodynamic Square") -> GSMSymbBoxWidget3:
+def create_interactive_widget(gsm_box: GSMThermodynBox2, 
+                            title: str = "Interactive Thermodynamic Square") -> GSMThermodynBox2Widget:
     """
     Convenience function to create an interactive 3x3 grid widget.
     
     Args:
-        gsm_box: GSMSymbBox instance containing real state functions
+        gsm_box: GSMThermodynBox2 instance containing interface-based state functions
         title: Title for the widget
         
     Returns:
-        GSMSymbBoxWidget3 instance ready to display
+        GSMThermodynBox2Widget instance ready to display
     """
-    return GSMSymbBoxWidget3(gsm_box, title)
+    return GSMThermodynBox2Widget(gsm_box, title)
 
 
 def demo_interactive_widget():

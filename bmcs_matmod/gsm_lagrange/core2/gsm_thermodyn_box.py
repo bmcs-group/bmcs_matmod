@@ -61,7 +61,7 @@ def _timeout_handler(signum, frame):
     raise TimeoutError("Simplification timed out")
 
 
-class GSMSymbBox:
+class GSMThermodynBox:
     """
     Thermodynamic state function box implementing all four fundamental state functions
     and their Legendre transformations.

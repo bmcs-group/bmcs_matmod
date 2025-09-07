@@ -44,4 +44,5 @@ geckodriver.log
 *.iml
 **/_lambdified_cache/
 **/.gsm_grid_cache/
+copilot_context
 
