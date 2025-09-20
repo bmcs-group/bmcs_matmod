@@ -198,12 +198,12 @@ class GSMThermodynBoxWidget:
                 display(Math(f"\\text{{Unknown: }} {label}"))
     
     def _show_state_function(self, func_name: str):
-        """Display a state function expression."""
+        """Display a state function expression with constitutive relations."""
         try:
             # Direct access - let the property handle everything
             state_fn_instance = getattr(self.gsm_box, func_name)
             
-            # Display the expression
+            # Display the main expression
             expr = state_fn_instance.fn_expr
             latex_expr = sp.latex(expr)
             display(Math(f"{func_name} = {latex_expr}"))
@@ -213,8 +213,95 @@ class GSMThermodynBoxWidget:
                           'U': 'Internal Energy', 'H': 'Enthalpy'}
             display(widgets.HTML(f"<p style='text-align: center; font-style: italic;'>{descriptions[func_name]}</p>"))
             
+            # Display constitutive relations using the organized interface
+            display(widgets.HTML("<hr style='margin: 15px 0;'>"))
+            display(widgets.HTML("<h4 style='text-align: center;'>Constitutive Relations</h4>"))
+            
+            try:
+                relations = state_fn_instance.get_organized_constitutive_relations()
+                
+                # Section headers and colors
+                section_config = {
+                    'thermal': ('Thermal:', '#d9534f'),
+                    'mechanical': ('Mechanical:', '#5bc0de'), 
+                    'internal': ('Internal:', '#5cb85c')
+                }
+                
+                for section, (header, color) in section_config.items():
+                    section_relations = relations.get(section, [])
+                    
+                    if section_relations:  # Only display if there are relations
+                        display(widgets.HTML(f"<h5 style='text-align: center; color: {color};'>{header}</h5>"))
+                        
+                        for conj_var, derivative in section_relations:
+                            # Get the corresponding natural variable
+                            natural_var = self._get_natural_variable_for_constitutive(state_fn_instance, conj_var)
+                            
+                            # Format the constitutive relation
+                            conj_latex = sp.latex(conj_var)
+                            natural_latex = sp.latex(natural_var)
+                            deriv_latex = sp.latex(derivative)
+                            
+                            display(Math(f"{conj_latex} = \\frac{{\\partial {func_name}}}{{\\partial {natural_latex}}} = {deriv_latex}"))
+                            
+            except Exception as e:
+                # Fallback to individual method calls if organized method fails
+                display(widgets.HTML(f"<p style='color: orange;'>Using fallback display (organized method failed: {str(e)})</p>"))
+                self._show_constitutive_relations_fallback(state_fn_instance, func_name)
+            
         except Exception as e:
             display(widgets.HTML(f"<p style='color: red;'>Error displaying {func_name}: {str(e)}</p>"))
+    
+    def _get_natural_variable_for_constitutive(self, state_fn, conj_var: sp.Symbol) -> sp.Symbol:
+        """Get the natural variable corresponding to a conjugate variable."""
+        if conj_var == state_fn.th_y_var:
+            return state_fn.th_x_var
+        elif conj_var == state_fn.mc_y_var:
+            return state_fn.mc_x_var
+        elif conj_var == state_fn.Sig_var:
+            return state_fn.Eps_var
+        else:
+            # Handle case where internal variables might be tuples/lists
+            if hasattr(state_fn.Sig_var, '__iter__') and conj_var in state_fn.Sig_var:
+                idx = list(state_fn.Sig_var).index(conj_var)
+                return list(state_fn.Eps_var)[idx]
+            raise ValueError(f"Unknown conjugate variable: {conj_var}")
+    
+    def _show_constitutive_relations_fallback(self, state_fn_instance, func_name: str):
+        """Fallback method for displaying constitutive relations using individual methods."""
+        # Thermal constitutive relation
+        try:
+            thermal_var, thermal_expr = state_fn_instance.get_thermal_constitutive_relation()
+            display(widgets.HTML("<h5 style='text-align: center; color: #d9534f;'>Thermal:</h5>"))
+            thermal_latex = sp.latex(thermal_expr)
+            thermal_var_latex = sp.latex(thermal_var)
+            display(Math(f"{thermal_var_latex} = \\frac{{\\partial {func_name}}}{{\\partial {sp.latex(state_fn_instance.th_x_var)}}} = {thermal_latex}"))
+        except Exception as e:
+            display(widgets.HTML(f"<p style='color: red;'>Error in thermal relation: {str(e)}</p>"))
+        
+        # Mechanical constitutive relations
+        try:
+            mechanical_relations = state_fn_instance.get_mechanical_constitutive_relations()
+            display(widgets.HTML("<h5 style='text-align: center; color: #5bc0de;'>Mechanical:</h5>"))
+            for mech_var, mech_expr in mechanical_relations:
+                mech_latex = sp.latex(mech_expr)
+                mech_var_latex = sp.latex(mech_var)
+                display(Math(f"{mech_var_latex} = \\frac{{\\partial {func_name}}}{{\\partial {sp.latex(state_fn_instance.mc_x_var)}}} = {mech_latex}"))
+        except Exception as e:
+            display(widgets.HTML(f"<p style='color: red;'>Error in mechanical relations: {str(e)}</p>"))
+        
+        # Internal constitutive relations
+        try:
+            internal_relations = state_fn_instance.get_internal_constitutive_relations()
+            if internal_relations:  # Only show if there are internal relations
+                display(widgets.HTML("<h5 style='text-align: center; color: #5cb85c;'>Internal:</h5>"))
+                for int_var, int_expr in internal_relations:
+                    int_latex = sp.latex(int_expr)
+                    int_var_latex = sp.latex(int_var)
+                    natural_var = self._get_natural_variable_for_constitutive(state_fn_instance, int_var)
+                    display(Math(f"{int_var_latex} = \\frac{{\\partial {func_name}}}{{\\partial {sp.latex(natural_var)}}} = {int_latex}"))
+        except Exception as e:
+            display(widgets.HTML(f"<p style='color: red;'>Error in internal relations: {str(e)}</p>"))
     
     def _show_variable(self, var_name: str):
         """Display information about a variable."""

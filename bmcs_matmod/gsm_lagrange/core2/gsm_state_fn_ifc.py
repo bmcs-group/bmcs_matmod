@@ -156,6 +156,21 @@ class GSMStateFnIfc(ABC):
         """
         pass
     
+    def get_organized_constitutive_relations(self) -> Dict[str, List[Tuple[sp.Symbol, sp.Expr]]]:
+        """
+        Get constitutive relations organized by category for display purposes.
+        
+        Returns:
+            Dictionary with keys 'thermal', 'mechanical', 'internal', each containing
+            list of (conjugate_variable, derivative_expression) tuples
+        """
+        organized = {
+            'thermal': [self.get_thermal_constitutive_relation()],
+            'mechanical': self.get_mechanical_constitutive_relations(),
+            'internal': self.get_internal_constitutive_relations()
+        }
+        return organized
+    
     def print_overview(self) -> None:
         """Print a summary of the state function and its variables."""
         print("GSM State Function Overview")

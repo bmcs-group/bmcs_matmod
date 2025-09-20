@@ -25,7 +25,7 @@ def test_import():
         print("✓ Scalar imported")
         
         # Test that test module can be imported
-        from tests.test_gsm_thermodyn_box2 import TestGSMThermodynBox2RoundTrips
+        from bmcs_matmod.gsm_lagrange.core2.tests.test_gsm_thermodyn_box import TestGSMThermodynBox2RoundTrips
         print("✓ Test classes imported")
         
         return True

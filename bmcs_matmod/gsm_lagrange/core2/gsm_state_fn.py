@@ -9,6 +9,8 @@ across thermal, mechanical, and internal variable domains.
 import sympy as sp
 from typing import List, Dict, Tuple, Union
 from enum import Enum
+import signal
+import warnings
 from .gsm_state_fn_ifc import GSMStateFnIfc
 
 
@@ -63,6 +65,9 @@ class GSMStateFn(GSMStateFnIfc):
     - Automatic variable labeling and organization
     - Context awareness for transformations
     """
+    
+    # Global simplification timeout - can be modified to control simplification behavior
+    SIMPLIFICATION_TIMEOUT = 10.0  # seconds - timeout for automatic expression simplification
     
     def __init__(self,
                  fn_expr: sp.Expr,
@@ -179,6 +184,51 @@ class GSMStateFn(GSMStateFnIfc):
         if 'sig' in expected_natural and actual_vars['sig'] != self._mc_x_var:
             print(f"Warning: Expected sig as mechanical natural variable for {self._state_function_type.value}")
     
+    # ========================================================================
+    # Internal Expression Simplification (Private)
+    # ========================================================================
+    
+    @classmethod
+    def _simplify_with_timeout(cls, expr: sp.Expr) -> sp.Expr:
+        """
+        Internal method to safely simplify expressions with timeout protection.
+        
+        Args:
+            expr: SymPy expression to simplify
+            
+        Returns:
+            Simplified expression, or original expression if simplification fails/times out
+        """
+        try:
+            # Set up signal handler for timeout (Unix-like systems only)
+            if hasattr(signal, 'SIGALRM'):
+                def timeout_handler(signum, frame):
+                    raise TimeoutError("Simplification timed out")
+                    
+                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.setitimer(signal.ITIMER_REAL, cls.SIMPLIFICATION_TIMEOUT)
+                
+                try:
+                    simplified_expr = sp.simplify(expr)
+                    signal.alarm(0)  # Cancel the alarm
+                    return simplified_expr
+                except TimeoutError:
+                    return expr  # Return original if timeout
+                except Exception:
+                    return expr  # Return original if simplification fails
+                finally:
+                    signal.alarm(0)  # Ensure alarm is cancelled
+                    signal.signal(signal.SIGALRM, old_handler)  # Restore old handler
+            else:
+                # Fallback for systems without signal support (e.g., Windows)
+                try:
+                    return sp.simplify(expr)
+                except Exception:
+                    return expr  # Return original if simplification fails
+                    
+        except Exception:
+            return expr  # Return original if setup fails
+    
     def get_expected_natural_variables(self) -> List[str]:
         """Get the expected natural variable names for this state function type."""
         return NATURAL_VARIABLES_MAPPING[self._state_function_type][0]
@@ -265,49 +315,57 @@ class GSMStateFn(GSMStateFnIfc):
     
     def compute_constitutive_relations(self) -> Dict[sp.Symbol, sp.Expr]:
         """
-        Compute constitutive relations as partial derivatives.
+        Compute constitutive relations as partial derivatives with automatic simplification.
         
         Returns:
-            Dictionary mapping conjugate variables to their derivative expressions
+            Dictionary mapping conjugate variables to their simplified derivative expressions
         """
         relations = {}
         
         # Thermal: conjugate = ∂f/∂(natural)
-        relations[self.th_y_var] = sp.diff(self.fn_expr, self.th_x_var)
+        thermal_derivative = sp.diff(self.fn_expr, self.th_x_var)
+        relations[self.th_y_var] = self._simplify_with_timeout(thermal_derivative)
         
         # Mechanical: conjugate = ∂f/∂(natural)
-        relations[self.mc_y_var] = sp.diff(self.fn_expr, self.mc_x_var)
+        mechanical_derivative = sp.diff(self.fn_expr, self.mc_x_var)
+        relations[self.mc_y_var] = self._simplify_with_timeout(mechanical_derivative)
         
         # Internal: conjugate = ∂f/∂(natural)
         if hasattr(self.Eps_var, '__iter__'):
             for Eps, Sig in zip(self.Eps_var, self.Sig_var):
-                relations[Sig] = sp.diff(self.fn_expr, Eps)
+                internal_derivative = sp.diff(self.fn_expr, Eps)
+                relations[Sig] = self._simplify_with_timeout(internal_derivative)
         else:
-            relations[self.Sig_var] = sp.diff(self.fn_expr, self.Eps_var)
+            internal_derivative = sp.diff(self.fn_expr, self.Eps_var)
+            relations[self.Sig_var] = self._simplify_with_timeout(internal_derivative)
         
         return relations
     
     def get_thermal_constitutive_relation(self) -> Tuple[sp.Symbol, sp.Expr]:
-        """Get the thermal constitutive relation."""
+        """Get the thermal constitutive relation with automatic simplification."""
         thermal_derivative = sp.diff(self.fn_expr, self.th_x_var)
-        return (self.th_y_var, thermal_derivative)
+        simplified_derivative = self._simplify_with_timeout(thermal_derivative)
+        return (self.th_y_var, simplified_derivative)
     
     def get_mechanical_constitutive_relations(self) -> List[Tuple[sp.Symbol, sp.Expr]]:
-        """Get mechanical constitutive relations."""
+        """Get mechanical constitutive relations with automatic simplification."""
         derivative = sp.diff(self.fn_expr, self.mc_x_var)
-        return [(self.mc_y_var, derivative)]
+        simplified_derivative = self._simplify_with_timeout(derivative)
+        return [(self.mc_y_var, simplified_derivative)]
     
     def get_internal_constitutive_relations(self) -> List[Tuple[sp.Symbol, sp.Expr]]:
-        """Get internal constitutive relations."""
+        """Get internal constitutive relations with automatic simplification."""
         relations = []
         
         if hasattr(self.Eps_var, '__iter__'):
             for Eps, Sig in zip(self.Eps_var, self.Sig_var):
                 derivative = sp.diff(self.fn_expr, Eps)
-                relations.append((Sig, derivative))
+                simplified_derivative = self._simplify_with_timeout(derivative)
+                relations.append((Sig, simplified_derivative))
         else:
             derivative = sp.diff(self.fn_expr, self.Eps_var)
-            relations.append((self.Sig_var, derivative))
+            simplified_derivative = self._simplify_with_timeout(derivative)
+            relations.append((self.Sig_var, simplified_derivative))
             
         return relations
     

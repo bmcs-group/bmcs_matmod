@@ -40,37 +40,44 @@ class GSMThermodynBox:
     3. Constitutive relation computation
     4. Transformation logic
     
-    This makes the framework more modular and allows for different state
+    This makes the framework completely generic and allows for different state
     function implementations (e.g., numerical, symbolic, hybrid).
     
-    Variable mappings are now managed by the GSMStateFn class for better
+    ## Generic Variable Handling
+    
+    The box works with completely abstract thermal variables:
+    - th_x_var: Natural thermal variable (could be T, S, or any other thermal variable)
+    - th_y_var: Conjugate thermal variable (the thermodynamic conjugate of th_x_var)
+    
+    This makes the framework more general than traditional implementations that
+    hard-code temperature T and entropy S. The box can work with any thermal
+    conjugate pair.
+    
+    Variable mappings are managed by the GSMStateFn class for better
     encapsulation and intelligence.
     """
     
     def __init__(self, 
                  initial_state_fn: StateFunction,
-                 initial_state_instance: GSMStateFnIfc,
-                 T_var: sp.Symbol = None,
-                 S_var: sp.Symbol = None):
+                 initial_state_instance: GSMStateFnIfc):
         """
         Initialize the thermodynamic state function box.
         
         Args:
             initial_state_fn: Starting state function type
             initial_state_instance: State function instance implementing GSMStateFnIfc
-            T_var: Temperature symbol (default: T)
-            S_var: Entropy symbol (default: S)
         """
-        # Set thermal variables with defaults
-        self.T_var = T_var if T_var is not None else sp.Symbol('T', real=True)
-        self.S_var = S_var if S_var is not None else sp.Symbol('S', real=True)
-        
         # Initialize state function storage
         self.state_functions: Dict[StateFunction, GSMStateFnIfc] = {}
         self.current_state_fn = initial_state_fn
         
         # Store the initial state function
         self.state_functions[initial_state_fn] = initial_state_instance
+        
+        # Extract thermal variables from the initial state function instance
+        # This makes the box completely generic - it works with any thermal variables
+        self.th_x_var = initial_state_instance.th_x_var  # Natural thermal variable
+        self.th_y_var = initial_state_instance.th_y_var  # Conjugate thermal variable
         
         # Validate the initial state function
         self._validate_state_function(initial_state_fn, initial_state_instance)
@@ -161,17 +168,17 @@ class GSMThermodynBox:
         """Compute the Legendre transformation expression with constitutive relation substitutions."""
         expr = source_instance.fn_expr
         
-        # Get variables from source
-        T = source_instance.th_x_var if hasattr(source_instance, 'th_x_var') else self.T_var
-        S = source_instance.th_y_var if hasattr(source_instance, 'th_y_var') else self.S_var
-        mc_x = source_instance.mc_x_var
-        mc_y = source_instance.mc_y_var
+        # Get variables from source - use generic thermal variables
+        th_x = source_instance.th_x_var  # Natural thermal variable
+        th_y = source_instance.th_y_var  # Conjugate thermal variable
+        mc_x = source_instance.mc_x_var  # Natural mechanical variable
+        mc_y = source_instance.mc_y_var  # Conjugate mechanical variable
         
-        # Add/subtract thermal conjugate term: ±T*S
+        # Add/subtract thermal conjugate term: ±th_x*th_y (e.g., ±T*S)
         if thermal_coeff != 0:
-            expr += thermal_coeff * T * S
+            expr += thermal_coeff * th_x * th_y
         
-        # Add/subtract work conjugate term: ±σ*ε
+        # Add/subtract work conjugate term: ±mc_x*mc_y (e.g., ±ε*σ)
         if work_coeff != 0:
             expr += work_coeff * mc_x * mc_y
         
@@ -188,46 +195,53 @@ class GSMThermodynBox:
         """Apply constitutive relation substitutions to complete the Legendre transformation."""
         substitutions = {}
         
-        # Get variables
-        T = source_instance.th_x_var if hasattr(source_instance, 'th_x_var') else self.T_var
-        S = source_instance.th_y_var if hasattr(source_instance, 'th_y_var') else self.S_var
-        mc_x = source_instance.mc_x_var  
-        mc_y = source_instance.mc_y_var
+        # Get variables from source instance
+        th_x = source_instance.th_x_var  # Natural thermal variable  
+        th_y = source_instance.th_y_var  # Conjugate thermal variable
+        mc_x = source_instance.mc_x_var  # Natural mechanical variable
+        mc_y = source_instance.mc_y_var  # Conjugate mechanical variable
         
-        # Apply thermal variable substitutions
+        # Apply thermal variable substitutions using the interface methods
         if thermal_coeff != 0:
-            # Derive constitutive relation for entropy: S = -∂F/∂T
-            S_from_source = -sp.diff(source_instance.fn_expr, T)
+            # Use the existing interface method to get thermal constitutive relation
+            th_y_var, th_y_from_source = source_instance.get_thermal_constitutive_relation()
             
-            if S_from_source != 0:
-                # If entropy depends on T, solve for T in terms of S
+            # Apply sign convention based on the state function type
+            if hasattr(source_instance, 'state_function_type'):
+                if source_instance.state_function_type in [StateFunction.HELMHOLTZ, StateFunction.GIBBS]:
+                    # For F and G: S = -∂F/∂T, S = -∂G/∂T
+                    th_y_from_source = -th_y_from_source
+                # For U and H: T = ∂U/∂S, T = ∂H/∂S (positive derivative)
+            
+            if th_y_from_source != 0:
+                # If conjugate variable depends on natural variable, solve for natural in terms of conjugate
                 try:
-                    entropy_relation = sp.Eq(S, S_from_source)
-                    T_solutions = sp.solve(entropy_relation, T)
-                    if T_solutions:
-                        substitutions[T] = T_solutions[0]
+                    thermal_relation = sp.Eq(th_y, th_y_from_source)
+                    th_x_solutions = sp.solve(thermal_relation, th_x)
+                    if th_x_solutions:
+                        substitutions[th_x] = th_x_solutions[0]
                 except:
-                    # Keep T unchanged if inversion fails
+                    # Keep original variable if inversion fails
                     pass
         
-        # Apply mechanical variable substitutions  
+        # Apply mechanical variable substitutions using the interface methods
         if work_coeff != 0:
-            # For F→H: work_coeff = -1, we have -ε*σ term
-            # We need to substitute ε with its inverse relation from σ
+            # Use the existing interface method to get mechanical constitutive relations
+            mechanical_relations = source_instance.get_mechanical_constitutive_relations()
             
-            # Derive stress constitutive relation: σ = ∂F/∂ε
-            stress_from_source = sp.diff(source_instance.fn_expr, mc_x)
-            
-            if stress_from_source != 0:
-                try:
-                    # Solve σ = ∂F/∂ε for ε in terms of σ
-                    stress_relation = sp.Eq(mc_y, stress_from_source)
-                    strain_solutions = sp.solve(stress_relation, mc_x)
-                    if strain_solutions:
-                        substitutions[mc_x] = strain_solutions[0]
-                except:
-                    # Keep original variables if inversion fails
-                    pass
+            if mechanical_relations:
+                mc_y_var, mc_y_from_source = mechanical_relations[0]  # Get first mechanical relation
+                
+                if mc_y_from_source != 0:
+                    try:
+                        # Solve mc_y = ∂f/∂mc_x for mc_x in terms of mc_y
+                        mechanical_relation = sp.Eq(mc_y, mc_y_from_source)
+                        mc_x_solutions = sp.solve(mechanical_relation, mc_x)
+                        if mc_x_solutions:
+                            substitutions[mc_x] = mc_x_solutions[0]
+                    except:
+                        # Keep original variables if inversion fails
+                        pass
         
         # Apply substitutions if any were found
         if substitutions:
@@ -245,26 +259,39 @@ class GSMThermodynBox:
         # Get expected variable organization for target
         natural_types, conjugate_types = NATURAL_VARIABLES_MAPPING[target_state_fn]
         
-        # Map variable types to actual symbols from source
-        T = source_instance.th_x_var if hasattr(source_instance, 'th_x_var') else self.T_var
-        S = source_instance.th_y_var if hasattr(source_instance, 'th_y_var') else self.S_var
+        # Get thermal variables from source - these remain abstract
+        source_th_x = source_instance.th_x_var  # Current natural thermal variable
+        source_th_y = source_instance.th_y_var  # Current conjugate thermal variable
         
-        # Organize variables according to target function's natural variables
-        th_x_var, th_y_var = (T, S) if 'T' in natural_types else (S, T)
+        # Organize thermal variables according to target function's natural variables
+        # The key insight: we don't need to know if these are T/S - just natural/conjugate roles
+        if natural_types[0] == conjugate_types[0]:  # This shouldn't happen, but handle edge case
+            th_x_var, th_y_var = source_th_x, source_th_y
+        else:
+            # Check if the current natural thermal variable should remain natural in target
+            current_natural_type = 'T' if 'T' in str(source_th_x).upper() else 'S'
+            if current_natural_type in natural_types:
+                # Current natural remains natural in target
+                th_x_var, th_y_var = source_th_x, source_th_y
+            else:
+                # Thermal variables swap roles in target
+                th_x_var, th_y_var = source_th_y, source_th_x
         
         # Handle mechanical variables - get source variables
         mc_x_source = source_instance.mc_x_var
         mc_y_source = source_instance.mc_y_var
         
-        # For mechanical variables, check if eps or sig should be natural
-        if 'eps' in natural_types:
-            # eps is natural, sig is conjugate
-            mc_x_var = mc_x_source if 'eps' in str(mc_x_source) or 'epsilon' in str(mc_x_source) else mc_y_source
-            mc_y_var = mc_y_source if 'sig' in str(mc_y_source) or 'sigma' in str(mc_y_source) else mc_x_source
+        # For mechanical variables, check if current natural should remain natural
+        current_mc_natural = 'eps' if any(term in str(mc_x_source).lower() for term in ['eps', 'epsilon']) else 'sig'
+        
+        if current_mc_natural in natural_types:
+            # Current mechanical natural remains natural
+            mc_x_var = mc_x_source
+            mc_y_var = mc_y_source
         else:
-            # sig is natural, eps is conjugate
-            mc_x_var = mc_x_source if 'sig' in str(mc_x_source) or 'sigma' in str(mc_x_source) else mc_y_source
-            mc_y_var = mc_y_source if 'eps' in str(mc_y_source) or 'epsilon' in str(mc_y_source) else mc_x_source
+            # Mechanical variables swap roles
+            mc_x_var = mc_y_source
+            mc_y_var = mc_x_source
         
         # Internal variables remain the same (always extensive in GSM)
         Eps_var = source_instance.Eps_var
