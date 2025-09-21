@@ -428,4 +428,4 @@ class GSMThermodynBox:
     def __repr__(self) -> str:
         """String representation of the thermodynamic box."""
         available = [sf.value for sf in self.state_functions.keys()]
-        return f"GSMThermodynBox2(current={self.current_state_fn.value}, available={available})"
+        return f"GSMThermoDynBox(current={self.current_state_fn.value}, available={available})"

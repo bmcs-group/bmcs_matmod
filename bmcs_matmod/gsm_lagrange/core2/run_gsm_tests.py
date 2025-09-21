@@ -3,7 +3,7 @@
 GSM Thermodynamic Framework Test Runner
 
 This script runs comprehensive tests for the GSM thermodynamic framework and
-reports on their success or failure. It focuses on the GSMThermodynBox2
+reports on their success or failure. It focuses on the GSMThermoDynBox
 implementation.
 
 Usage:
@@ -17,6 +17,7 @@ import sys
 import argparse
 import subprocess
 import time
+import re
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 
@@ -42,8 +43,7 @@ def run_pytest_command(test_file: Path, verbose: bool = False) -> Tuple[int, str
     else:
         cmd.append("-q")
     
-    # Add integration test marker
-    cmd.extend(["-m", "not integration"])
+    # Run ALL tests without marker filtering
     
     try:
         result = subprocess.run(
@@ -104,7 +104,7 @@ def parse_test_results(stdout: str, stderr: str) -> Dict[str, any]:
     Returns:
         Dictionary with parsed results
     """
-    lines = stdout.split('\n') + stderr.split('\n')
+    combined_output = stdout + "\n" + stderr
     
     results = {
         'passed': 0,
@@ -117,51 +117,27 @@ def parse_test_results(stdout: str, stderr: str) -> Dict[str, any]:
         'errors_list': []
     }
     
-    for line in lines:
-        if 'passed' in line and 'failed' in line:
-            # Parse summary line like "5 failed, 10 passed in 1.23s"
-            parts = line.split()
-            for i, part in enumerate(parts):
-                if part == 'passed':
-                    results['passed'] = int(parts[i-1])
-                elif part == 'failed':
-                    results['failed'] = int(parts[i-1])
-                elif part == 'error' or part == 'errors':
-                    results['errors'] = int(parts[i-1])
-                elif part == 'skipped':
-                    results['skipped'] = int(parts[i-1])
-                elif 'warnings' in part:
-                    try:
-                        results['warnings'] = int(parts[i-1])
-                    except (ValueError, IndexError):
-                        pass
-                elif part.endswith('s') and '.' in part:
-                    # Duration like "1.23s"
-                    try:
-                        results['duration'] = float(part[:-1])
-                    except ValueError:
-                        pass
-        elif 'FAILED' in line:
+    # Use regex to find the summary line like "22 passed, 4 warnings in 13.47s"
+    # Pattern matches lines with equals signs or test count summaries
+    summary_pattern = r'(?:=+\s*)?(\d+)\s+passed(?:,\s*(\d+)\s+failed)?(?:,\s*(\d+)\s+errors?)?(?:,\s*(\d+)\s+skipped)?(?:,\s*(\d+)\s+warnings?)?\s+in\s+([\d.]+)s'
+    
+    match = re.search(summary_pattern, combined_output, re.IGNORECASE)
+    if match:
+        results['passed'] = int(match.group(1)) if match.group(1) else 0
+        results['failed'] = int(match.group(2)) if match.group(2) else 0
+        results['errors'] = int(match.group(3)) if match.group(3) else 0
+        results['skipped'] = int(match.group(4)) if match.group(4) else 0
+        results['warnings'] = int(match.group(5)) if match.group(5) else 0
+        results['duration'] = float(match.group(6)) if match.group(6) else 0.0
+    
+    # Look for failure and error details
+    for line in combined_output.split('\n'):
+        if 'FAILED' in line and '::' in line:
             results['failures'].append(line.strip())
-        elif 'ERROR' in line:
+        elif 'ERROR' in line and '::' in line:
             results['errors_list'].append(line.strip())
     
-    # If no summary found, check for simple cases
-    if results['passed'] == 0 and results['failed'] == 0:
-        if '0 passed' in stdout or '0 passed' in stderr:
-            pass  # Already correctly set
-        elif 'passed' in stdout:
-            # Try to extract number of passed tests
-            for line in lines:
-                if 'passed in' in line:
-                    parts = line.split()
-                    for i, part in enumerate(parts):
-                        if part == 'passed':
-                            try:
-                                results['passed'] = int(parts[i-1])
-                            except (ValueError, IndexError):
-                                pass
-                            break
+    return results
     
     return results
 
@@ -262,10 +238,10 @@ def main():
     
     args = parser.parse_args()
     
-    # Find test files - only GSMThermodynBox2 is supported
+    # Find test files - use the actual test file with tests
     tests_dir = Path(__file__).parent / "tests"
     test_files = {
-        'gsm_thermodyn_box2': tests_dir / "test_gsm_thermodyn_box2.py"
+        'gsm_thermodyn_box': tests_dir / "test_gsm_thermodyn_box.py"  # This is the file with actual tests
     }
     
     # Check that test files exist
@@ -315,8 +291,8 @@ def main():
         if not module_passed:
             all_passed = False
         
-        # Print detailed output if verbose and there were failures
-        if args.verbose and (return_code != 0 or (results['failed'] > 0 or results['errors'] > 0)):
+        # Print detailed output if verbose
+        if args.verbose:
             print(f"\nDETAILED OUTPUT for {module_name}:")
             print("-" * 40)
             print("STDOUT:")

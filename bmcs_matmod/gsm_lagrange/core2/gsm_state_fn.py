@@ -12,6 +12,7 @@ from enum import Enum
 import signal
 import warnings
 from .gsm_state_fn_ifc import GSMStateFnIfc
+from .gsm_vars import markdown_vars_table
 
 
 class StateFunction(Enum):
@@ -20,6 +21,13 @@ class StateFunction(Enum):
     HELMHOLTZ = "F"            # F(T, ε, Ɛ)
     ENTHALPY = "H"             # H(S, σ, Ɛ)
     GIBBS = "G"                # G(T, σ, Ɛ)
+
+
+class VarTableType(Enum):
+    """Enumeration of variable table types for markdown generation."""
+    NATURAL = "natural"
+    CONJUGATE = "conjugate"
+    ALL = "all"
 
 
 # Class-level mapping of natural and conjugate variables for each state function
@@ -369,65 +377,90 @@ class GSMStateFn(GSMStateFnIfc):
             
         return relations
     
-    def substitute_variables(self, substitutions: Dict[sp.Symbol, sp.Expr]) -> 'GSMStateFn':
-        """Create a new state function with variable substitutions applied."""
-        new_expr = self.fn_expr.subs(substitutions)
+    def markdown_overview(self) -> str:
+        """
+        Get a markdown-formatted overview of the state function and its variables.
         
-        return GSMStateFn(
-            fn_expr=new_expr,
-            th_x_var=self.th_x_var,
-            th_y_var=self.th_y_var,
-            mc_x_var=self.mc_x_var,
-            mc_y_var=self.mc_y_var,
-            Eps_var=self.Eps_var,
-            Sig_var=self.Sig_var,
-            state_function_type=self._state_function_type
-        )
-    
-    def print_overview(self) -> None:
-        """Print a summary of the state function and its variables."""
-        print("GSM State Function Overview")
-        print("=" * 30)
-        print(f"Type: {self._state_function_type.value}")
-        print(f"Expression: {self.fn_expr}")
-        print()
+        Returns:
+            Markdown string containing complete overview suitable for display(Markdown(...)).
+        """
+        lines = []
         
-        print("Natural Variables (independent):")
-        print(f"  Thermal: {self.th_x_var}")
-        print(f"  Mechanical: {self.mc_x_var}")
-        print(f"  Internal: {self.Eps_var}")
-        print()
+        # Title and basic information
+        lines.append("# GSM State Function Overview")
+        lines.append("")
+        lines.append(f"${self._state_function_type.value} = {sp.latex(self.fn_expr)}$")
+        lines.append("")
         
-        print("Conjugate Variables (derivatives):")
-        print(f"  Thermal: {self.th_y_var}")
-        print(f"  Mechanical: {self.mc_y_var}")
-        print(f"  Internal: {self.Sig_var}")
-        print()
+        # Natural variables section
+        lines.append("## Natural Variables (independent)")
+        lines.append(self.markdown_natural_vars_table())
+        lines.append("")
         
+        # Conjugate variables section  
+        lines.append("## Conjugate Variables (derivatives)")
+        lines.append(self.markdown_conjugate_vars_table())
+        lines.append("")
+        
+        # Constitutive relations  
+        lines.append("## Constitutive relations")
+        lines.append(self.markdown_constitutive_relations())
+        lines.append("")
+        
+        # Expected variable organization
         expected_natural = self.get_expected_natural_variables()
         expected_conjugate = self.get_expected_conjugate_variables()
-        print("Expected Variable Organization:")
-        print(f"  Natural: {expected_natural}")
-        print(f"  Conjugate: {expected_conjugate}")
-        print(f"  Thermally Intensive: {self.is_thermally_intensive()}")
-        print(f"  Mechanically Intensive: {self.is_mechanically_intensive()}")
+        lines.append("## Expected Variable Organization")
+        lines.append(f"- **Natural:** {expected_natural}")
+        lines.append(f"- **Conjugate:** {expected_conjugate}")
+        lines.append(f"- **Thermally Intensive:** {self.is_thermally_intensive()}")
+        lines.append(f"- **Mechanically Intensive:** {self.is_mechanically_intensive()}")
         
+        # Transformation targets if available
         targets = self.get_legendre_transformation_targets()
         if targets:
             target_names = [t.value for t in targets]
-            print(f"  Transformation Targets: {target_names}")
-        print()
-    
-    def print_constitutive_relations(self) -> None:
-        """Print the constitutive relations (derivatives)."""
-        relations = self.compute_constitutive_relations()
+            lines.append(f"- **Transformation Targets:** {target_names}")
         
-        print("Constitutive Relations:")
-        print("=" * 25)
+        lines.append("")
+        
+        return "\n".join(lines)
+    
+    def markdown_constitutive_relations(self, separate_blocks: bool = True) -> str:
+        """
+        Get constitutive relations in markdown with LaTeX formatting.
+
+        Args:
+            separate_blocks: If True, each relation is its own display math block (recommended).
+                             If False, relations are returned as a bullet list with inline math.
+
+        Returns:
+            Markdown string containing LaTeX-formatted constitutive relations suitable
+            for rendering in a Jupyter notebook via display(Markdown(...)).
+
+        Format (separate_blocks=True):
+            $$ S = \frac{\partial f}{\partial T} = ... $$
+            $$ \sigma = \frac{\partial f}{\partial \varepsilon} = ... $$
+
+        Format (separate_blocks=False):
+            - $ S = \frac{\partial f}{\partial T} = ... $
+            - $ \sigma = \frac{\partial f}{\partial \varepsilon} = ... $
+        """
+        relations = self.compute_constitutive_relations()
+        lines: List[str] = []
+
         for conjugate_var, derivative in relations.items():
-            print(f"{conjugate_var} = ∂f/∂{self._get_natural_for_conjugate(conjugate_var)}")
-            print(f"     = {derivative}")
-            print()
+            natural_var = self._get_natural_for_conjugate(conjugate_var)
+            conj_ltx = sp.latex(conjugate_var)
+            nat_ltx = sp.latex(natural_var)
+            deriv_ltx = sp.latex(derivative)
+            relation_expr = f"{conj_ltx} = \\frac{{\\partial f}}{{\\partial {nat_ltx}}} = {deriv_ltx}"
+            if separate_blocks:
+                lines.append(f"$$ {relation_expr} $$")
+            else:
+                lines.append(f"- $ {relation_expr} $")
+
+        return "\n".join(lines)
     
     def _get_natural_for_conjugate(self, conjugate_var: sp.Symbol) -> sp.Symbol:
         """Get the natural variable corresponding to a conjugate variable."""
@@ -443,6 +476,42 @@ class GSMStateFn(GSMStateFnIfc):
                 idx = list(self.Sig_var).index(conjugate_var)
                 return list(self.Eps_var)[idx]
             raise ValueError(f"Unknown conjugate variable: {conjugate_var}")
+    
+    def markdown_vars_table(self, table_type: VarTableType) -> str:
+        """
+        Generate markdown table for variables based on type.
+        
+        Args:
+            table_type: Type of variables to include in table
+            
+        Returns:
+            Markdown-formatted table string
+            
+        Usage:
+            >>> helmholtz_fn.get_md_vars_table(VarTableType.NATURAL)
+            >>> helmholtz_fn.get_md_vars_table(VarTableType.CONJUGATE)
+            >>> helmholtz_fn.get_md_vars_table(VarTableType.ALL)
+        """
+        if table_type == VarTableType.NATURAL:
+            return markdown_vars_table(self.get_natural_variables())
+        elif table_type == VarTableType.CONJUGATE:
+            return markdown_vars_table(self.get_conjugate_variables())
+        elif table_type == VarTableType.ALL:
+            return markdown_vars_table(self.get_all_variables())
+        else:
+            raise ValueError(f"Unknown table type: {table_type}")
+    
+    def markdown_natural_vars_table(self) -> str:
+        """Convenience method to get markdown table for natural variables."""
+        return self.markdown_vars_table(VarTableType.NATURAL)
+    
+    def markdown_conjugate_vars_table(self) -> str:
+        """Convenience method to get markdown table for conjugate variables."""
+        return self.markdown_vars_table(VarTableType.CONJUGATE)
+    
+    def markdown_all_vars_table(self) -> str:
+        """Convenience method to get markdown table for all variables."""
+        return self.markdown_vars_table(VarTableType.ALL)
     
     def __repr__(self) -> str:
         """String representation of the state function."""

@@ -137,4 +137,71 @@ Each component includes validation methods:
 - **MaterialParams**: Parameter bounds and compatibility checking
 - **GSMModel**: Overall model validation combining symbolic and parameter validation
 
+## Variable Definition and LaTeX Rendering
+
+### Scalar Variable Interface
+
+The `Scalar` class provides a dual-name system for mathematical variables:
+
+```python
+Scalar(name: str, codename: Optional[str] = None)
+```
+
+**Purpose of Dual Names:**
+- **`name`**: Primary symbol for SymPy operations and LaTeX rendering
+- **`codename`**: Alternative name for code generation and numerical mapping
+
+### LaTeX Rendering Patterns
+
+**Pattern 1: Simple Variables (same display and code name)**
+```python
+eps = Scalar('eps')          # Display: eps, Code: eps
+T = Scalar('T')              # Display: T, Code: T
+omega = Scalar('omega')      # Display: omega, Code: omega
+```
+
+**Pattern 2: LaTeX Display with Simple Codename**
+```python
+strain = Scalar(r'\varepsilon', 'eps')     # Display: ε, Code: eps
+stress = Scalar(r'\sigma', 'sig')          # Display: σ, Code: sig
+damage = Scalar(r'\omega', 'omega')        # Display: ω, Code: omega
+```
+
+**Pattern 3: Complex LaTeX with Descriptive Codename**
+```python
+temp = Scalar('T', 'temperature')                    # Display: T, Code: temperature
+modulus = Scalar('E', 'elastic_modulus')             # Display: E, Code: elastic_modulus
+expansion = Scalar(r'\alpha', 'thermal_expansion')   # Display: α, Code: thermal_expansion
+```
+
+### Usage in Different Contexts
+
+1. **SymPy Operations**: Use the variable directly
+   ```python
+   strain = Scalar(r'\varepsilon', 'eps')
+   energy = sp.Rational(1, 2) * strain**2  # Uses name for symbolic math
+   ```
+
+2. **LaTeX Rendering**: Automatic via SymPy's latex() function
+   ```python
+   sp.latex(strain)  # Returns '\\varepsilon'
+   ```
+
+3. **Code Generation/Lambdification**: Use codename
+   ```python
+   state_dict = {strain.codename: 0.01}  # {'eps': 0.01}
+   ```
+
+4. **Notebook Display**: Combine both
+   ```python
+   display(Math(f"{strain.codename}: {sp.latex(strain)}"))  # "eps: ε"
+   ```
+
+### Benefits
+
+1. **Mathematical Clarity**: LaTeX symbols provide clear mathematical notation
+2. **Code Simplicity**: Simple codenames facilitate numerical computation
+3. **Flexibility**: Same variable works in both mathematical and computational contexts
+4. **Consistency**: Standardized approach across all GSM models
+
 This naming convention and architecture ensure clear communication about the role and capabilities of each component in the material modeling framework.

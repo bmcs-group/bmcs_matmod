@@ -3,7 +3,7 @@ GSM Thermodynamic Box 2 Widget - Interactive IPywidgets Implementation
 
 This module provides an interactive ipywidgets-based visualization for the thermodynamic
 square with clickable buttons in a 3x3 grid layout. This approach focuses on didactic
-value for teaching thermodynamics using the interface-based GSMThermodynBox2.
+value for teaching thermodynamics using the interface-based GSMThermoDynBox.
 
 Key Features:
 - 3x3 grid of clickable ipywidget buttons
@@ -12,7 +12,7 @@ Key Features:
 - Educational focus: step-by-step exploration of thermodynamic relationships
 - Uses IPython.display for high-quality mathematical rendering
 - Visual indication: Initial state function button has darker background color
-- Interface-based: Works with GSMThermodynBox2 and GSMStateFnIfc implementations
+- Interface-based: Works with GSMThermoDynBox and GSMStateFnIfc implementations
 
 3x3 Grid Layout:
     ε   | F  | T
@@ -44,7 +44,7 @@ class GSMThermodynBoxWidget:
     functions. Clicking a button displays the corresponding mathematical expression below
     the grid using IPython's high-quality LaTeX rendering.
     
-    Works with GSMThermodynBox2 which uses interface-based state function implementations.
+    Works with GSMThermoDynBox which uses interface-based state function implementations.
     """
     
     def __init__(self, gsm_box: GSMThermodynBox, title: str = "Interactive Thermodynamic Square"):

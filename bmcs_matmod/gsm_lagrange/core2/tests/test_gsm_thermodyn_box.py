@@ -28,7 +28,7 @@ from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import GSMStateFn, StateFunctio
 from bmcs_matmod.gsm_lagrange.core2.gsm_vars import Scalar
 
 
-class TestGSMThermodynBox2RoundTrips:
+class TestGSMThermodynBoxRoundTrips:
     """Test round-trip transformations - the primary criterion for mathematical correctness."""
     
     @pytest.fixture
@@ -46,7 +46,7 @@ class TestGSMThermodynBox2RoundTrips:
     
     @pytest.fixture
     def elastic_box(self, symbols):
-        """Create a GSMThermodynBox2 with simple elastic material."""
+        """Create a GSMThermodynBox with simple elastic material."""
         T, S, eps, sig, E = (symbols[k] for k in ['T', 'S', 'eps', 'sig', 'E'])
         
         # Simple elastic Helmholtz free energy: F(T,ε) = ½Eε²
@@ -71,7 +71,7 @@ class TestGSMThermodynBox2RoundTrips:
     
     @pytest.fixture
     def damage_box(self, symbols):
-        """Create a GSMThermodynBox2 with elastic-damage material."""
+        """Create a GSMThermodynBox with elastic-damage material."""
         T, S, eps, sig, omega, Y, E = (symbols[k] for k in ['T', 'S', 'eps', 'sig', 'omega', 'Y', 'E'])
         
         # Elastic-damage Helmholtz free energy: F(T,ε,ω) = ½(1-ω)Eε²
@@ -96,7 +96,7 @@ class TestGSMThermodynBox2RoundTrips:
     
     @pytest.fixture
     def thermal_expansion_box(self, symbols):
-        """Create a GSMThermodynBox2 with thermal expansion material."""
+        """Create a GSMThermodynBox with thermal expansion material."""
         T, S, eps, sig, E = (symbols[k] for k in ['T', 'S', 'eps', 'sig', 'E'])
         alpha = Scalar(r'\alpha', codename='alpha', real=True)
         
@@ -252,7 +252,7 @@ class TestGSMThermodynBox2RoundTrips:
         assert difference == 0, f"Thermal expansion F→U→F round-trip failed. Difference: {difference}"
 
 
-class TestGSMThermodynBox2PropertyAccess:
+class TestGSMThermodynBoxPropertyAccess:
     """Test property-based access and state function management."""
     
     @pytest.fixture
@@ -338,7 +338,7 @@ class TestGSMThermodynBox2PropertyAccess:
         assert current_instance is G_instance, "Current state function instance incorrect"
 
 
-class TestGSMThermodynBox2ConstitutiveRelations:
+class TestGSMThermodynBoxConstitutiveRelations:
     """Test constitutive relation consistency and correctness."""
     
     @pytest.fixture
@@ -428,7 +428,7 @@ class TestGSMThermodynBox2ConstitutiveRelations:
         assert isinstance(internal_relations[0][1], sp.Expr), "Internal relation expression should be sympy expression"
 
 
-class TestGSMThermodynBox2FrameworkValidation:
+class TestGSMThermodynBoxFrameworkValidation:
     """Test overall framework validation and edge cases."""
     
     @pytest.fixture
@@ -590,7 +590,7 @@ class TestGSMThermodynBox2FrameworkValidation:
         assert validation_result == True, "Validation should pass for valid box"
 
 
-class TestGSMThermodynBox2EdgeCases:
+class TestGSMThermodynBoxEdgeCases:
     """Test edge cases and error conditions."""
     
     @pytest.fixture

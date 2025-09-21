@@ -2,7 +2,7 @@
 GSM State Function Interface
 
 This module defines the interface that state function implementations must satisfy
-to be used in the GSMThermodynBox2 framework.
+to be used in the GSMThermoDynBox framework.
 """
 
 from abc import ABC, abstractmethod
@@ -15,7 +15,7 @@ class GSMStateFnIfc(ABC):
     Interface for thermodynamic state functions in the GSM framework.
     
     This interface defines the contract that all state function implementations
-    must satisfy to be used as nodes/edges in the GSMThermodynBox2.
+    must satisfy to be used as nodes/edges in the GSMThermoDynBox.
     
     The interface organizes thermodynamic variables into three domains:
     - Thermal: temperature (T) ↔ entropy (S) conjugate pair
@@ -140,19 +140,6 @@ class GSMStateFnIfc(ABC):
         
         Returns:
             List of tuples (conjugate_variable, derivative_expression) for each internal DOF
-        """
-        pass
-    
-    @abstractmethod
-    def substitute_variables(self, substitutions: Dict[sp.Symbol, sp.Expr]) -> 'GSMStateFnIfc':
-        """
-        Create a new state function with variable substitutions applied.
-        
-        Args:
-            substitutions: Dictionary mapping variables to their replacement expressions
-            
-        Returns:
-            New state function instance with substitutions applied
         """
         pass
     
