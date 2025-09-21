@@ -15,6 +15,22 @@ class GSMVariableBase:
     - rank: Tensor rank (0=scalar, 1=vector, 2=tensor)
     - dimensionality: Spatial dimensionality (1d, 2d, 3d)
     
+    Intensive vs Extensive Variables:
+    The GSM framework distinguishes between:
+    
+    **Extensive Variables**: Scale with system size (amount of material)
+    - Examples: entropy S, volume V, total displacement, internal damage volume
+    - Units are "total" quantities that double when system size doubles
+    
+    **Intensive Variables**: Independent of system size (field properties)  
+    - Examples: temperature T, stress σ, strain ε, pressure p, thermodynamic forces
+    - Units are "per unit" quantities or dimensionless ratios
+    - Remain constant when system is subdivided
+    
+    Conjugate pairs can be (intensive×extensive) or (intensive×intensive):
+    - T×S: thermal energy (intensive×extensive)
+    - σ×ε: energy density (intensive×intensive, needs volume for total energy)
+    
     LaTeX Rendering:
     The 'name' parameter supports LaTeX syntax directly. Use raw strings for LaTeX symbols:
     - name='eps', codename='strain' -> symbol 'eps' for both SymPy and code

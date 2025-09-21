@@ -8,6 +8,27 @@ The GSM framework uses a systematic coupling between:
 - **Internal Variables (Eps_vars)**: State variables that capture internal material processes
 - **Thermodynamic Forces (Sig_vars)**: Conjugate forces driving the evolution of internal variables
 
+### Intensive vs Extensive Variables
+
+The framework distinguishes between two fundamental types of thermodynamic variables:
+
+**Extensive Variables**: Scale with system size (amount of material)
+- Examples: Volume, mass, total energy, entropy S, total displacement
+- If you double the system size, these variables double
+- Units are typically "total" quantities (J, m³, mol, etc.)
+- In GSM: entropy S, internal variables like total damage volume
+
+**Intensive Variables**: Independent of system size (field properties)
+- Examples: Temperature, pressure, stress, strain, density, chemical potential
+- If you double the system size, these variables remain constant
+- Units are typically "per unit" quantities (Pa = N/m², K, dimensionless ratios)
+- In GSM: temperature T, stress σ, strain ε, thermodynamic forces driving internal processes
+
+**Conjugate Pairs**: Can be (intensive, extensive) or (intensive, intensive):
+- (T, S): Temperature × Entropy = thermal energy contribution (intensive × extensive)
+- (σ, ε): Stress × Strain = energy density (intensive × intensive, needs volume factor)
+- (Y, ω): Thermodynamic force × Internal variable = depends on the nature of the internal variable
+
 ## Standard Variable Categories
 
 ### 0. Thermal Variables
@@ -16,22 +37,22 @@ The GSM framework uses a systematic coupling between:
 - **Symbol**: `T`
 - **LaTeX**: `T`
 - **Codename**: `T`
-- **Physical meaning**: Absolute temperature (intensive variable)
+- **Physical meaning**: Absolute temperature
 - **Units**: Temperature units (e.g., K, °C)
-- **Nature**: Intensive thermodynamic variable
+- **Nature**: **Intensive** (field property, independent of system size)
 
 **Entropy**: `S`
 - **Symbol**: `S`
 - **LaTeX**: `S`
 - **Codename**: `S`
-- **Physical meaning**: System entropy (extensive variable)
+- **Physical meaning**: System entropy
 - **Units**: Energy per temperature units (e.g., J/K)
-- **Nature**: Extensive thermodynamic variable
+- **Nature**: **Extensive** (scales with system size/amount of material)
 
 **Conjugate Pair**: `(T, S)` form a thermodynamic conjugate pair where:
-- `T`: Controls thermal state (intensive)
-- `S`: Responds to thermal changes (extensive)
-- **Work term**: `T·S` (thermal work)
+- `T`: **Intensive** - controls thermal state
+- `S`: **Extensive** - responds to thermal changes
+- **Work term**: `T·S` (total thermal energy)
 
 ### 0.1. External Mechanical Variables
 
@@ -39,15 +60,22 @@ The GSM framework uses a systematic coupling between:
 - **Symbol**: `ε`
 - **LaTeX**: `\varepsilon`
 - **Codename**: `eps`
-- **Physical meaning**: Applied mechanical deformation (extensive variable)
-- **Nature**: Control variable in Helmholtz formulation
+- **Physical meaning**: Applied mechanical deformation ratio (displacement/length)
+- **Nature**: **Intensive** (dimensionless ratio, independent of system size)
+- **Usage**: Control variable in Helmholtz formulation
 
 **External Stress**: `sig` (external stress)
 - **Symbol**: `σ`
 - **LaTeX**: `\sigma`
 - **Codename**: `sig`
-- **Physical meaning**: Applied mechanical load (intensive variable)
-- **Nature**: Control variable in Gibbs formulation
+- **Physical meaning**: Applied mechanical load per unit area
+- **Nature**: **Intensive** (field property, force per unit area)
+- **Usage**: Control variable in Gibbs formulation
+
+**Conjugate Pair**: `(σ, ε)` form a mechanical conjugate pair where:
+- Both are **intensive** variables
+- Their product `σ·ε` gives energy density (energy per unit volume)
+- Total mechanical energy requires integration over volume: ∫(σ·ε)dV
 
 **Conjugate Pair**: `(sig, eps)` form a mechanical conjugate pair where:
 - **Work term**: `σ·ε` (mechanical work)
