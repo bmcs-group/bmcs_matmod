@@ -6,7 +6,7 @@ try:
     from bmcs_matmod.gsm_lagrange.core2.gsm_thermodyn_box import GSMThermodynBox
     print("✅ GSMThermodynBox2 imported successfully")
     
-    from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import GSMStateFn, StateFunction
+    from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import GSMStateFn, StateFunctionType
     print("✅ GSMStateFn and StateFunction imported successfully")
     
     from bmcs_matmod.gsm_lagrange.core2.gsm_vars import Scalar

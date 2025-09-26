@@ -17,7 +17,7 @@ making the framework more modular and extensible.
 import sympy as sp
 from typing import Dict, List, Optional, Tuple, Union
 from .gsm_state_fn_ifc import GSMStateFnIfc
-from .gsm_state_fn import GSMStateFn, StateFunction, NATURAL_VARIABLES_MAPPING, TRANSFORMATION_MAPPING
+from .gsm_state_fn import GSMStateFn, StateFunctionType, NATURAL_VARIABLES_MAPPING, TRANSFORMATION_MAPPING
 
 
 class GSMThermodynBox:
@@ -58,7 +58,7 @@ class GSMThermodynBox:
     """
     
     def __init__(self, 
-                 initial_state_fn: StateFunction,
+                 initial_state_fn: StateFunctionType,
                  initial_state_instance: GSMStateFnIfc):
         """
         Initialize the thermodynamic state function box.
@@ -68,7 +68,7 @@ class GSMThermodynBox:
             initial_state_instance: State function instance implementing GSMStateFnIfc
         """
         # Initialize state function storage
-        self.state_functions: Dict[StateFunction, GSMStateFnIfc] = {}
+        self.state_functions: Dict[StateFunctionType, GSMStateFnIfc] = {}
         self.current_state_fn = initial_state_fn
         
         # Store the initial state function
@@ -82,7 +82,7 @@ class GSMThermodynBox:
         # Validate the initial state function
         self._validate_state_function(initial_state_fn, initial_state_instance)
     
-    def _validate_state_function(self, state_fn: StateFunction, instance: GSMStateFnIfc) -> None:
+    def _validate_state_function(self, state_fn: StateFunctionType, instance: GSMStateFnIfc) -> None:
         """Validate that a state function instance matches expected variable organization."""
         expected_natural, expected_conjugate = NATURAL_VARIABLES_MAPPING[state_fn]
         
@@ -102,12 +102,12 @@ class GSMThermodynBox:
                 raise ValueError(f"State function instance type {instance.state_function_type} "
                                f"does not match expected type {state_fn}")
     
-    def set_state_function(self, state_fn: StateFunction, instance: GSMStateFnIfc) -> None:
+    def set_state_function(self, state_fn: StateFunctionType, instance: GSMStateFnIfc) -> None:
         """Set a specific state function instance."""
         self._validate_state_function(state_fn, instance)
         self.state_functions[state_fn] = instance
     
-    def get_state_function(self, state_fn: StateFunction) -> Optional[GSMStateFnIfc]:
+    def get_state_function(self, state_fn: StateFunctionType) -> Optional[GSMStateFnIfc]:
         """Get a specific state function instance."""
         return self.state_functions.get(state_fn)
     
@@ -115,14 +115,14 @@ class GSMThermodynBox:
         """Get the currently active state function instance."""
         return self.state_functions[self.current_state_fn]
     
-    def set_current_state_function(self, state_fn: StateFunction) -> None:
+    def set_current_state_function(self, state_fn: StateFunctionType) -> None:
         """Set the currently active state function."""
         if state_fn not in self.state_functions:
             raise ValueError(f"State function {state_fn} not available. "
                            f"Available: {list(self.state_functions.keys())}")
         self.current_state_fn = state_fn
     
-    def legendre_transform(self, target_state_fn: StateFunction) -> GSMStateFnIfc:
+    def legendre_transform(self, target_state_fn: StateFunctionType) -> GSMStateFnIfc:
         """
         Perform Legendre transformation from current to target state function.
         
@@ -208,7 +208,7 @@ class GSMThermodynBox:
             
             # Apply sign convention based on the state function type
             if hasattr(source_instance, 'state_function_type'):
-                if source_instance.state_function_type in [StateFunction.HELMHOLTZ, StateFunction.GIBBS]:
+                if source_instance.state_function_type in [StateFunctionType.HELMHOLTZ, StateFunctionType.GIBBS]:
                     # For F and G: S = -∂F/∂T, S = -∂G/∂T
                     th_y_from_source = -th_y_from_source
                 # For U and H: T = ∂U/∂S, T = ∂H/∂S (positive derivative)
@@ -252,7 +252,7 @@ class GSMThermodynBox:
         return expr
     
     def _create_target_state_function(self, 
-                                    target_state_fn: StateFunction,
+                                    target_state_fn: StateFunctionType,
                                     transformed_expr: sp.Expr,
                                     source_instance: GSMStateFnIfc) -> GSMStateFn:
         """Create a new state function instance for the target function."""
@@ -308,14 +308,14 @@ class GSMThermodynBox:
             state_function_type=target_state_fn
         )
     
-    def get_available_state_functions(self) -> List[StateFunction]:
+    def get_available_state_functions(self) -> List[StateFunctionType]:
         """Get list of currently available state functions."""
         return list(self.state_functions.keys())
     
-    def compute_all_state_functions(self) -> Dict[StateFunction, GSMStateFnIfc]:
+    def compute_all_state_functions(self) -> Dict[StateFunctionType, GSMStateFnIfc]:
         """Compute all four state functions by performing necessary transformations."""
-        target_functions = [StateFunction.INTERNAL_ENERGY, StateFunction.HELMHOLTZ, 
-                          StateFunction.ENTHALPY, StateFunction.GIBBS]
+        target_functions = [StateFunctionType.INTERNAL_ENERGY, StateFunctionType.HELMHOLTZ, 
+                          StateFunctionType.ENTHALPY, StateFunctionType.GIBBS]
         
         for target_fn in target_functions:
             if target_fn not in self.state_functions:
@@ -356,13 +356,13 @@ class GSMThermodynBox:
         print(f"Validation: {len(self.state_functions)} state functions available")
         return True
     
-    def get_transformation_graph(self) -> Dict[StateFunction, List[StateFunction]]:
+    def get_transformation_graph(self) -> Dict[StateFunctionType, List[StateFunctionType]]:
         """Get the graph of possible transformations from each state function."""
         graph = {}
         
-        for state_fn in StateFunction:
+        for state_fn in StateFunctionType:
             graph[state_fn] = []
-            for target_fn in StateFunction:
+            for target_fn in StateFunctionType:
                 if state_fn != target_fn and (state_fn, target_fn) in TRANSFORMATION_MAPPING:
                     graph[state_fn].append(target_fn)
         
@@ -377,11 +377,11 @@ class GSMThermodynBox:
         Returns the state function instance if available, otherwise computes it via 
         Legendre transformation from the current state function.
         """
-        if StateFunction.INTERNAL_ENERGY in self.state_functions:
-            return self.state_functions[StateFunction.INTERNAL_ENERGY]
+        if StateFunctionType.INTERNAL_ENERGY in self.state_functions:
+            return self.state_functions[StateFunctionType.INTERNAL_ENERGY]
         else:
             # Perform on-demand transformation
-            return self.legendre_transform(StateFunction.INTERNAL_ENERGY)
+            return self.legendre_transform(StateFunctionType.INTERNAL_ENERGY)
     
     @property
     def F(self) -> Optional[GSMStateFnIfc]:
@@ -391,11 +391,11 @@ class GSMThermodynBox:
         Returns the state function instance if available, otherwise computes it via 
         Legendre transformation from the current state function.
         """
-        if StateFunction.HELMHOLTZ in self.state_functions:
-            return self.state_functions[StateFunction.HELMHOLTZ]
+        if StateFunctionType.HELMHOLTZ in self.state_functions:
+            return self.state_functions[StateFunctionType.HELMHOLTZ]
         else:
             # Perform on-demand transformation
-            return self.legendre_transform(StateFunction.HELMHOLTZ)
+            return self.legendre_transform(StateFunctionType.HELMHOLTZ)
     
     @property
     def H(self) -> Optional[GSMStateFnIfc]:
@@ -405,11 +405,11 @@ class GSMThermodynBox:
         Returns the state function instance if available, otherwise computes it via 
         Legendre transformation from the current state function.
         """
-        if StateFunction.ENTHALPY in self.state_functions:
-            return self.state_functions[StateFunction.ENTHALPY]
+        if StateFunctionType.ENTHALPY in self.state_functions:
+            return self.state_functions[StateFunctionType.ENTHALPY]
         else:
             # Perform on-demand transformation
-            return self.legendre_transform(StateFunction.ENTHALPY)
+            return self.legendre_transform(StateFunctionType.ENTHALPY)
     
     @property
     def G(self) -> Optional[GSMStateFnIfc]:
@@ -419,11 +419,11 @@ class GSMThermodynBox:
         Returns the state function instance if available, otherwise computes it via 
         Legendre transformation from the current state function.
         """
-        if StateFunction.GIBBS in self.state_functions:
-            return self.state_functions[StateFunction.GIBBS]
+        if StateFunctionType.GIBBS in self.state_functions:
+            return self.state_functions[StateFunctionType.GIBBS]
         else:
             # Perform on-demand transformation
-            return self.legendre_transform(StateFunction.GIBBS)
+            return self.legendre_transform(StateFunctionType.GIBBS)
     
     def __repr__(self) -> str:
         """String representation of the thermodynamic box."""

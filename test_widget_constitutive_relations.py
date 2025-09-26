@@ -4,7 +4,7 @@ Test script to verify the enhanced GSM thermodynamic box widget with constitutiv
 """
 
 import sympy as sp
-from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import GSMStateFn, StateFunction
+from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import GSMStateFn, StateFunctionType
 from bmcs_matmod.gsm_lagrange.core2.gsm_thermodyn_box import GSMThermodynBox
 from bmcs_matmod.gsm_lagrange.core2.gsm_thermodyn_box_widget import GSMThermodynBoxWidget
 
@@ -28,7 +28,7 @@ def test_widget_with_constitutive_relations():
         mc_y_var=sig,    # Stress (conjugate) 
         Eps_var=Eps,     # Internal strain (natural)
         Sig_var=Sig,     # Internal stress (conjugate)
-        state_function_type=StateFunction.HELMHOLTZ
+        state_function_type=StateFunctionType.HELMHOLTZ
     )
     
     print("Testing enhanced widget with constitutive relations...")

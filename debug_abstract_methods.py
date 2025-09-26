@@ -25,7 +25,7 @@ try:
     
     import sympy as sp
     from bmcs_matmod.gsm_lagrange.core2.gsm_vars import Scalar
-    from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import StateFunction
+    from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import StateFunctionType
     
     T = Scalar('T', codename='T')
     S = Scalar('S', codename='S')
@@ -38,7 +38,7 @@ try:
         fn_expr=F_expr,
         th_x_var=T, th_y_var=S, mc_x_var=eps, mc_y_var=sig,
         Eps_var=sp.Symbol('eps_dummy'), Sig_var=sp.Symbol('sig_dummy'),
-        state_function_type=StateFunction.HELMHOLTZ
+        state_function_type=StateFunctionType.HELMHOLTZ
     )
     print("✅ GSMStateFn instance created successfully!")
     

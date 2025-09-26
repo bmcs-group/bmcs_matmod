@@ -12,7 +12,7 @@ def test_basic_gsm_functionality():
     try:
         # Import with full paths
         from bmcs_matmod.gsm_lagrange.core2.gsm_thermodyn_box2 import GSMThermodynBox2
-        from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import GSMStateFn, StateFunction
+        from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import GSMStateFn, StateFunctionType
         from bmcs_matmod.gsm_lagrange.core2.gsm_vars import Scalar
         print("✅ All imports successful")
         
@@ -31,7 +31,7 @@ def test_basic_gsm_functionality():
         # Create state function
         helmholtz_fn = GSMStateFn(
             name='helmholtz',
-            state_fn=StateFunction.F,
+            state_fn=StateFunctionType.F,
             description='Helmholtz Free Energy',
             state_variables=[T, eps],
             state_expr=F_expr

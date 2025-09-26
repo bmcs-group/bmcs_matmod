@@ -24,7 +24,7 @@ from pathlib import Path
 
 # Import the modules under test using full import paths
 from bmcs_matmod.gsm_lagrange.core2.gsm_thermodyn_box import GSMThermodynBox
-from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import GSMStateFn, StateFunction
+from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import GSMStateFn, StateFunctionType
 from bmcs_matmod.gsm_lagrange.core2.gsm_vars import Scalar
 
 
@@ -61,11 +61,11 @@ class TestGSMThermodynBoxRoundTrips:
             mc_y_var=sig,    # Stress is conjugate variable
             Eps_var=sp.Symbol('eps_dummy'),  # Dummy internal variable
             Sig_var=sp.Symbol('sig_dummy'),  # Dummy internal conjugate
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         return GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn
         )
     
@@ -86,11 +86,11 @@ class TestGSMThermodynBoxRoundTrips:
             mc_y_var=sig,    # Stress is conjugate variable
             Eps_var=omega,   # Internal natural variable (damage)
             Sig_var=Y,       # Internal conjugate variable (stored energy)
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         return GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn
         )
     
@@ -112,11 +112,11 @@ class TestGSMThermodynBoxRoundTrips:
             mc_y_var=sig,    # Stress is conjugate variable
             Eps_var=alpha,   # Thermal parameter as internal variable
             Sig_var=sp.Symbol('alpha_conj'),  # Dummy conjugate
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         return GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn
         )
     
@@ -127,10 +127,10 @@ class TestGSMThermodynBoxRoundTrips:
         F_original_expr = F_original.fn_expr
         
         # Transform F→G→F
-        G_instance = elastic_box.legendre_transform(StateFunction.GIBBS)
-        elastic_box.set_current_state_function(StateFunction.GIBBS)
+        G_instance = elastic_box.legendre_transform(StateFunctionType.GIBBS)
+        elastic_box.set_current_state_function(StateFunctionType.GIBBS)
         
-        F_recovered_instance = elastic_box.legendre_transform(StateFunction.HELMHOLTZ)
+        F_recovered_instance = elastic_box.legendre_transform(StateFunctionType.HELMHOLTZ)
         F_recovered_expr = F_recovered_instance.fn_expr
         
         # Check exact equality (difference = 0)
@@ -142,10 +142,10 @@ class TestGSMThermodynBoxRoundTrips:
         F_original = elastic_box.get_current_state_function()
         F_original_expr = F_original.fn_expr
         
-        U_instance = elastic_box.legendre_transform(StateFunction.INTERNAL_ENERGY)
-        elastic_box.set_current_state_function(StateFunction.INTERNAL_ENERGY)
+        U_instance = elastic_box.legendre_transform(StateFunctionType.INTERNAL_ENERGY)
+        elastic_box.set_current_state_function(StateFunctionType.INTERNAL_ENERGY)
         
-        F_recovered_instance = elastic_box.legendre_transform(StateFunction.HELMHOLTZ)
+        F_recovered_instance = elastic_box.legendre_transform(StateFunctionType.HELMHOLTZ)
         F_recovered_expr = F_recovered_instance.fn_expr
         
         difference = sp.simplify(F_recovered_expr - F_original_expr)
@@ -154,14 +154,14 @@ class TestGSMThermodynBoxRoundTrips:
     def test_round_trip_G_to_H_to_G_elastic(self, elastic_box):
         """Test G→H→G round-trip for elastic material."""
         # First get G
-        G_instance = elastic_box.legendre_transform(StateFunction.GIBBS)
+        G_instance = elastic_box.legendre_transform(StateFunctionType.GIBBS)
         G_original_expr = G_instance.fn_expr
-        elastic_box.set_current_state_function(StateFunction.GIBBS)
+        elastic_box.set_current_state_function(StateFunctionType.GIBBS)
         
-        H_instance = elastic_box.legendre_transform(StateFunction.ENTHALPY)
-        elastic_box.set_current_state_function(StateFunction.ENTHALPY)
+        H_instance = elastic_box.legendre_transform(StateFunctionType.ENTHALPY)
+        elastic_box.set_current_state_function(StateFunctionType.ENTHALPY)
         
-        G_recovered_instance = elastic_box.legendre_transform(StateFunction.GIBBS)
+        G_recovered_instance = elastic_box.legendre_transform(StateFunctionType.GIBBS)
         G_recovered_expr = G_recovered_instance.fn_expr
         
         difference = sp.simplify(G_recovered_expr - G_original_expr)
@@ -170,14 +170,14 @@ class TestGSMThermodynBoxRoundTrips:
     def test_round_trip_U_to_G_to_U_elastic(self, elastic_box):
         """Test U→G→U round-trip (diagonal transformation) for elastic material."""
         # First get U
-        U_instance = elastic_box.legendre_transform(StateFunction.INTERNAL_ENERGY)
+        U_instance = elastic_box.legendre_transform(StateFunctionType.INTERNAL_ENERGY)
         U_original_expr = U_instance.fn_expr
-        elastic_box.set_current_state_function(StateFunction.INTERNAL_ENERGY)
+        elastic_box.set_current_state_function(StateFunctionType.INTERNAL_ENERGY)
         
-        G_instance = elastic_box.legendre_transform(StateFunction.GIBBS)
-        elastic_box.set_current_state_function(StateFunction.GIBBS)
+        G_instance = elastic_box.legendre_transform(StateFunctionType.GIBBS)
+        elastic_box.set_current_state_function(StateFunctionType.GIBBS)
         
-        U_recovered_instance = elastic_box.legendre_transform(StateFunction.INTERNAL_ENERGY)
+        U_recovered_instance = elastic_box.legendre_transform(StateFunctionType.INTERNAL_ENERGY)
         U_recovered_expr = U_recovered_instance.fn_expr
         
         difference = sp.simplify(U_recovered_expr - U_original_expr)
@@ -186,14 +186,14 @@ class TestGSMThermodynBoxRoundTrips:
     def test_round_trip_H_to_F_to_H_elastic(self, elastic_box):
         """Test H→F→H round-trip (diagonal transformation) for elastic material."""
         # First get H
-        H_instance = elastic_box.legendre_transform(StateFunction.ENTHALPY)
+        H_instance = elastic_box.legendre_transform(StateFunctionType.ENTHALPY)
         H_original_expr = H_instance.fn_expr
-        elastic_box.set_current_state_function(StateFunction.ENTHALPY)
+        elastic_box.set_current_state_function(StateFunctionType.ENTHALPY)
         
-        F_instance = elastic_box.legendre_transform(StateFunction.HELMHOLTZ)
-        elastic_box.set_current_state_function(StateFunction.HELMHOLTZ)
+        F_instance = elastic_box.legendre_transform(StateFunctionType.HELMHOLTZ)
+        elastic_box.set_current_state_function(StateFunctionType.HELMHOLTZ)
         
-        H_recovered_instance = elastic_box.legendre_transform(StateFunction.ENTHALPY)
+        H_recovered_instance = elastic_box.legendre_transform(StateFunctionType.ENTHALPY)
         H_recovered_expr = H_recovered_instance.fn_expr
         
         difference = sp.simplify(H_recovered_expr - H_original_expr)
@@ -206,9 +206,9 @@ class TestGSMThermodynBoxRoundTrips:
         F_orig_expr = F_orig_instance.fn_expr
         
         # Get other state functions
-        G_orig_instance = damage_box.legendre_transform(StateFunction.GIBBS)
-        U_orig_instance = damage_box.legendre_transform(StateFunction.INTERNAL_ENERGY)
-        H_orig_instance = damage_box.legendre_transform(StateFunction.ENTHALPY)
+        G_orig_instance = damage_box.legendre_transform(StateFunctionType.GIBBS)
+        U_orig_instance = damage_box.legendre_transform(StateFunctionType.INTERNAL_ENERGY)
+        H_orig_instance = damage_box.legendre_transform(StateFunctionType.ENTHALPY)
         
         G_orig_expr = G_orig_instance.fn_expr
         U_orig_expr = U_orig_instance.fn_expr
@@ -216,9 +216,9 @@ class TestGSMThermodynBoxRoundTrips:
         
         # Test key round-trips
         round_trips = [
-            (StateFunction.HELMHOLTZ, StateFunction.GIBBS, StateFunction.HELMHOLTZ, F_orig_expr, F_orig_instance),
-            (StateFunction.HELMHOLTZ, StateFunction.INTERNAL_ENERGY, StateFunction.HELMHOLTZ, F_orig_expr, F_orig_instance),
-            (StateFunction.GIBBS, StateFunction.ENTHALPY, StateFunction.GIBBS, G_orig_expr, G_orig_instance),
+            (StateFunctionType.HELMHOLTZ, StateFunctionType.GIBBS, StateFunctionType.HELMHOLTZ, F_orig_expr, F_orig_instance),
+            (StateFunctionType.HELMHOLTZ, StateFunctionType.INTERNAL_ENERGY, StateFunctionType.HELMHOLTZ, F_orig_expr, F_orig_instance),
+            (StateFunctionType.GIBBS, StateFunctionType.ENTHALPY, StateFunctionType.GIBBS, G_orig_expr, G_orig_instance),
         ]
         
         for start_fn, intermediate_fn, end_fn, original_expr, start_instance in round_trips:
@@ -242,10 +242,10 @@ class TestGSMThermodynBoxRoundTrips:
         F_original_expr = F_original.fn_expr
         
         # Test F→U→F round-trip (thermal transformation)
-        U_instance = thermal_expansion_box.legendre_transform(StateFunction.INTERNAL_ENERGY)
-        thermal_expansion_box.set_current_state_function(StateFunction.INTERNAL_ENERGY)
+        U_instance = thermal_expansion_box.legendre_transform(StateFunctionType.INTERNAL_ENERGY)
+        thermal_expansion_box.set_current_state_function(StateFunctionType.INTERNAL_ENERGY)
         
-        F_recovered_instance = thermal_expansion_box.legendre_transform(StateFunction.HELMHOLTZ)
+        F_recovered_instance = thermal_expansion_box.legendre_transform(StateFunctionType.HELMHOLTZ)
         F_recovered_expr = F_recovered_instance.fn_expr
         
         difference = sp.simplify(F_recovered_expr - F_original_expr)
@@ -279,11 +279,11 @@ class TestGSMThermodynBoxPropertyAccess:
             fn_expr=F_damage,
             th_x_var=T, th_y_var=S, mc_x_var=eps, mc_y_var=sig,
             Eps_var=omega, Sig_var=Y,
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         return GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn
         )
     
@@ -296,10 +296,10 @@ class TestGSMThermodynBoxPropertyAccess:
         H_prop = test_box.H
         
         # Get via explicit access
-        F_explicit = test_box.get_state_function(StateFunction.HELMHOLTZ) or test_box.legendre_transform(StateFunction.HELMHOLTZ)
-        G_explicit = test_box.get_state_function(StateFunction.GIBBS) or test_box.legendre_transform(StateFunction.GIBBS)
-        U_explicit = test_box.get_state_function(StateFunction.INTERNAL_ENERGY) or test_box.legendre_transform(StateFunction.INTERNAL_ENERGY)
-        H_explicit = test_box.get_state_function(StateFunction.ENTHALPY) or test_box.legendre_transform(StateFunction.ENTHALPY)
+        F_explicit = test_box.get_state_function(StateFunctionType.HELMHOLTZ) or test_box.legendre_transform(StateFunctionType.HELMHOLTZ)
+        G_explicit = test_box.get_state_function(StateFunctionType.GIBBS) or test_box.legendre_transform(StateFunctionType.GIBBS)
+        U_explicit = test_box.get_state_function(StateFunctionType.INTERNAL_ENERGY) or test_box.legendre_transform(StateFunctionType.INTERNAL_ENERGY)
+        H_explicit = test_box.get_state_function(StateFunctionType.ENTHALPY) or test_box.legendre_transform(StateFunctionType.ENTHALPY)
         
         # Check consistency
         assert sp.simplify(F_prop.fn_expr - F_explicit.fn_expr) == 0, "F property inconsistent"
@@ -311,30 +311,30 @@ class TestGSMThermodynBoxPropertyAccess:
         """Test that state functions are properly stored and retrievable."""
         # Initially only F should be available
         initial_functions = test_box.get_available_state_functions()
-        assert StateFunction.HELMHOLTZ in initial_functions, "Initial F not available"
+        assert StateFunctionType.HELMHOLTZ in initial_functions, "Initial F not available"
         
         # Transform to G and check it's stored
-        G_instance = test_box.legendre_transform(StateFunction.GIBBS)
+        G_instance = test_box.legendre_transform(StateFunctionType.GIBBS)
         available_after_G = test_box.get_available_state_functions()
-        assert StateFunction.GIBBS in available_after_G, "G not stored after transformation"
+        assert StateFunctionType.GIBBS in available_after_G, "G not stored after transformation"
         
         # Retrieve G and check it's the same instance
-        G_retrieved = test_box.get_state_function(StateFunction.GIBBS)
+        G_retrieved = test_box.get_state_function(StateFunctionType.GIBBS)
         assert G_retrieved is G_instance, "Retrieved G is not the same instance"
     
     def test_current_state_function_management(self, test_box):
         """Test current state function setting and getting."""
         # Initially should be F (HELMHOLTZ)
-        assert test_box.current_state_fn == StateFunction.HELMHOLTZ, "Initial current state function incorrect"
+        assert test_box.current_state_fn == StateFunctionType.HELMHOLTZ, "Initial current state function incorrect"
         
         # Change current state function
-        test_box.legendre_transform(StateFunction.GIBBS)
-        test_box.set_current_state_function(StateFunction.GIBBS)
-        assert test_box.current_state_fn == StateFunction.GIBBS, "Current state function not updated to G"
+        test_box.legendre_transform(StateFunctionType.GIBBS)
+        test_box.set_current_state_function(StateFunctionType.GIBBS)
+        assert test_box.current_state_fn == StateFunctionType.GIBBS, "Current state function not updated to G"
         
         # Get current state function instance
         current_instance = test_box.get_current_state_function()
-        G_instance = test_box.get_state_function(StateFunction.GIBBS)
+        G_instance = test_box.get_state_function(StateFunctionType.GIBBS)
         assert current_instance is G_instance, "Current state function instance incorrect"
 
 
@@ -365,11 +365,11 @@ class TestGSMThermodynBoxConstitutiveRelations:
             fn_expr=F_damage,
             th_x_var=T, th_y_var=S, mc_x_var=eps, mc_y_var=sig,
             Eps_var=omega, Sig_var=Y,
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         return GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn
         )
     
@@ -453,11 +453,11 @@ class TestGSMThermodynBoxFrameworkValidation:
             fn_expr=F_elastic,
             th_x_var=T, th_y_var=S, mc_x_var=eps, mc_y_var=sig,
             Eps_var=sp.Symbol('eps_dummy'), Sig_var=sp.Symbol('sig_dummy'),
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         box = GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn
         )
         
@@ -484,11 +484,11 @@ class TestGSMThermodynBoxFrameworkValidation:
             fn_expr=F_test,
             th_x_var=T, th_y_var=S, mc_x_var=eps, mc_y_var=sig,
             Eps_var=sp.Symbol('eps_dummy'), Sig_var=sp.Symbol('sig_dummy'),
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         box = GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn
         )
         
@@ -496,8 +496,8 @@ class TestGSMThermodynBoxFrameworkValidation:
         all_functions = box.compute_all_state_functions()
         
         # Check that all four functions are available
-        expected_functions = {StateFunction.INTERNAL_ENERGY, StateFunction.HELMHOLTZ, 
-                            StateFunction.ENTHALPY, StateFunction.GIBBS}
+        expected_functions = {StateFunctionType.INTERNAL_ENERGY, StateFunctionType.HELMHOLTZ, 
+                            StateFunctionType.ENTHALPY, StateFunctionType.GIBBS}
         actual_functions = set(all_functions.keys())
         
         assert actual_functions == expected_functions, f"Not all state functions computed. Got: {actual_functions}"
@@ -516,11 +516,11 @@ class TestGSMThermodynBoxFrameworkValidation:
             fn_expr=F_test,
             th_x_var=T, th_y_var=S, mc_x_var=eps, mc_y_var=sig,
             Eps_var=sp.Symbol('eps_dummy'), Sig_var=sp.Symbol('sig_dummy'),
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         box = GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn
         )
         
@@ -550,11 +550,11 @@ class TestGSMThermodynBoxFrameworkValidation:
             fn_expr=F_test,
             th_x_var=T, th_y_var=S, mc_x_var=eps, mc_y_var=sig,
             Eps_var=sp.Symbol('eps_dummy'), Sig_var=sp.Symbol('sig_dummy'),
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         box = GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn
         )
         
@@ -563,7 +563,7 @@ class TestGSMThermodynBoxFrameworkValidation:
         
         # Check structure
         assert isinstance(graph, dict), "Transformation graph not returned as dict"
-        for state_fn in StateFunction:
+        for state_fn in StateFunctionType:
             assert state_fn in graph, f"State function {state_fn} not in graph"
             assert isinstance(graph[state_fn], list), f"Graph entry for {state_fn} not a list"
     
@@ -576,11 +576,11 @@ class TestGSMThermodynBoxFrameworkValidation:
             fn_expr=F_test,
             th_x_var=T, th_y_var=S, mc_x_var=eps, mc_y_var=sig,
             Eps_var=sp.Symbol('eps_dummy'), Sig_var=sp.Symbol('sig_dummy'),
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         box = GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn
         )
         
@@ -615,21 +615,21 @@ class TestGSMThermodynBoxEdgeCases:
             fn_expr=F_linear,
             th_x_var=T, th_y_var=S, mc_x_var=eps, mc_y_var=sig,
             Eps_var=sp.Symbol('eps_dummy'), Sig_var=sp.Symbol('sig_dummy'),
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         box = GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn
         )
         
         # Test F→G→F round-trip for linear case
         F_original = box.F.fn_expr
         
-        G_instance = box.legendre_transform(StateFunction.GIBBS)
-        box.set_current_state_function(StateFunction.GIBBS)
+        G_instance = box.legendre_transform(StateFunctionType.GIBBS)
+        box.set_current_state_function(StateFunctionType.GIBBS)
         
-        F_recovered_instance = box.legendre_transform(StateFunction.HELMHOLTZ)
+        F_recovered_instance = box.legendre_transform(StateFunctionType.HELMHOLTZ)
         F_recovered = F_recovered_instance.fn_expr
         
         difference = sp.simplify(F_recovered - F_original)
@@ -646,11 +646,11 @@ class TestGSMThermodynBoxEdgeCases:
             fn_expr=F_zero,
             th_x_var=T, th_y_var=S, mc_x_var=eps, mc_y_var=sig,
             Eps_var=sp.Symbol('eps_dummy'), Sig_var=sp.Symbol('sig_dummy'),
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         box = GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn)
         
         # Test F→G→F round-trip for zero function
@@ -660,10 +660,10 @@ class TestGSMThermodynBoxEdgeCases:
         assert F_original == 0, "Zero function not preserved"
         
         # Perform round-trip
-        G_instance = box.legendre_transform(StateFunction.GIBBS)
-        box.set_current_state_function(StateFunction.GIBBS)
+        G_instance = box.legendre_transform(StateFunctionType.GIBBS)
+        box.set_current_state_function(StateFunctionType.GIBBS)
         
-        F_recovered_instance = box.legendre_transform(StateFunction.HELMHOLTZ)
+        F_recovered_instance = box.legendre_transform(StateFunctionType.HELMHOLTZ)
         F_recovered = F_recovered_instance.fn_expr
         
         assert F_recovered == 0, "Zero function round-trip failed"
@@ -677,17 +677,17 @@ class TestGSMThermodynBoxEdgeCases:
             fn_expr=F_test,
             th_x_var=T, th_y_var=S, mc_x_var=eps, mc_y_var=sig,
             Eps_var=sp.Symbol('eps_dummy'), Sig_var=sp.Symbol('sig_dummy'),
-            state_function_type=StateFunction.HELMHOLTZ
+            state_function_type=StateFunctionType.HELMHOLTZ
         )
         
         box = GSMThermodynBox(
-            initial_state_fn=StateFunction.HELMHOLTZ,
+            initial_state_fn=StateFunctionType.HELMHOLTZ,
             initial_state_instance=F_state_fn
         )
         
         # Try to set current to unavailable state function
         with pytest.raises(ValueError, match="not available"):
-            box.set_current_state_function(StateFunction.GIBBS)  # G not computed yet
+            box.set_current_state_function(StateFunctionType.GIBBS)  # G not computed yet
 
 
 @pytest.mark.integration
@@ -695,7 +695,7 @@ def test_comprehensive_gsm_thermodyn_box2_validation():
     """Integration test that runs a comprehensive validation."""
     # Import here to ensure proper module loading
     from bmcs_matmod.gsm_lagrange.core2.gsm_thermodyn_box import GSMThermodynBox
-    from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import GSMStateFn, StateFunction
+    from bmcs_matmod.gsm_lagrange.core2.gsm_state_fn import GSMStateFn, StateFunctionType
     from bmcs_matmod.gsm_lagrange.core2.gsm_vars import Scalar
     
     # Symbols
@@ -714,11 +714,11 @@ def test_comprehensive_gsm_thermodyn_box2_validation():
         fn_expr=F_damage,
         th_x_var=T, th_y_var=S, mc_x_var=eps, mc_y_var=sig,
         Eps_var=omega, Sig_var=Y,
-        state_function_type=StateFunction.HELMHOLTZ
+        state_function_type=StateFunctionType.HELMHOLTZ
     )
     
     box = GSMThermodynBox(
-        initial_state_fn=StateFunction.HELMHOLTZ,
+        initial_state_fn=StateFunctionType.HELMHOLTZ,
         initial_state_instance=F_state_fn
     )
     
@@ -730,9 +730,9 @@ def test_comprehensive_gsm_thermodyn_box2_validation():
     
     # Test key round-trips
     round_trip_tests = [
-        (StateFunction.HELMHOLTZ, StateFunction.GIBBS, F_original),
-        (StateFunction.HELMHOLTZ, StateFunction.INTERNAL_ENERGY, F_original),
-        (StateFunction.GIBBS, StateFunction.ENTHALPY, G_original),
+        (StateFunctionType.HELMHOLTZ, StateFunctionType.GIBBS, F_original),
+        (StateFunctionType.HELMHOLTZ, StateFunctionType.INTERNAL_ENERGY, F_original),
+        (StateFunctionType.GIBBS, StateFunctionType.ENTHALPY, G_original),
     ]
     
     for start_fn, intermediate_fn, original in round_trip_tests:
@@ -752,7 +752,7 @@ def test_comprehensive_gsm_thermodyn_box2_validation():
         assert difference == 0, f"Integration test: round-trip {start_fn.value}→{intermediate_fn.value}→{start_fn.value} failed, difference = {difference}"
     
     # Test constitutive relations
-    box.set_current_state_function(StateFunction.HELMHOLTZ)  # Reset to clean state
+    box.set_current_state_function(StateFunctionType.HELMHOLTZ)  # Reset to clean state
     
     F_fresh = box.F.fn_expr
     G_fresh = box.G.fn_expr

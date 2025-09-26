@@ -31,9 +31,8 @@ Visual Indicators:
 import ipywidgets as widgets
 from IPython.display import display, Math, clear_output
 import sympy as sp
-from typing import Dict, Optional
+from typing import Dict
 from .gsm_thermodyn_box import GSMThermodynBox
-from .gsm_state_fn import StateFunction
 
 
 class GSMThermodynBoxWidget:

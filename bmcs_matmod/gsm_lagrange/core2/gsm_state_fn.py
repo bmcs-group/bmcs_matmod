@@ -15,7 +15,7 @@ from .gsm_state_fn_ifc import GSMStateFnIfc
 from .gsm_vars import markdown_vars_table
 
 
-class StateFunction(Enum):
+class StateFunctionType(Enum):
     """Enumeration of the four fundamental thermodynamic state functions."""
     INTERNAL_ENERGY = "U"      # U(S, ε, Ɛ) 
     HELMHOLTZ = "F"            # F(T, ε, Ɛ)
@@ -31,31 +31,31 @@ class VarTableType(Enum):
 
 
 # Class-level mapping of natural and conjugate variables for each state function
-NATURAL_VARIABLES_MAPPING: Dict[StateFunction, Tuple[List[str], List[str]]] = {
+NATURAL_VARIABLES_MAPPING: Dict[StateFunctionType, Tuple[List[str], List[str]]] = {
     # State function: (natural variables, conjugate variables)
-    StateFunction.INTERNAL_ENERGY: (['S', 'eps', 'Eps'], ['T', 'sig', 'Sig']),  # U(S,ε,Ɛ)
-    StateFunction.HELMHOLTZ:       (['T', 'eps', 'Eps'], ['S', 'sig', 'Sig']),  # F(T,ε,Ɛ)  
-    StateFunction.ENTHALPY:        (['S', 'sig', 'Eps'], ['T', 'eps', 'Sig']),  # H(S,σ,Ɛ)
-    StateFunction.GIBBS:           (['T', 'sig', 'Eps'], ['S', 'eps', 'Sig']),  # G(T,σ,Ɛ)
+    StateFunctionType.INTERNAL_ENERGY: (['S', 'eps', 'Eps'], ['T', 'sig', 'Sig']),  # U(S,ε,Ɛ)
+    StateFunctionType.HELMHOLTZ:       (['T', 'eps', 'Eps'], ['S', 'sig', 'Sig']),  # F(T,ε,Ɛ)  
+    StateFunctionType.ENTHALPY:        (['S', 'sig', 'Eps'], ['T', 'eps', 'Sig']),  # H(S,σ,Ɛ)
+    StateFunctionType.GIBBS:           (['T', 'sig', 'Eps'], ['S', 'eps', 'Sig']),  # G(T,σ,Ɛ)
 }
 
 # Transformation mapping for Legendre transformations
-TRANSFORMATION_MAPPING: Dict[Tuple[StateFunction, StateFunction], Tuple[int, int]] = {
+TRANSFORMATION_MAPPING: Dict[Tuple[StateFunctionType, StateFunctionType], Tuple[int, int]] = {
     # Direct (adjacent) transformations
-    (StateFunction.INTERNAL_ENERGY, StateFunction.HELMHOLTZ):   (-1,  0),  # U → F: F = U - TS
-    (StateFunction.HELMHOLTZ, StateFunction.INTERNAL_ENERGY):   ( 1,  0),  # F → U: U = F + TS
-    (StateFunction.INTERNAL_ENERGY, StateFunction.ENTHALPY):    ( 0,  1),  # U → H: H = U + σε
-    (StateFunction.ENTHALPY, StateFunction.INTERNAL_ENERGY):    ( 0, -1),  # H → U: U = H - σε
-    (StateFunction.HELMHOLTZ, StateFunction.GIBBS):             ( 0, -1),  # F → G: G = F - εσ
-    (StateFunction.GIBBS, StateFunction.HELMHOLTZ):             ( 0,  1),  # G → F: F = G + εσ
-    (StateFunction.ENTHALPY, StateFunction.GIBBS):              (-1,  0),  # H → G: G = H - TS
-    (StateFunction.GIBBS, StateFunction.ENTHALPY):              ( 1,  0),  # G → H: H = G + TS
+    (StateFunctionType.INTERNAL_ENERGY, StateFunctionType.HELMHOLTZ):   (-1,  0),  # U → F: F = U - TS
+    (StateFunctionType.HELMHOLTZ, StateFunctionType.INTERNAL_ENERGY):   ( 1,  0),  # F → U: U = F + TS
+    (StateFunctionType.INTERNAL_ENERGY, StateFunctionType.ENTHALPY):    ( 0,  1),  # U → H: H = U + σε
+    (StateFunctionType.ENTHALPY, StateFunctionType.INTERNAL_ENERGY):    ( 0, -1),  # H → U: U = H - σε
+    (StateFunctionType.HELMHOLTZ, StateFunctionType.GIBBS):             ( 0, -1),  # F → G: G = F - εσ
+    (StateFunctionType.GIBBS, StateFunctionType.HELMHOLTZ):             ( 0,  1),  # G → F: F = G + εσ
+    (StateFunctionType.ENTHALPY, StateFunctionType.GIBBS):              (-1,  0),  # H → G: G = H - TS
+    (StateFunctionType.GIBBS, StateFunctionType.ENTHALPY):              ( 1,  0),  # G → H: H = G + TS
     
     # Diagonal (two-step) transformations
-    (StateFunction.INTERNAL_ENERGY, StateFunction.GIBBS):       (-1, -1),  # U → G: G = U - TS - εσ
-    (StateFunction.GIBBS, StateFunction.INTERNAL_ENERGY):       ( 1,  1),  # G → U: U = G + TS + εσ
-    (StateFunction.HELMHOLTZ, StateFunction.ENTHALPY):          ( 1, -1),  # F → H: H = F + TS - εσ
-    (StateFunction.ENTHALPY, StateFunction.HELMHOLTZ):          (-1,  1),  # H → F: F = H - TS + εσ
+    (StateFunctionType.INTERNAL_ENERGY, StateFunctionType.GIBBS):       (-1, -1),  # U → G: G = U - TS - εσ
+    (StateFunctionType.GIBBS, StateFunctionType.INTERNAL_ENERGY):       ( 1,  1),  # G → U: U = G + TS + εσ
+    (StateFunctionType.HELMHOLTZ, StateFunctionType.ENTHALPY):          ( 1, -1),  # F → H: H = F + TS - εσ
+    (StateFunctionType.ENTHALPY, StateFunctionType.HELMHOLTZ):          (-1,  1),  # H → F: F = H - TS + εσ
 }
 
 
@@ -85,7 +85,7 @@ class GSMStateFn(GSMStateFnIfc):
                  mc_y_var: sp.Symbol,  # Mechanical conjugate (σ or ε)
                  Eps_var: Union[sp.Symbol, Tuple[sp.Symbol, ...]],   # Internal natural (Ɛ)
                  Sig_var: Union[sp.Symbol, Tuple[sp.Symbol, ...]],   # Internal conjugate (𝒮)
-                 state_function_type: StateFunction):
+                 state_function_type: StateFunctionType):
         """
         Initialize state function with expression and variable organization.
         
@@ -118,7 +118,7 @@ class GSMStateFn(GSMStateFnIfc):
         self._validate_variable_organization()
     
     @property
-    def state_function_type(self) -> StateFunction:
+    def state_function_type(self) -> StateFunctionType:
         """The type of state function (U, F, H, G)."""
         return self._state_function_type
     
@@ -255,7 +255,7 @@ class GSMStateFn(GSMStateFnIfc):
         expected_natural, _ = NATURAL_VARIABLES_MAPPING[self._state_function_type]
         return 'sig' in expected_natural
     
-    def get_legendre_transformation_targets(self) -> List[StateFunction]:
+    def get_legendre_transformation_targets(self) -> List[StateFunctionType]:
         """Get possible Legendre transformation targets from this state function."""
         targets = []
         for (source, target), _ in TRANSFORMATION_MAPPING.items():
@@ -282,13 +282,13 @@ class GSMStateFn(GSMStateFnIfc):
         
         # Pattern matching for state function detection
         if 's' in th_x_name and ('eps' in mc_x_name or 'epsilon' in mc_x_name):
-            detected_type = StateFunction.INTERNAL_ENERGY  # U(S, ε, Ɛ)
+            detected_type = StateFunctionType.INTERNAL_ENERGY  # U(S, ε, Ɛ)
         elif 't' in th_x_name and ('eps' in mc_x_name or 'epsilon' in mc_x_name):
-            detected_type = StateFunction.HELMHOLTZ       # F(T, ε, Ɛ)
+            detected_type = StateFunctionType.HELMHOLTZ       # F(T, ε, Ɛ)
         elif 's' in th_x_name and ('sig' in mc_x_name or 'sigma' in mc_x_name):
-            detected_type = StateFunction.ENTHALPY        # H(S, σ, Ɛ)
+            detected_type = StateFunctionType.ENTHALPY        # H(S, σ, Ɛ)
         elif 't' in th_x_name and ('sig' in mc_x_name or 'sigma' in mc_x_name):
-            detected_type = StateFunction.GIBBS           # G(T, σ, Ɛ)
+            detected_type = StateFunctionType.GIBBS           # G(T, σ, Ɛ)
         
         return cls(fn_expr, th_x_var, th_y_var, mc_x_var, mc_y_var, 
                   Eps_var, Sig_var, detected_type)
@@ -518,3 +518,215 @@ class GSMStateFn(GSMStateFnIfc):
         natural_vars = [str(var) for var in self.get_natural_variables()]
         type_info = self._state_function_type.value
         return f"GSMStateFn[{type_info}](f({', '.join(natural_vars)}) = {self.fn_expr})"
+
+
+# ============================================================================
+# Thermodynamic State Function Subclasses
+# ============================================================================
+
+class GSMHelmholtzFn(GSMStateFn):
+    """
+    Helmholtz Free Energy state function: F(T, ε, Ɛ)
+    
+    Natural variables: T (temperature), eps (strain), Eps (internal strain)
+    Conjugate variables: S (entropy), sig (stress), Sig (internal stress)
+    
+    This subclass provides explicit variable attributes and establishes the
+    correct mapping to the general framework variables.
+    """
+    
+    def __init__(self,
+                 fn_expr: sp.Expr,
+                 T: sp.Symbol,         # Temperature (thermal natural)
+                 S: sp.Symbol,         # Entropy (thermal conjugate) 
+                 eps: sp.Symbol,       # Strain (mechanical natural)
+                 sig: sp.Symbol,       # Stress (mechanical conjugate)
+                 Eps: Union[sp.Symbol, Tuple[sp.Symbol, ...]] = None,  # Internal natural
+                 Sig: Union[sp.Symbol, Tuple[sp.Symbol, ...]] = None): # Internal conjugate
+        """
+        Initialize Helmholtz free energy state function.
+        
+        Args:
+            fn_expr: Sympy expression F(T, ε, Ɛ)
+            T: Temperature symbol (natural thermal variable)
+            S: Entropy symbol (conjugate thermal variable)
+            eps: Strain symbol (natural mechanical variable) 
+            sig: Stress symbol (conjugate mechanical variable)
+            Eps: Internal strain symbol(s) (natural internal variables)
+            Sig: Internal stress symbol(s) (conjugate internal variables)
+        """
+        # Store explicit variable attributes for type safety and clarity
+        self.T = T
+        self.S = S  
+        self.eps = eps
+        self.sig = sig
+        self.Eps = Eps
+        self.Sig = Sig
+        
+        # Initialize base class with correct mapping: F(T, ε, Ɛ)
+        super().__init__(
+            fn_expr=fn_expr,
+            th_x_var=T,      # Temperature is natural
+            th_y_var=S,      # Entropy is conjugate  
+            mc_x_var=eps,    # Strain is natural
+            mc_y_var=sig,    # Stress is conjugate
+            Eps_var=Eps,     # Internal strain (natural)
+            Sig_var=Sig,     # Internal stress (conjugate)
+            state_function_type=StateFunctionType.HELMHOLTZ
+        )
+
+
+class GSMGibbsFn(GSMStateFn):
+    """
+    Gibbs Free Energy state function: G(T, σ, Ɛ)
+    
+    Natural variables: T (temperature), sig (stress), Eps (internal strain)
+    Conjugate variables: S (entropy), eps (strain), Sig (internal stress)
+    
+    This subclass provides explicit variable attributes and establishes the
+    correct mapping to the general framework variables.
+    """
+    
+    def __init__(self,
+                 fn_expr: sp.Expr,
+                 T: sp.Symbol,         # Temperature (thermal natural)
+                 S: sp.Symbol,         # Entropy (thermal conjugate)
+                 sig: sp.Symbol,       # Stress (mechanical natural)
+                 eps: sp.Symbol,       # Strain (mechanical conjugate)
+                 Eps: Union[sp.Symbol, Tuple[sp.Symbol, ...]] = None,  # Internal natural
+                 Sig: Union[sp.Symbol, Tuple[sp.Symbol, ...]] = None): # Internal conjugate
+        """
+        Initialize Gibbs free energy state function.
+        
+        Args:
+            fn_expr: Sympy expression G(T, σ, Ɛ)
+            T: Temperature symbol (natural thermal variable)
+            S: Entropy symbol (conjugate thermal variable)
+            sig: Stress symbol (natural mechanical variable)
+            eps: Strain symbol (conjugate mechanical variable)
+            Eps: Internal strain symbol(s) (natural internal variables)
+            Sig: Internal stress symbol(s) (conjugate internal variables)
+        """
+        # Store explicit variable attributes for type safety and clarity
+        self.T = T
+        self.S = S
+        self.sig = sig
+        self.eps = eps
+        self.Eps = Eps
+        self.Sig = Sig
+        
+        # Initialize base class with correct mapping: G(T, σ, Ɛ)
+        super().__init__(
+            fn_expr=fn_expr,
+            th_x_var=T,      # Temperature is natural
+            th_y_var=S,      # Entropy is conjugate
+            mc_x_var=sig,    # Stress is natural
+            mc_y_var=eps,    # Strain is conjugate
+            Eps_var=Eps,     # Internal strain (natural)
+            Sig_var=Sig,     # Internal stress (conjugate)
+            state_function_type=StateFunctionType.GIBBS
+        )
+
+
+class GSMEnthalpyFn(GSMStateFn):
+    """
+    Enthalpy state function: H(S, σ, Ɛ)
+    
+    Natural variables: S (entropy), sig (stress), Eps (internal strain)
+    Conjugate variables: T (temperature), eps (strain), Sig (internal stress)
+    
+    This subclass provides explicit variable attributes and establishes the
+    correct mapping to the general framework variables.
+    """
+    
+    def __init__(self,
+                 fn_expr: sp.Expr,
+                 S: sp.Symbol,         # Entropy (thermal natural)
+                 T: sp.Symbol,         # Temperature (thermal conjugate)
+                 sig: sp.Symbol,       # Stress (mechanical natural)
+                 eps: sp.Symbol,       # Strain (mechanical conjugate)
+                 Eps: Union[sp.Symbol, Tuple[sp.Symbol, ...]] = None,  # Internal natural
+                 Sig: Union[sp.Symbol, Tuple[sp.Symbol, ...]] = None): # Internal conjugate
+        """
+        Initialize enthalpy state function.
+        
+        Args:
+            fn_expr: Sympy expression H(S, σ, Ɛ)
+            S: Entropy symbol (natural thermal variable)
+            T: Temperature symbol (conjugate thermal variable)
+            sig: Stress symbol (natural mechanical variable)
+            eps: Strain symbol (conjugate mechanical variable)
+            Eps: Internal strain symbol(s) (natural internal variables)
+            Sig: Internal stress symbol(s) (conjugate internal variables)
+        """
+        # Store explicit variable attributes for type safety and clarity
+        self.S = S
+        self.T = T
+        self.sig = sig
+        self.eps = eps
+        self.Eps = Eps
+        self.Sig = Sig
+        
+        # Initialize base class with correct mapping: H(S, σ, Ɛ)
+        super().__init__(
+            fn_expr=fn_expr,
+            th_x_var=S,      # Entropy is natural
+            th_y_var=T,      # Temperature is conjugate
+            mc_x_var=sig,    # Stress is natural
+            mc_y_var=eps,    # Strain is conjugate
+            Eps_var=Eps,     # Internal strain (natural)
+            Sig_var=Sig,     # Internal stress (conjugate)
+            state_function_type=StateFunctionType.ENTHALPY
+        )
+
+
+class GSMInternalEnergyFn(GSMStateFn):
+    """
+    Internal Energy state function: U(S, ε, Ɛ)
+    
+    Natural variables: S (entropy), eps (strain), Eps (internal strain)
+    Conjugate variables: T (temperature), sig (stress), Sig (internal stress)
+    
+    This subclass provides explicit variable attributes and establishes the
+    correct mapping to the general framework variables.
+    """
+    
+    def __init__(self,
+                 fn_expr: sp.Expr,
+                 S: sp.Symbol,         # Entropy (thermal natural)
+                 T: sp.Symbol,         # Temperature (thermal conjugate)
+                 eps: sp.Symbol,       # Strain (mechanical natural)
+                 sig: sp.Symbol,       # Stress (mechanical conjugate)
+                 Eps: Union[sp.Symbol, Tuple[sp.Symbol, ...]] = None,  # Internal natural
+                 Sig: Union[sp.Symbol, Tuple[sp.Symbol, ...]] = None): # Internal conjugate
+        """
+        Initialize internal energy state function.
+        
+        Args:
+            fn_expr: Sympy expression U(S, ε, Ɛ)
+            S: Entropy symbol (natural thermal variable)
+            T: Temperature symbol (conjugate thermal variable)
+            eps: Strain symbol (natural mechanical variable)
+            sig: Stress symbol (conjugate mechanical variable)
+            Eps: Internal strain symbol(s) (natural internal variables)
+            Sig: Internal stress symbol(s) (conjugate internal variables)
+        """
+        # Store explicit variable attributes for type safety and clarity
+        self.S = S
+        self.T = T
+        self.eps = eps
+        self.sig = sig
+        self.Eps = Eps
+        self.Sig = Sig
+        
+        # Initialize base class with correct mapping: U(S, ε, Ɛ)
+        super().__init__(
+            fn_expr=fn_expr,
+            th_x_var=S,      # Entropy is natural
+            th_y_var=T,      # Temperature is conjugate
+            mc_x_var=eps,    # Strain is natural
+            mc_y_var=sig,    # Stress is conjugate
+            Eps_var=Eps,     # Internal strain (natural)
+            Sig_var=Sig,     # Internal stress (conjugate)
+            state_function_type=StateFunctionType.INTERNAL_ENERGY
+        )
